@@ -2,119 +2,164 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #333;
+  background: linear-gradient(135deg, #0f0f1e 0%, #1a1a2e 50%, #16213e 100%);
+  color: #e0e7ff;
+  position: relative;
+  overflow-x: hidden;
+}
+
+.container::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 20% 50%, rgba(102, 126, 234, 0.1) 0%, transparent 50%),
+              radial-gradient(circle at 80% 80%, rgba(118, 75, 162, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.container > * {
+  position: relative;
+  z-index: 1;
 }
 
 .header {
-  background: rgba(255, 255, 255, 0.95);
-  padding: 2rem;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.08) 100%);
+  backdrop-filter: blur(20px);
+  padding: 3rem 2rem;
   text-align: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid rgba(102, 126, 234, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 }
 
 .header h1 {
   margin: 0 0 0.5rem 0;
-  font-size: 2.5rem;
+  font-size: 2.8rem;
+  font-weight: 800;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  letter-spacing: -1px;
 }
 
 .header p {
   margin: 0;
-  color: #666;
-  font-size: 1.1rem;
+  color: #a0aec0;
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.5px;
 }
 
 .main {
   flex: 1;
-  padding: 2rem;
-  max-width: 600px;
+  padding: 2.5rem 2rem;
+  max-width: 700px;
   margin: 0 auto;
   width: 100%;
 }
 
 .error {
-  background: #fee;
-  border-left: 4px solid #f44;
-  padding: 1rem;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.05) 100%);
+  border-left: 4px solid #ef4444;
+  border-radius: 12px;
+  padding: 16px;
   margin-bottom: 1.5rem;
-  border-radius: 4px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: #c22;
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  backdrop-filter: blur(10px);
 }
 
+.error button {
 .error button {
   background: none;
   border: none;
   font-size: 1.5rem;
   cursor: pointer;
-  color: #c22;
+  color: #fca5a5;
   padding: 0;
   margin-left: 1rem;
+  transition: opacity 0.2s;
+}
+
+.error button:hover {
+  opacity: 0.8;
 }
 
 .resetButton {
   width: 100%;
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 700;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 10px;
   cursor: pointer;
-  margin-top: 1.5rem;
-  transition: transform 0.2s, box-shadow 0.2s;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .resetButton:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
 }
 
 .resetButton:active {
-  transform: translateY(0);
+  transform: translateY(-1px);
 }
 
 .chatButton {
   width: 100%;
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-  background: linear-gradient(135deg, #45b7d1 0%, #3498db 100%);
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 10px;
   cursor: pointer;
   margin-top: 1.5rem;
-  margin-bottom: 1rem;
-  transition: transform 0.2s, box-shadow 0.2s;
+  margin-bottom: 1.5rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .chatButton:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
 }
 
 .chatButton:active {
-  transform: translateY(0);
+  transform: translateY(-1px);
 }
 
 .footer {
-  background: rgba(255, 255, 255, 0.95);
-  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.05) 100%);
+  backdrop-filter: blur(20px);
+  padding: 2rem;
   text-align: center;
-  border-top: 1px solid #eee;
-  color: #666;
+  border-top: 1px solid rgba(102, 126, 234, 0.2);
+  color: #a0aec0;
   margin-top: auto;
 }
 
 .footer p {
   margin: 0;
   font-size: 0.9rem;
+  font-weight: 500;
 }
 
 @media (max-width: 640px) {
