@@ -1,23 +1,36 @@
-# Frontend Dockerfile for Phonox (Development)
-# Single stage for dev mode with hot reload
+# Frontend Dockerfile for Phonox
+# Multi-stage: builder → runtime
 
+# Build stage
+FROM node:20-alpine as builder
+
+WORKDIR /app
+
+COPY frontend/package.json frontend/package-lock.json ./
+
+RUN npm ci
+
+COPY frontend/ .
+
+# Runtime stage
 FROM node:20-alpine
 
 WORKDIR /app
 
-ENV VITE_API_URL=http://localhost:8000
+ENV VITE_API_URL=http://backend:8000
 
-# Copy package files
-COPY package.json package-lock.json ./
+# Copy dependencies from builder
+COPY --from=builder /app/node_modules ./node_modules
 
-# Install dependencies
-RUN npm ci --verbose
+# Copy application code
+COPY frontend/ .
 
-# Copy source code
-COPY . .
-
-# Expose Vite dev server port
+# Expose port
 EXPOSE 5173
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD wget -q -O- http://localhost:5173 || exit 1
 
 # Run Vite dev server with host binding
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

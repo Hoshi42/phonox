@@ -24,14 +24,13 @@ COPY --from=builder /root/.local /root/.local
 ENV PATH=/root/.local/bin:$PATH
 
 # Copy application code
-COPY . .
+COPY backend ./backend
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health', timeout=2)"
+# Copy database if it exists (optional)
+RUN touch /app/phonox.db || true
 
 # Expose port
 EXPOSE 8000
 
-# Run FastAPI app
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run uvicorn with reload for development
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
