@@ -76,6 +76,30 @@ export class ApiClient {
     return response.json()
   }
 
+  async chat(recordId: string, message: string, metadata?: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const response = await fetch(`${this.baseUrl}/api/v1/identify/${recordId}/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message,
+        metadata,
+      }),
+    })
+
+    if (!response.ok) {
+      try {
+        const error = (await response.json()) as ApiError
+        throw new Error(error.detail || 'Chat failed')
+      } catch {
+        throw new Error(`Chat failed: ${response.statusText}`)
+      }
+    }
+
+    return response.json()
+  }
+
   async getHealth(): Promise<Record<string, unknown>> {
     const response = await fetch(`${this.baseUrl}/health`)
     return response.json()
