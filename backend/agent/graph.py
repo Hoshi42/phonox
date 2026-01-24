@@ -167,7 +167,7 @@ def vision_extraction_node(state: VinylState) -> VinylState:
             "label": "Apple Records",
             "catalog_number": "PCS 7088",
             "genres": ["Rock", "Pop"],
-            "confidence": 0.75,
+            "confidence": 0.85,
         }
         
         logger.info(
@@ -188,6 +188,18 @@ def vision_extraction_node(state: VinylState) -> VinylState:
         }
 
     state["vision_extraction"] = vision_results
+
+    # Add vision results to evidence chain for confidence calculation
+    evidence_chain = state.get("evidence_chain", [])
+    evidence_chain.append(
+        Evidence(
+            source=EvidenceType.VISION,
+            data=vision_results,
+            confidence=vision_results.get("confidence", 0.0),  # type: ignore
+            timestamp=datetime.now(),
+        )
+    )
+    state["evidence_chain"] = evidence_chain
     return state
 
 
