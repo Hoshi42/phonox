@@ -22,8 +22,9 @@ export class ApiClient {
 
   async identify(files: File[]): Promise<{ id: string }> {
     const formData = new FormData()
-    files.forEach((file, index) => {
-      formData.append(`image_${index}`, file)
+    files.forEach((file) => {
+      // Use 'files' as the field name to match FastAPI's List[UploadFile] parameter
+      formData.append('files', file)
     })
 
     const response = await fetch(`${this.baseUrl}/api/v1/identify`, {
@@ -32,11 +33,17 @@ export class ApiClient {
     })
 
     if (!response.ok) {
-      const error = (await response.json()) as ApiError
-      throw new Error(error.detail || 'Upload failed')
+      try {
+        const error = (await response.json()) as ApiError
+        throw new Error(error.detail || 'Upload failed')
+      } catch (e) {
+        throw new Error(`Upload failed: ${response.statusText}`)
+      }
     }
 
-    return response.json()
+    const result = await response.json()
+    // Backend returns record_id, but we need id
+    return { id: result.record_id || result.id }
   }
 
   async getResult(recordId: string): Promise<Record<string, unknown>> {
