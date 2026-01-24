@@ -11,22 +11,16 @@ export class ApiClient {
 
   constructor(baseUrl?: string) {
     // Determine API URL based on environment:
-    // 1. Use provided baseUrl
-    // 2. Use VITE_API_URL environment variable (set by Docker)
-    // 3. Use Docker backend service name (works inside Docker)
-    // 4. Use localhost (works for local dev)
+    // The browser ALWAYS needs to use localhost (the Docker service name 'backend' is not resolvable from the browser)
     
     if (baseUrl) {
       this.baseUrl = baseUrl
     } else if (import.meta.env.VITE_API_URL) {
       this.baseUrl = import.meta.env.VITE_API_URL
-    } else if (typeof window !== 'undefined') {
-      // Inside Docker: use backend service name
-      // Outside Docker (localhost): use localhost:8000
-      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-      this.baseUrl = isLocalhost ? 'http://localhost:8000' : 'http://backend:8000'
     } else {
-      this.baseUrl = 'http://backend:8000'
+      // Always use localhost:8000 from the browser
+      // (Docker service name 'backend' only works inside the Docker network, not from the browser)
+      this.baseUrl = 'http://localhost:8000'
     }
     
     console.log('[API] ApiClient initialized with baseUrl:', this.baseUrl)
