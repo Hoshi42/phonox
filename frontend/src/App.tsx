@@ -119,11 +119,9 @@ function App() {
                 {record.needs_review && !record.auto_commit && (
                   <ReviewForm recordId={recordId || ''} onReview={handleReview} />
                 )}
-                {record.status === 'complete' && (
-                  <button onClick={() => setShowChat(true)} className={styles.chatButton}>
-                    💬 Refine With Chat
-                  </button>
-                )}
+                <button onClick={() => setShowChat(true)} className={styles.chatButton}>
+                  💬 Refine With Chat
+                </button>
               </>
             ) : (
               <ChatPanel
