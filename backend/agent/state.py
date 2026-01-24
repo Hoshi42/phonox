@@ -5,8 +5,19 @@ Defines the data structures used throughout the LangGraph agent workflow.
 Uses TypedDict for type safety and static analysis support.
 """
 
-from typing import TypedDict, Optional, List
+from typing import TypedDict, Optional, List, Literal
 from datetime import datetime
+from enum import Enum
+
+
+class EvidenceType(str, Enum):
+    """Types of evidence sources for vinyl record identification."""
+    DISCOGS = "discogs"
+    MUSICBRAINZ = "musicbrainz"
+    IMAGE = "image"
+    VISION = "vision"  # Claude 3 multimodal analysis
+    WEBSEARCH = "websearch"  # Tavily web search
+    USER_INPUT = "user_input"
 
 
 class Evidence(TypedDict):
@@ -14,12 +25,12 @@ class Evidence(TypedDict):
     Single piece of evidence about a vinyl record.
     
     Attributes:
-        source: Origin of this evidence ("discogs", "musicbrainz", "image", "vision", "websearch")
+        source: Origin of this evidence (EvidenceType enum)
         confidence: Numeric confidence score (0.0 to 1.0)
         data: Raw tool response or extracted features
         timestamp: When this evidence was collected
     """
-    source: str  # "discogs", "musicbrainz", "image", "vision", "websearch", "user_input"
+    source: str  # EvidenceType value: "discogs", "musicbrainz", "image", "vision", "websearch", "user_input"
     confidence: float  # Range: [0.0, 1.0]
     data: dict  # Tool-specific response format
     timestamp: datetime
@@ -52,29 +63,49 @@ class VinylMetadata(TypedDict):
     overall_confidence: float  # Weighted average of evidence confidences
 
 
-class VinylState(TypedDict):
+class VinylState(TypedDict, total=False):
     """
     Complete state of a vinyl record processing workflow.
     
     This is the main state object passed through the LangGraph agent.
     Each node in the graph reads and writes to this state.
     
-    Attributes:
-        images: List of base64-encoded images or file paths
-        metadata: Extracted/looked-up metadata (None if processing)
-        evidence_chain: Complete history of all evidence collected
-        status: Processing status ("pending", "processing", "complete", "failed")
-        error: Error message if status is "failed"
-        vision_extraction: Claude 3 multimodal analysis output (NEW)
-        websearch_results: Tavily web search results (NEW)
+    Phase 1.1 node interfaces expect these fields:
+    - images: Input images for processing
+    - image_features: Extracted features (embeddings, colors, OCR)
+    - vision_extraction: Claude 3 multimodal analysis output
+    - evidence_chain: Chain of evidence collected
+    - websearch_results: Tavily web search results
+    - confidence: Overall confidence score (0.0-1.0)
+    - auto_commit: Boolean flag for auto-approval
+    - needs_review: Boolean flag for manual review
+    - validation_passed: Image validation result
+    - validation_errors: List of validation errors
     """
-    images: List[str]  # Base64 strings or file paths
-    metadata: Optional[VinylMetadata]  # None until processing completes
-    evidence_chain: List[Evidence]  # Append-only list
-    status: str  # "pending" | "processing" | "complete" | "failed"
-    error: Optional[str]  # Only set if status == "failed"
-    vision_extraction: Optional[dict]  # Claude 3 vision output (NEW)
-    websearch_results: Optional[List[dict]]  # Tavily results (NEW)
+    # Input
+    images: List[dict]  # List of image dicts: {format, size_bytes}
+    
+    # Processing
+    image_features: dict  # {embeddings, colors, ocr_text}
+    vision_extraction: dict  # Claude 3 output: {artist, title, year, label, catalog_number, genres, confidence}
+    websearch_results: List[dict]  # Tavily search results
+    
+    # Evidence & Scoring
+    evidence_chain: List[Evidence]  # Append-only history of evidence
+    confidence: float  # Overall confidence (0.0-1.0)
+    
+    # Routing
+    auto_commit: bool  # If confidence >= 0.85
+    needs_review: bool  # If confidence < 0.85
+    
+    # Validation
+    validation_passed: bool
+    validation_errors: List[str]
+    
+    # Legacy fields (kept for backward compatibility)
+    metadata: Optional[VinylMetadata]
+    status: str
+    error: Optional[str]
 
 
 # Confidence scoring weights (must sum to 1.0)
