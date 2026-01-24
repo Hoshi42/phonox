@@ -57,18 +57,25 @@
 .mainWrapper {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 350px;
+  grid-template-columns: 1fr;
   gap: 2rem;
   padding: 2.5rem 2rem;
-  max-width: 1400px;
+  max-width: 700px;
   margin: 0 auto;
   width: 100%;
   overflow-y: auto;
 }
 
+/* Two-column layout when chat is present */
+.mainWrapper:has(.chatSidebar) {
+  max-width: 1400px;
+  grid-template-columns: 1fr 350px;
+}
+
 @media (max-width: 1024px) {
-  .mainWrapper {
+  .mainWrapper:has(.chatSidebar) {
     grid-template-columns: 1fr;
+    max-width: 700px;
   }
 
   .chatSidebar {
