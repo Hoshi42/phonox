@@ -7,7 +7,7 @@ from typing import Dict, Any
 
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 
 from backend.database import Base, VinylRecord, get_db
@@ -94,7 +94,7 @@ async def health_check(db: Session = Depends(override_get_db)) -> HealthCheckRes
 
     # Check database connectivity
     try:
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         dependencies["database"] = "connected"
     except Exception as e:
         logger.error(f"Database check failed: {e}")
