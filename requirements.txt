@@ -3,6 +3,11 @@ langchain>=0.1.0
 langgraph>=0.0.40
 pydantic>=2.0.0
 
+# FastAPI & Web
+fastapi>=0.100.0
+uvicorn>=0.23.0
+sqlalchemy>=2.0.0
+
 # LLM & AI APIs
 anthropic>=0.7.0
 tavily-python>=0.3.0
