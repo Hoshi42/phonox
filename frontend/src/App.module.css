@@ -57,23 +57,17 @@
 .mainWrapper {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 350px;
   gap: 2rem;
   padding: 2.5rem 2rem;
-  max-width: 700px;
+  max-width: 1400px;
   margin: 0 auto;
   width: 100%;
   overflow-y: auto;
 }
 
-/* Two-column layout when chat is present */
-.mainWrapper:has(.chatSidebar) {
-  max-width: 1400px;
-  grid-template-columns: 1fr 350px;
-}
-
 @media (max-width: 1024px) {
-  .mainWrapper:has(.chatSidebar) {
+  .mainWrapper {
     grid-template-columns: 1fr;
     max-width: 700px;
   }
@@ -178,6 +172,40 @@
   top: 2.5rem;
   height: fit-content;
   max-height: calc(100vh - 300px);
+}
+
+.chatPlaceholder {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.05) 100%);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  color: #a0aec0;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.chatPlaceholder h2 {
+  margin: 0 0 1rem 0;
+  color: #e0e7ff;
+  font-size: 1.5rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.chatPlaceholder p {
+  margin: 0;
+  color: #a0aec0;
+  font-size: 0.95rem;
+  line-height: 1.5;
 }
 
 .footer {

@@ -125,8 +125,8 @@ function App() {
           )}
         </main>
 
-        {recordId && record && (
-          <aside className={styles.chatSidebar}>
+        <aside className={styles.chatSidebar}>
+          {recordId && record ? (
             <ChatPanel
               recordId={recordId}
               currentMetadata={{
@@ -154,8 +154,13 @@ function App() {
               }}
               onClose={undefined}
             />
-          </aside>
-        )}
+          ) : (
+            <div className={styles.chatPlaceholder}>
+              <h2>Chat</h2>
+              <p>Upload a vinyl record image to start chatting about it</p>
+            </div>
+          )}
+        </aside>
       </div>
 
       <footer className={styles.footer}>
