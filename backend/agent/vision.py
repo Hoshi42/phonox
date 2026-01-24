@@ -192,7 +192,9 @@ Do NOT include any text outside the JSON object. If you cannot read the cover cl
             raise VisionExtractionError(f"Invalid response format: {e}") from e
 
     except Exception as e:
-        logger.error(f"Vision extraction failed: {e}")
+        logger.error(f"Vision extraction failed: {type(e).__name__}: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
 
         if fallback_on_error:
             logger.warning("Falling back to mock data...")
