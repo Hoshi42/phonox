@@ -121,28 +121,36 @@ See [Collaboration Instructions](.github/agents/instructions.md) for detailed wo
 
 ## Key Features
 
-### Phase 1: Core Agent
+### Phase 1: Core Agent ✅
 - ✅ Typed state models (VinylState, Evidence)
-- ✅ LangGraph workflow orchestration
+- ✅ LangGraph workflow orchestration (6 nodes)
 - ✅ Confidence-based decision gates (≥0.85 auto-commit)
-- ✅ Fallback chains (Discogs → MusicBrainz → Image Match → Manual)
+- ✅ Fallback chains (Discogs → MusicBrainz → Vision → Websearch)
+- ✅ 134 unit + integration tests passing
 
-### Phase 2-3: Tools & Backend
-- 🚧 Discogs API integration (barcode + fuzzy lookup)
-- 🚧 MusicBrainz integration
-- 🚧 Image feature extraction (ViT-base embeddings)
-- 🚧 FastAPI endpoints with database persistence
+### Phase 2-3: FastAPI Backend & Database ✅
+- ✅ FastAPI with CORS, health checks, lifespan management
+- ✅ SQLAlchemy ORM with VinylRecord model (18 columns)
+- ✅ Database persistence for metadata, evidence chain, confidence
+- ✅ 3 RESTful endpoints: /identify, /identify/{id}, /identify/{id}/review
+- ✅ 18 API integration tests passing
+- ✅ mypy type-safe (0 errors)
 
-### Phase 4: Frontend
-- 🚧 Mobile-first PWA
-- 🚧 Camera capture (2+ images required)
-- 🚧 Real-time result display + manual review UI
-- 🚧 Offline capability via service workers
+### Phase 4: Frontend PWA ✅
+- ✅ React 18 + TypeScript + Vite with HMR
+- ✅ Image upload component (drag-and-drop, 1-5 images)
+- ✅ Results display with confidence scoring
+- ✅ Manual review/correction form for low-confidence records
+- ✅ Service worker for offline caching and PWA installation
+- ✅ Mobile-responsive design (desktop, tablet, mobile)
+- ✅ Playwright E2E test suite (13 tests)
+- ✅ Real-time result polling
 
-### Phase 5: Production
-- 🚧 Error handling & edge cases
-- 🚧 Performance optimization
-- 🚧 Monitoring & alerting
+### Phase 5: Production Ready (Next)
+- 🔄 Error handling & edge cases
+- 🔄 Performance optimization
+- 🔄 Monitoring & alerting
+
 
 ---
 
