@@ -21,6 +21,8 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from backend.agent.state import VinylState, Evidence, EvidenceType
 from backend.agent.vision import extract_vinyl_metadata
+from backend.agent.metadata import lookup_metadata_from_both
+from backend.agent.websearch import search_vinyl_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -203,39 +205,61 @@ def lookup_metadata_node(state: VinylState) -> VinylState:
     """
     evidence_chain = state.get("evidence_chain", [])
 
-    # Stub: Mock Discogs result
-    discogs_evidence: Evidence = {
-        "source": EvidenceType.DISCOGS,
-        "confidence": 0.85,
-        "data": {
-            "artist": "The Beatles",
-            "title": "Abbey Road",
-            "year": 1969,
-            "label": "Apple Records",
-            "catalog_number": "PCS 7088",
-        },
-        "timestamp": datetime.now(),
-    }
+    # Get artist + title from vision extraction
+    vision_data = state.get("vision_extraction", {})
+    artist = vision_data.get("artist", "")
+    title = vision_data.get("title", "")
 
-    evidence_chain.append(discogs_evidence)
+    if not artist or not title:
+        logger.warning("lookup_metadata: Insufficient data for metadata lookup")
+        return state
 
-    # Stub: Mock MusicBrainz result
-    musicbrainz_evidence: Evidence = {
-        "source": EvidenceType.MUSICBRAINZ,
-        "confidence": 0.80,
-        "data": {
-            "artist": "The Beatles",
-            "title": "Abbey Road",
-            "year": 1969,
-            "release_group_id": "mock-id",
-        },
-        "timestamp": datetime.now(),
-    }
+    try:
+        # Query both Discogs and MusicBrainz
+        discogs_result, musicbrainz_result = lookup_metadata_from_both(artist, title)
 
-    evidence_chain.append(musicbrainz_evidence)
+        # Add Discogs evidence if found
+        if discogs_result:
+            discogs_evidence: Evidence = {
+                "source": EvidenceType.DISCOGS,
+                "confidence": discogs_result.get("confidence", 0.85),
+                "data": {
+                    "artist": discogs_result.get("artist"),
+                    "title": discogs_result.get("title"),
+                    "year": discogs_result.get("year"),
+                    "label": discogs_result.get("label"),
+                    "catalog_number": discogs_result.get("catalog_number"),
+                    "genres": discogs_result.get("genres", []),
+                },
+                "timestamp": datetime.now(),
+            }
+            evidence_chain.append(discogs_evidence)
+            logger.info(f"lookup_metadata: Added Discogs evidence for {artist} - {title}")
+
+        # Add MusicBrainz evidence if found
+        if musicbrainz_result:
+            musicbrainz_evidence: Evidence = {
+                "source": EvidenceType.MUSICBRAINZ,
+                "confidence": musicbrainz_result.get("confidence", 0.80),
+                "data": {
+                    "artist": musicbrainz_result.get("artist"),
+                    "title": musicbrainz_result.get("title"),
+                    "year": musicbrainz_result.get("year"),
+                    "label": musicbrainz_result.get("label"),
+                    "catalog_number": musicbrainz_result.get("catalog_number"),
+                    "genres": musicbrainz_result.get("genres", []),
+                },
+                "timestamp": datetime.now(),
+            }
+            evidence_chain.append(musicbrainz_evidence)
+            logger.info(f"lookup_metadata: Added MusicBrainz evidence for {artist} - {title}")
+
+    except Exception as e:
+        logger.error(f"lookup_metadata: Error querying metadata APIs: {e}")
 
     state["evidence_chain"] = evidence_chain
-    logger.info(f"lookup_metadata: Added {len(evidence_chain)} evidence sources")
+
+    return state
 
     return state
 
@@ -260,10 +284,6 @@ def websearch_fallback_node(state: VinylState) -> VinylState:
         logger.info(f"websearch_fallback: Skipping (confidence {current_confidence:.2f} >= 0.75)")
         return state
 
-    from tavily import TavilyClient
-
-    client = TavilyClient()
-
     # Get artist + title from vision or metadata for search query
     vision_data = state.get("vision_extraction", {})
     artist = vision_data.get("artist", "")
@@ -273,34 +293,36 @@ def websearch_fallback_node(state: VinylState) -> VinylState:
         logger.warning("websearch_fallback: Insufficient data for websearch query")
         return state
 
-    # Stub: Mock websearch result
-    # In production, this would call Tavily API
-    websearch_results = [
-        {
-            "title": f"{artist} - {title} (Discogs)",
-            "url": "https://www.discogs.com/mock",
-            "snippet": "Album information from Discogs",
-            "relevance": 0.90,
+    try:
+        # Search using Tavily API
+        websearch_results = search_vinyl_metadata(artist, title, fallback_on_error=True)
+
+        if not websearch_results:
+            logger.warning(f"websearch_fallback: No results for {artist} - {title}")
+            return state
+
+        state["websearch_results"] = websearch_results
+
+        # Add websearch evidence
+        evidence_chain = state.get("evidence_chain", [])
+        websearch_evidence: Evidence = {
+            "source": EvidenceType.WEBSEARCH,
+            "confidence": 0.50,  # Websearch is less reliable than direct API calls
+            "data": {
+                "query": f"{artist} {title}",
+                "top_result": websearch_results[0] if websearch_results else None,
+                "results_count": len(websearch_results),
+            },
+            "timestamp": datetime.now(),
         }
-    ]
+        evidence_chain.append(websearch_evidence)
+        state["evidence_chain"] = evidence_chain
 
-    state["websearch_results"] = websearch_results
+        logger.info(f"websearch_fallback: Found {len(websearch_results)} results for {artist} - {title}")
 
-    # Add websearch evidence
-    evidence_chain = state.get("evidence_chain", [])
-    websearch_evidence: Evidence = {
-        "source": EvidenceType.WEBSEARCH,
-        "confidence": 0.10,
-        "data": {
-            "query": f"{artist} {title}",
-            "top_result": websearch_results[0] if websearch_results else None,
-        },
-        "timestamp": datetime.now(),
-    }
-    evidence_chain.append(websearch_evidence)
-    state["evidence_chain"] = evidence_chain
-
-    logger.info(f"websearch_fallback: Found {len(websearch_results)} results")
+    except Exception as e:
+        logger.error(f"websearch_fallback: Error during websearch: {e}")
+        # Continue with existing evidence even if websearch fails
 
     return state
 

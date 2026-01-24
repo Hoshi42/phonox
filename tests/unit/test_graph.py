@@ -187,26 +187,91 @@ def test_vision_extraction_success(valid_images_state):
 
 def test_lookup_metadata_adds_evidence(empty_state):
     """Test lookup_metadata adds Discogs and MusicBrainz evidence."""
-    result = lookup_metadata_node(empty_state)
+    from unittest.mock import patch
+    
+    # Add vision extraction data
+    empty_state["vision_extraction"] = {
+        "artist": "The Beatles",
+        "title": "Abbey Road",
+        "year": 1969,
+        "label": "Apple Records",
+        "catalog_number": "PCS 7088",
+        "genres": ["Rock"],
+        "confidence": 0.75,
+    }
+    empty_state["evidence_chain"] = []  # Start with empty chain
+    
+    with patch("backend.agent.graph.lookup_metadata_from_both") as mock_lookup:
+        mock_lookup.return_value = (
+            {
+                "artist": "The Beatles",
+                "title": "Abbey Road",
+                "year": 1969,
+                "label": "Apple Records",
+                "catalog_number": "PCS 7088",
+                "genres": ["Rock"],
+                "confidence": 0.85,
+            },
+            {
+                "artist": "The Beatles",
+                "title": "Abbey Road",
+                "year": 1969,
+                "label": "Apple Records",
+                "catalog_number": "PCS 7088",
+                "genres": ["Rock"],
+                "confidence": 0.80,
+            },
+        )
+        
+        result = lookup_metadata_node(empty_state)
 
-    assert len(result["evidence_chain"]) == 2
-    assert result["evidence_chain"][0]["source"] == EvidenceType.DISCOGS
-    assert result["evidence_chain"][1]["source"] == EvidenceType.MUSICBRAINZ
+        assert len(result["evidence_chain"]) == 2
+        assert result["evidence_chain"][0]["source"] == EvidenceType.DISCOGS
+        assert result["evidence_chain"][1]["source"] == EvidenceType.MUSICBRAINZ
 
 
 def test_lookup_metadata_evidence_structure(empty_state):
     """Test evidence has correct structure."""
-    result = lookup_metadata_node(empty_state)
+    from unittest.mock import patch
+    
+    empty_state["vision_extraction"] = {
+        "artist": "Test Artist",
+        "title": "Test Album",
+        "year": 2020,
+        "label": "Test Label",
+        "catalog_number": "TEST001",
+        "genres": ["Rock"],
+        "confidence": 0.75,
+    }
+    empty_state["evidence_chain"] = []
+    
+    with patch("backend.agent.graph.lookup_metadata_from_both") as mock_lookup:
+        mock_lookup.return_value = (
+            {
+                "artist": "Test Artist",
+                "title": "Test Album",
+                "year": 2020,
+                "label": "Test Label",
+                "catalog_number": "TEST001",
+                "genres": ["Rock"],
+                "confidence": 0.85,
+            },
+            None,
+        )
+        
+        result = lookup_metadata_node(empty_state)
 
-    for evidence in result["evidence_chain"]:
-        assert "source" in evidence
-        assert "confidence" in evidence
-        assert "data" in evidence
-        assert evidence["confidence"] > 0
+        for evidence in result["evidence_chain"]:
+            assert "source" in evidence
+            assert "confidence" in evidence
+            assert "data" in evidence
+            assert evidence["confidence"] > 0
 
 
 def test_lookup_metadata_preserves_existing_chain(empty_state):
     """Test lookup_metadata appends to existing chain."""
+    from unittest.mock import patch
+    
     existing_evidence: Evidence = {
         "source": EvidenceType.IMAGE,
         "confidence": 0.5,
@@ -214,10 +279,41 @@ def test_lookup_metadata_preserves_existing_chain(empty_state):
         "timestamp": datetime.now(),
     }
     empty_state["evidence_chain"] = [existing_evidence]
+    empty_state["vision_extraction"] = {
+        "artist": "Test Artist",
+        "title": "Test Album",
+        "year": 2020,
+        "label": "Test Label",
+        "catalog_number": "TEST001",
+        "genres": ["Rock"],
+        "confidence": 0.75,
+    }
 
-    result = lookup_metadata_node(empty_state)
+    with patch("backend.agent.graph.lookup_metadata_from_both") as mock_lookup:
+        mock_lookup.return_value = (
+            {
+                "artist": "Test Artist",
+                "title": "Test Album",
+                "year": 2020,
+                "label": "Test Label",
+                "catalog_number": "TEST001",
+                "genres": ["Rock"],
+                "confidence": 0.85,
+            },
+            {
+                "artist": "Test Artist",
+                "title": "Test Album",
+                "year": 2020,
+                "label": "Test Label",
+                "catalog_number": "TEST001",
+                "genres": ["Rock"],
+                "confidence": 0.80,
+            },
+        )
+        
+        result = lookup_metadata_node(empty_state)
 
-    assert len(result["evidence_chain"]) == 3  # 1 existing + 2 new
+        assert len(result["evidence_chain"]) == 3  # 1 existing + 2 new
 
 
 # ============================================================================
