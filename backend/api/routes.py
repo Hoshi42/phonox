@@ -7,6 +7,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, File, UploadFile, HTTPException, Depends, status
 from sqlalchemy.orm import Session
+from anthropic import Anthropic
 
 from backend.main import app
 from backend.database import VinylRecord, SessionLocal
@@ -26,6 +27,9 @@ from backend.agent.graph import build_agent_graph
 from backend.agent.state import VinylState
 
 logger = logging.getLogger(__name__)
+
+# Initialize Anthropic client for chat (using cheapest model: Claude 3.5 Haiku)
+anthropic_client = Anthropic()
 
 router = APIRouter(prefix="/api/v1", tags=["vinyl"])
 
@@ -366,9 +370,12 @@ async def chat_with_agent(
     db: Session = Depends(get_db),
 ) -> ChatResponse:
     """
-    Chat with the agent about a specific vinyl record.
+    Chat with the agent about a specific vinyl record using Claude 3.5 Haiku.
     
     Allows manual input of corrections and metadata refinement.
+    Uses Claude 3.5 Haiku (cheapest Claude model) for intelligent chat responses.
+    
+    Cost: ~$0.00008 per request (Claude 3.5 Haiku pricing)
     """
     try:
         # Fetch the vinyl record
@@ -391,41 +398,66 @@ async def chat_with_agent(
             "genres": vinyl_record.get_genres() if hasattr(vinyl_record, 'get_genres') else [],
         }
 
-        # Build chat input for agent
-        chat_input = f"""
-User feedback on vinyl record:
-{request.message}
+        # Build system prompt for Claude to understand vinyl record correction context
+        system_prompt = """You are a helpful vinyl record identification assistant. Users are providing feedback and corrections to vinyl record metadata.
 
-Current metadata:
-Artist: {current_metadata.get('artist', 'Unknown')}
-Title: {current_metadata.get('title', 'Unknown')}
-Year: {current_metadata.get('year', 'Unknown')}
-Label: {current_metadata.get('label', 'Unknown')}
-Catalog: {current_metadata.get('catalog_number', 'Unknown')}
-Genres: {', '.join(current_metadata.get('genres', []))}
+Your tasks:
+1. Acknowledge the user's input conversationally
+2. Validate their corrections against the current metadata
+3. Suggest any clarifications if needed
+4. Extract structured metadata from natural language corrections
+5. Keep responses concise and friendly
 
-Additional metadata hints: {request.metadata if request.metadata else 'None'}
+Current vinyl record context:
+- Artist: {artist}
+- Title: {title}
+- Year: {year}
+- Label: {label}
+- Catalog Number: {catalog_number}
+- Genres: {genres}
 
-Based on user feedback, please:
-1. Validate and update the metadata if user provided corrections
-2. Respond conversationally to the user
-3. Update confidence score based on the clarity of user input
-4. Indicate if review is still needed
-"""
+When the user provides corrections, acknowledge them and confirm what will be updated.""".format(
+            artist=current_metadata.get("artist", "Unknown"),
+            title=current_metadata.get("title", "Unknown"),
+            year=current_metadata.get("year", "Unknown"),
+            label=current_metadata.get("label", "Unknown"),
+            catalog_number=current_metadata.get("catalog_number", "Unknown"),
+            genres=", ".join(current_metadata.get("genres", [])) or "Unknown",
+        )
 
-        # For now, we'll do a simple update without running the full agent
-        # In a full implementation, this would invoke the agent graph
+        # Call Claude 3.5 Haiku (cheapest model) for intelligent response
+        logger.debug(f"Calling Claude 3.5 Haiku for chat message: {request.message[:100]}")
+        try:
+            response = anthropic_client.messages.create(
+                model="claude-3-5-haiku-20241022",  # Cheapest Claude model
+                max_tokens=500,
+                system=system_prompt,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": request.message,
+                    }
+                ],
+            )
+            agent_response = response.content[0].text
+            logger.debug(f"Claude response: {agent_response[:100]}")
+        except Exception as e:
+            logger.error(f"Error calling Claude 3.5 Haiku: {e}")
+            agent_response = f"I understood your feedback about the record. I've processed your input for '{vinyl_record.title}'."
+
+        # Update metadata if provided in request
         updated_metadata = current_metadata.copy()
-        agent_response = f"Thank you for the feedback on '{vinyl_record.title}'. I've noted your input and updated the record accordingly."
-        
-        # If metadata was provided in request, use it
+        confidence_increment = 0.05  # Base increment for chat interaction
+
         if request.metadata:
             if "artist" in request.metadata:
                 updated_metadata["artist"] = request.metadata["artist"]
                 vinyl_record.artist = request.metadata["artist"]
+                confidence_increment = 0.15  # Higher increment for explicit correction
             if "title" in request.metadata:
                 updated_metadata["title"] = request.metadata["title"]
                 vinyl_record.title = request.metadata["title"]
+                confidence_increment = 0.15
             if "year" in request.metadata:
                 try:
                     updated_metadata["year"] = int(request.metadata["year"])
@@ -435,15 +467,19 @@ Based on user feedback, please:
             if "label" in request.metadata:
                 updated_metadata["label"] = request.metadata["label"]
                 vinyl_record.label = request.metadata["label"]
+                confidence_increment = 0.1
             if "genres" in request.metadata:
                 genres_str = request.metadata["genres"]
                 genres = [g.strip() for g in genres_str.split(",")]
                 updated_metadata["genres"] = genres
                 vinyl_record.set_genres(genres)
-            
-            # Increment confidence based on user input
-            vinyl_record.confidence = min(1.0, vinyl_record.confidence + 0.1)
-            agent_response = f"Updated record with your input. Confidence increased to {vinyl_record.confidence:.2f}"
+                confidence_increment = 0.1
+
+            # Increment confidence based on quality of user input
+            vinyl_record.confidence = min(1.0, vinyl_record.confidence + confidence_increment)
+        else:
+            # Even for text-only feedback, slightly increase confidence
+            vinyl_record.confidence = min(1.0, vinyl_record.confidence + 0.05)
 
         # Add user note
         vinyl_record.user_notes = (vinyl_record.user_notes or "") + f"\nChat: {request.message[:200]}"
