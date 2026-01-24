@@ -1,0 +1,88 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: phonox_postgres
+    environment:
+      POSTGRES_USER: phonox
+      POSTGRES_PASSWORD: phonox_dev
+      POSTGRES_DB: phonox
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U phonox"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - phonox_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: phonox_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - phonox_network
+    command: redis-server --appendonly yes
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: phonox_backend
+    ports:
+      - "8000:8000"
+    environment:
+      PYTHONUNBUFFERED: "1"
+      DB_URL: postgresql://phonox:phonox_dev@postgres:5432/phonox
+      REDIS_URL: redis://redis:6379
+      LOG_LEVEL: INFO
+      LLM_PROVIDER: openai
+      ENVIRONMENT: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app/backend
+    networks:
+      - phonox_network
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+    container_name: phonox_frontend
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:8000
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - phonox_network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  phonox_network:
+    driver: bridge

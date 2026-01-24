@@ -1,0 +1,62 @@
+# Auto detect text files and normalize line endings to LF
+* text=auto
+
+# Shell scripts
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Python
+*.py text eol=lf
+*.pyw text eol=lf
+*.pyx text eol=lf
+*.pyi text eol=lf
+*.txt text eol=lf
+
+# Frontend
+*.js text eol=lf
+*.jsx text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.json text eol=lf
+*.css text eol=lf
+*.scss text eol=lf
+*.less text eol=lf
+*.html text eol=lf
+*.htm text eol=lf
+
+# Markdown
+*.md text eol=lf
+*.markdown text eol=lf
+
+# Yaml/Config
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.ini text eol=lf
+*.conf text eol=lf
+
+# Git
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# Documentation
+*.rst text eol=lf
+*.adoc text eol=lf
+*.asciidoc text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mov binary
+*.mp4 binary
+*.mp3 binary
+*.gz binary
+*.zip binary
+*.7z binary
+*.ttf binary
+*.otf binary
+*.db binary
+*.sqlite binary
