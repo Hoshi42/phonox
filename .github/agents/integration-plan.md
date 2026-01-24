@@ -77,21 +77,32 @@ We group iterations into **increments** that are deployable units.
 
 ---
 
-### Increment 1: Core Agent (Weeks 2-3)
+### Increment 1: Core Agent with Multimodal Vision/Websearch (Weeks 2-3)
 **Iterations**: 1.1, 1.2, 1.3  
-**Deliverable**: LangGraph workflows with confidence gates  
+**Deliverable**: LangGraph workflows with 6-node architecture including multimodal vision and websearch fallback  
 **What Works**:
-- Agent graph compiles
+- Agent graph compiles with 6 nodes (validate_images, extract_features, vision_extraction, lookup_metadata, websearch_fallback, confidence_gate)
 - All nodes callable with valid state
 - State transitions tested
-- Confidence calculation verified
-- Fallback logic proven
+- 4-way confidence calculation verified (discogs 0.45, musicbrainz 0.25, vision 0.20, websearch 0.10)
+- Vision extraction (Claude 3 Sonnet) tested with mock API
+- Websearch fallback (Tavily API) tested with mock API
+- Fallback logic proven (websearch triggers when confidence < 0.75)
 
 **Integration Gate**:
 - [ ] Agent graph loads: `from backend.agent.graph import build_agent_graph; g = build_agent_graph()`
-- [ ] All nodes pass signature tests
-- [ ] Integration test: mock end-to-end flow works
-- [ ] Confidence ranges verified (0.50, 0.70, 0.85, 0.90)
+- [ ] All 6 nodes pass signature tests (validate_images, extract_features, vision_extraction, lookup_metadata, websearch_fallback, confidence_gate)
+- [ ] Integration test: mock end-to-end flow works with all 6 nodes
+- [ ] Vision extraction node returns proper metadata dict with 0.20 confidence weight
+- [ ] Websearch fallback node triggers correctly (confidence < 0.75)
+- [ ] Confidence ranges verified:
+  - Minimum (websearch alone): 0.10
+  - Single source (vision): 0.20
+  - Two sources (vision + musicbrainz): 0.45
+  - Three sources (all primary): 0.90
+  - Fallback scenario (websearch after failure): 0.75+
+  - Perfect match (all sources): 0.95+
+- [ ] Evidence sources include all four: "discogs", "musicbrainz", "vision", "websearch"
 - [ ] All 3 iterations marked COMPLETED
 
 **Deploy Check**: Merge to main, tag as v0.1.0-alpha

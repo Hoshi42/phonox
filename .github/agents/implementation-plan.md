@@ -187,9 +187,21 @@ class VinylState(TypedDict):
 
 ---
 
-### PHASE 1: Core Agent
+### PHASE 1: Core Agent + Multimodal Vision/Websearch
 
-#### Iteration 1.1: LangGraph Graph Implementation
+**Overview**: Build LangGraph workflows with 6-node agent architecture including multimodal vision analysis (Claude 3) and fallback websearch (Tavily). Confidence weighting updated to 4-way system.
+
+**Capability Additions**:
+- Vision extraction from album artwork (Claude 3 Sonnet)
+- Websearch fallback when primary sources unavailable (Tavily API)
+- 4-way confidence scoring (discogs 0.45, musicbrainz 0.25, vision 0.20, websearch 0.10)
+
+**Timeline Adjustment**: 
+- Original: 2-3 days per iteration, ~6-7 days total
+- Revised: 3-4 days (1.1), 2.5 days (1.2), 2.5 days (1.3) = ~8-9 days total
+- Impact: Phase 2 start shifts from Week 3 end to Week 3 late / Week 4 early
+
+---
 **Status**: NOT STARTED  
 **Deliverables**:
 - [ ] `backend/agent/graph.py` – StateGraph builder
@@ -205,13 +217,32 @@ from backend.agent.state import VinylState
 def build_agent_graph():
     graph = StateGraph(VinylState)
     
+    # Core image validation and feature extraction
     graph.add_node("validate_images", validate_images_node)
     graph.add_node("extract_features", extract_features_node)
+    
+    # Multimodal vision analysis (Claude 3 Sonnet)
+    graph.add_node("vision_extraction", vision_extraction_node)
+    
+    # Metadata lookup (Discogs, MusicBrainz)
     graph.add_node("lookup_metadata", lookup_metadata_node)
+    
+    # Websearch fallback (Tavily API)
+    graph.add_node("websearch_fallback", websearch_fallback_node)
+    
+    # Confidence scoring and routing
     graph.add_node("confidence_gate", confidence_gate_node)
     
     # Edges and routing
     graph.add_edge("START", "validate_images")
+    graph.add_edge("validate_images", "extract_features")
+    graph.add_edge("extract_features", "vision_extraction")
+    graph.add_edge("vision_extraction", "lookup_metadata")
+    graph.add_conditional_edges(
+        "lookup_metadata",
+        lambda state: "confidence_gate" if state["confidence"] >= 0.70 else "websearch_fallback"
+    )
+    graph.add_edge("websearch_fallback", "confidence_gate")
     graph.add_conditional_edges(
         "confidence_gate",
         lambda state: "auto_commit" if state["auto_commit"] else "needs_review"
@@ -222,12 +253,22 @@ def build_agent_graph():
 
 **Acceptance Criteria**:
 - Graph compiles without errors
-- All nodes callable with VinylState input
+- All 6 nodes callable with VinylState input
 - Edge routing tested with mock states
-- Error handling for missing fields
+- vision_extraction node signature matches Claude 3 input/output contract
+- websearch_fallback node signature matches Tavily API contract
+- Error handling for missing fields and API failures
+
+**External Dependencies**:
+- `anthropic>=0.3.0` (Claude 3 Sonnet for vision_extraction)
+- `tavily-python>=0.3.0` (Tavily API for websearch_fallback)
+
+**Environment Variables**:
+- `ANTHROPIC_API_KEY` (required for vision_extraction node)
+- `TAVILY_API_KEY` (required for websearch_fallback node)
 
 **Dependencies**: 0.2, 0.3  
-**Timeline**: 2-3 days  
+**Timeline**: 3-4 days (increased from 2-3 days to account for 2 additional nodes and edge routing)  
 **Next**: 1.2
 
 ---
@@ -237,15 +278,23 @@ def build_agent_graph():
 **Deliverables**:
 - [ ] `validate_images` node (image format, count, size checks)
 - [ ] `extract_features` node stub (returns empty features for now)
-- [ ] Unit tests for both nodes
+- [ ] `vision_extraction` node (Claude 3 Sonnet multimodal analysis)
+  - Extracts: artist, title, year, label, catalog_number, genres from album artwork
+  - Confidence scoring: 0.20 weight in 4-way system
+  - Cost: ~$0.002 per image (Claude 3 Sonnet pricing)
+- [ ] Unit tests for all three nodes
+- [ ] Mock Claude 3 API responses for testing
 
 **Acceptance Criteria**:
 - validate_images rejects invalid inputs (count, format, size)
 - Valid images pass through
-- Tests mock all external calls
+- vision_extraction returns structured metadata dict with required fields
+- vision_extraction confidence score accurately reflects visual match quality
+- Tests mock Claude 3 API (no actual API calls during unit tests)
+- All three nodes properly integrated into graph from Phase 1.1
 
 **Dependencies**: 1.1  
-**Timeline**: 2 days  
+**Timeline**: 2.5 days (increased from 2 days to account for vision_extraction implementation)  
 **Next**: 1.3
 
 ---
@@ -254,18 +303,27 @@ def build_agent_graph():
 **Status**: NOT STARTED  
 **Deliverables**:
 - [ ] `lookup_metadata` node stub (returns mock metadata)
-- [ ] `confidence_gate` node with scoring logic
-- [ ] Evidence chain accumulation
-- [ ] Tests for confidence calculation
+- [ ] `websearch_fallback` node (Tavily API integration)
+  - Triggers when confidence < 0.75 (fallback strategy)
+  - Returns best match from websearch results
+  - Confidence scoring: 0.10 weight in 4-way system
+  - Cost: Free tier (10/month) or $20/month unlimited
+- [ ] `confidence_gate` node with 4-way scoring logic
+  - Weights: discogs 0.45, musicbrainz 0.25, vision 0.20, websearch 0.10
+  - Evidence chain accumulation
+- [ ] Tests for confidence calculation (4-way weighting)
+- [ ] Tests for websearch_fallback (mocked API responses)
 
 **Acceptance Criteria**:
-- Confidence calculated correctly (weighted average)
+- Confidence calculated correctly (4-way weighted average)
 - Auto-commit flag set if ≥0.85
 - Evidence chain preserved through all nodes
-- All tests pass with mock tools
+- websearch_fallback triggers only when confidence < 0.75
+- All tests pass with mocked APIs (Claude 3 and Tavily)
+- Fallback sources properly weighted in confidence calculation
 
 **Dependencies**: 1.2  
-**Timeline**: 2 days  
+**Timeline**: 2.5 days (increased from 2 days to account for websearch_fallback implementation)  
 **Next**: 2.1
 
 ---
