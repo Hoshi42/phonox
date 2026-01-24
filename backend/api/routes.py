@@ -57,23 +57,25 @@ def _serialize_evidence_chain(evidence_chain: List[dict]) -> List[dict]:
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def identify_vinyl(
-    request: VinylIdentifyRequest,
+    files: List[UploadFile] = File(...),
+    user_notes: Optional[str] = None,
     db: Session = Depends(get_db),
 ) -> VinylIdentifyResponse:
     """
     Identify a vinyl record from images.
 
     Creates a new identification job and returns a job ID for polling.
+    Accepts multipart form data with image files.
     """
     try:
-        # Validate image paths exist (in production, would check actual files)
-        if not request.image_paths or len(request.image_paths) == 0:
+        # Validate files
+        if not files or len(files) == 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="At least one image path is required",
+                detail="At least one image file is required",
             )
 
-        if len(request.image_paths) > 5:
+        if len(files) > 5:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Maximum 5 images allowed",
@@ -84,7 +86,7 @@ async def identify_vinyl(
         vinyl_record = VinylRecord(
             id=record_id,
             status="processing",
-            user_notes=request.user_notes,
+            user_notes=user_notes,
         )
         db.add(vinyl_record)
         db.commit()
@@ -99,8 +101,19 @@ async def identify_vinyl(
             graph = build_agent_graph()
 
             # Create initial state
-            # Convert image paths (strings) to image dicts format expected by VinylState
-            image_dicts = [{"path": path} for path in request.image_paths]
+            # Convert uploaded files to image dicts with file content
+            import base64
+            image_dicts = []
+            for file in files:
+                content = await file.read()
+                # Encode binary content as base64 string for processing
+                file_content = base64.b64encode(content).decode('utf-8')
+                image_dicts.append({
+                    "path": file.filename or f"image_{len(image_dicts)}",
+                    "content": file_content,
+                    "content_type": file.content_type or "image/jpeg"
+                })
+            
             initial_state: VinylState = {  # type: ignore
                 "images": image_dicts,
                 "validation_passed": False,
