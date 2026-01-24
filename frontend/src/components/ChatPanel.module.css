@@ -1,7 +1,9 @@
 .chatPanel {
   display: flex;
   flex-direction: column;
-  height: 600px;
+  height: 100%;
+  max-height: 700px;
+  min-height: 500px;
   border-radius: 16px;
   background: linear-gradient(135deg, #0f0f1e 0%, #1a1a2e 100%);
   overflow: hidden;

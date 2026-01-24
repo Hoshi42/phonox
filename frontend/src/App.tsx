@@ -30,7 +30,6 @@ export interface VinylRecord {
 function App() {
   const [recordId, setRecordId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [showChat, setShowChat] = useState(false)
   const [record, setRecord] = useState<VinylRecord | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null)
@@ -96,75 +95,75 @@ function App() {
         <p>Upload images of your vinyl records for AI-powered identification</p>
       </header>
 
-      <main className={styles.main}>
-        {error && (
-          <div className={styles.error}>
-            <button onClick={() => setError(null)}>&times;</button>
-            {error}
-          </div>
-        )}
+      <div className={styles.mainWrapper}>
+        <main className={styles.main}>
+          {error && (
+            <div className={styles.error}>
+              <button onClick={() => setError(null)}>&times;</button>
+              {error}
+            </div>
+          )}
 
-        {!record && !loading && (
-          <ImageUpload onUpload={handleUpload} />
-        )}
+          {!record && !loading && (
+            <ImageUpload onUpload={handleUpload} />
+          )}
 
-        {loading && <LoadingSpinner />}
+          {loading && <LoadingSpinner />}
 
-        {record && (
-          <>
-            <ResultsView record={record} />
-            
-            {!showChat ? (
-              <>
-                {record.needs_review && !record.auto_commit && (
-                  <ReviewForm recordId={recordId || ''} onReview={handleReview} />
-                )}
-                <button onClick={() => setShowChat(true)} className={styles.chatButton}>
-                  💬 Refine With Chat
-                </button>
-              </>
-            ) : (
-              <ChatPanel
-                recordId={recordId || ''}
-                currentMetadata={{
-                  artist: record.artist,
-                  title: record.title,
-                  year: record.year,
-                  label: record.label,
-                  catalog_number: record.catalog_number,
-                  genres: record.genres,
-                }}
-                onMetadataUpdate={(metadata) => {
-                  setRecord((prev) =>
-                    prev
-                      ? {
-                          ...prev,
-                          artist: (metadata.artist as string) || prev.artist,
-                          title: (metadata.title as string) || prev.title,
-                          year: (metadata.year as number) || prev.year,
-                          label: (metadata.label as string) || prev.label,
-                          catalog_number: (metadata.catalog_number as string) || prev.catalog_number,
-                          genres: (metadata.genres as string[]) || prev.genres,
-                        }
-                      : null,
-                  )
-                }}
-                onClose={() => setShowChat(false)}
-              />
-            )}
-            
-            <button onClick={handleReset} className={styles.resetButton}>
-              Identify Another Record
-            </button>
-          </>
+          {record && (
+            <>
+              <ResultsView record={record} />
+              
+              {record.needs_review && !record.auto_commit && (
+                <ReviewForm recordId={recordId || ''} onReview={handleReview} />
+              )}
+              
+              <button onClick={handleReset} className={styles.resetButton}>
+                Identify Another Record
+              </button>
+            </>
+          )}
+        </main>
+
+        {recordId && record && (
+          <aside className={styles.chatSidebar}>
+            <ChatPanel
+              recordId={recordId}
+              currentMetadata={{
+                artist: record.artist,
+                title: record.title,
+                year: record.year,
+                label: record.label,
+                catalog_number: record.catalog_number,
+                genres: record.genres,
+              }}
+              onMetadataUpdate={(metadata) => {
+                setRecord((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        artist: (metadata.artist as string) || prev.artist,
+                        title: (metadata.title as string) || prev.title,
+                        year: (metadata.year as number) || prev.year,
+                        label: (metadata.label as string) || prev.label,
+                        catalog_number: (metadata.catalog_number as string) || prev.catalog_number,
+                        genres: (metadata.genres as string[]) || prev.genres,
+                      }
+                    : null,
+                )
+              }}
+              onClose={undefined}
+            />
+          </aside>
         )}
-      </main>
+      </div>
 
       <footer className={styles.footer}>
         <p>&copy; 2024 Phonox. AI-powered vinyl record identification.</p>
       </footer>
     </div>
   )
+}
 }
 
 export default App

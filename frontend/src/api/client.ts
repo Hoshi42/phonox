@@ -10,14 +10,23 @@ export class ApiClient {
   private baseUrl: string
 
   constructor(baseUrl?: string) {
-    // Use provided baseUrl, environment variable, or default to /api (Vite proxies this)
+    // Determine API URL based on environment:
+    // 1. Use provided baseUrl
+    // 2. Use VITE_API_URL environment variable (set by Docker)
+    // 3. Use Docker backend service name (works inside Docker)
+    // 4. Use localhost (works for local dev)
+    
     if (baseUrl) {
       this.baseUrl = baseUrl
     } else if (import.meta.env.VITE_API_URL) {
       this.baseUrl = import.meta.env.VITE_API_URL
+    } else if (typeof window !== 'undefined') {
+      // Inside Docker: use backend service name
+      // Outside Docker (localhost): use localhost:8000
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      this.baseUrl = isLocalhost ? 'http://localhost:8000' : 'http://backend:8000'
     } else {
-      // Default: use relative /api path which Vite proxies to the backend
-      this.baseUrl = ''
+      this.baseUrl = 'http://backend:8000'
     }
   }
 
