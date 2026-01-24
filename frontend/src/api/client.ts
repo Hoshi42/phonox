@@ -28,6 +28,9 @@ export class ApiClient {
     } else {
       this.baseUrl = 'http://backend:8000'
     }
+    
+    console.log('[API] ApiClient initialized with baseUrl:', this.baseUrl)
+    console.log('[API] window.location.hostname:', typeof window !== 'undefined' ? window.location.hostname : 'N/A')
   }
 
   async identify(files: File[]): Promise<{ id: string }> {
@@ -37,36 +40,61 @@ export class ApiClient {
       formData.append('files', file)
     })
 
-    const response = await fetch(`${this.baseUrl}/api/v1/identify`, {
-      method: 'POST',
-      body: formData,
-    })
+    const url = `${this.baseUrl}/api/v1/identify`
+    console.log('[API] identify() - Uploading to:', url)
+    console.log('[API] identify() - Files:', files.map(f => ({ name: f.name, size: f.size, type: f.type })))
 
-    if (!response.ok) {
-      try {
-        const error = (await response.json()) as ApiError
-        throw new Error(error.detail || 'Upload failed')
-      } catch (e) {
-        throw new Error(`Upload failed: ${response.statusText}`)
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        body: formData,
+      })
+
+      console.log('[API] identify() - Response status:', response.status, response.statusText)
+
+      if (!response.ok) {
+        try {
+          const error = (await response.json()) as ApiError
+          console.error('[API] identify() - Error response:', error)
+          throw new Error(error.detail || 'Upload failed')
+        } catch (e) {
+          console.error('[API] identify() - Failed to parse error response:', e)
+          throw new Error(`Upload failed: ${response.statusText}`)
+        }
       }
-    }
 
-    const result = await response.json()
-    // Backend returns record_id, but we need id
-    return { id: result.record_id || result.id }
+      const result = await response.json()
+      console.log('[API] identify() - Success:', result)
+      // Backend returns record_id, but we need id
+      return { id: result.record_id || result.id }
+    } catch (error) {
+      console.error('[API] identify() - Network error:', error)
+      throw error
+    }
   }
 
   async getResult(recordId: string): Promise<Record<string, unknown>> {
-    const response = await fetch(`${this.baseUrl}/api/v1/identify/${recordId}`)
+    const url = `${this.baseUrl}/api/v1/identify/${recordId}`
+    console.log('[API] getResult() - Fetching from:', url)
 
-    if (!response.ok) {
-      if (response.status === 404) {
-        throw new Error('Record not found')
+    try {
+      const response = await fetch(url)
+
+      if (!response.ok) {
+        console.error('[API] getResult() - Response not OK:', response.status, response.statusText)
+        if (response.status === 404) {
+          throw new Error('Record not found')
+        }
+        throw new Error('Failed to fetch result')
       }
-      throw new Error('Failed to fetch result')
-    }
 
-    return response.json()
+      const result = await response.json()
+      console.log('[API] getResult() - Got result:', result)
+      return result
+    } catch (error) {
+      console.error('[API] getResult() - Network error:', error)
+      throw error
+    }
   }
 
   async review(recordId: string, corrections: Record<string, unknown>): Promise<Record<string, unknown>> {

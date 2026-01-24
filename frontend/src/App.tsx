@@ -38,13 +38,17 @@ function App() {
     setLoading(true)
     setError(null)
     try {
+      console.log('[App] Uploading files:', files)
       const response = await apiClient.identify(files)
+      console.log('[App] Upload successful, recordId:', response.id)
       setRecordId(response.id)
       
       // Start polling for results
       const interval = setInterval(async () => {
         try {
+          console.log('[App] Polling for results...')
           const result = await apiClient.getResult(response.id)
+          console.log('[App] Got result:', result)
           setRecord(result)
           
           if (result.status === 'complete' || result.status === 'failed') {
@@ -52,12 +56,13 @@ function App() {
             setLoading(false)
           }
         } catch (err) {
-          console.error('Polling error:', err)
+          console.error('[App] Polling error:', err)
         }
       }, 2000)
       
       setPollInterval(interval)
     } catch (err) {
+      console.error('[App] Upload error:', err)
       setError(err instanceof Error ? err.message : 'Upload failed')
       setLoading(false)
     }
