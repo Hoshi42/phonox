@@ -9,8 +9,15 @@ export interface ApiError {
 export class ApiClient {
   private baseUrl: string
 
-  constructor(baseUrl = 'http://localhost:8000') {
-    this.baseUrl = baseUrl
+  constructor(baseUrl?: string) {
+    // Use environment variable if available, otherwise fallback to default
+    if (baseUrl) {
+      this.baseUrl = baseUrl
+    } else if (import.meta.env.VITE_API_URL) {
+      this.baseUrl = import.meta.env.VITE_API_URL
+    } else {
+      this.baseUrl = 'http://localhost:8000'
+    }
   }
 
   async identify(files: File[]): Promise<{ id: string }> {

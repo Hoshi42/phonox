@@ -7,6 +7,7 @@ pydantic>=2.0.0
 fastapi>=0.100.0
 uvicorn>=0.23.0
 sqlalchemy>=2.0.0
+python-multipart>=0.0.6
 
 # LLM & AI APIs
 anthropic>=0.7.0
