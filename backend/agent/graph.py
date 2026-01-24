@@ -59,18 +59,26 @@ def validate_images_node(state: VinylState) -> VinylState:
         logger.warning(f"validate_images: Too many images ({len(images)})")
         return state
 
-    # Validate format and size (simplified - assumes images are already loaded)
+    # Validate format and size
     valid_formats = {"jpeg", "jpg", "png", "webp", "gif"}
     validation_errors = []
 
     for idx, image in enumerate(images):
-        # In production, check actual image metadata
-        # For now, assume images are pre-validated by frontend
         if isinstance(image, dict):
+            # Get format from either 'format' key or 'content_type' key
             fmt = image.get("format", "").lower()
+            if not fmt and "content_type" in image:
+                # Extract format from content_type (e.g., "image/jpeg" -> "jpeg")
+                content_type = image.get("content_type", "").lower()
+                if content_type.startswith("image/"):
+                    fmt = content_type.replace("image/", "").replace("svg+xml", "svg")
+            
             size = image.get("size_bytes", 0)
+            filename = image.get("path", f"image_{idx}")
+            
+            logger.info(f"validate_images: Image {idx}: filename={filename}, format={fmt}, content_type={image.get('content_type')}, size={size}")
 
-            if fmt not in valid_formats:
+            if fmt and fmt not in valid_formats:
                 validation_errors.append(f"Image {idx}: Invalid format '{fmt}'")
 
             if size > 10 * 1024 * 1024:  # 10MB
@@ -141,8 +149,8 @@ def vision_extraction_node(state: VinylState) -> VinylState:
     Returns:
         VinylState: Updated state with vision_extraction dict
     """
-    if not state.get("image_features"):
-        logger.warning("vision_extraction: No image features to analyze")
+    if not state.get("validation_passed"):
+        logger.warning("vision_extraction: Images not validated")
         return state
 
     images = state.get("images", [])
@@ -151,29 +159,40 @@ def vision_extraction_node(state: VinylState) -> VinylState:
         logger.warning("vision_extraction: No images provided")
         return state
 
-    # Phase 1.2: For now, use first image only (stub with mock)
+    # Use first image for metadata extraction (Phase 1.2)
     # In Phase 1.4+, we'll analyze all images and aggregate results
     
     try:
-        # Try to extract metadata using Claude 3 Sonnet
-        # In production, image would be actual base64-encoded image data
-        # For Phase 1.2 testing, use mock data with real API fallback
+        first_image = images[0]
+        logger.info(f"vision_extraction: Processing image: {first_image.get('path')}")
         
-        # Mock implementation for now (since we don't have real image data in tests)
-        vision_results = {
-            "artist": "The Beatles",
-            "title": "Abbey Road",
-            "year": 1969,
-            "label": "Apple Records",
-            "catalog_number": "PCS 7088",
-            "genres": ["Rock", "Pop"],
-            "confidence": 0.85,
-        }
+        # Extract image data
+        image_content = first_image.get("content", "")
+        image_format = first_image.get("content_type", "image/jpeg").replace("image/", "")
         
-        logger.info(
-            f"vision_extraction: Extracted metadata - {vision_results['artist']} / {vision_results['title']} "
-            f"(confidence: {vision_results['confidence']:.2f})"
-        )
+        if not image_content:
+            logger.warning("vision_extraction: No image content to analyze")
+            vision_results = {
+                "artist": "Unknown",
+                "title": "Unknown",
+                "year": None,
+                "label": "Unknown",
+                "catalog_number": None,
+                "genres": [],
+                "confidence": 0.0,
+            }
+        else:
+            # Call Claude 3 Sonnet for actual metadata extraction
+            logger.info(f"vision_extraction: Calling Claude 3 Sonnet API (format: {image_format})...")
+            vision_results = extract_vinyl_metadata(
+                image_base64=image_content,
+                image_format=image_format,
+                fallback_on_error=True
+            )
+            logger.info(
+                f"vision_extraction: Extracted metadata - {vision_results.get('artist', 'Unknown')} / {vision_results.get('title', 'Unknown')} "
+                f"(confidence: {vision_results.get('confidence', 0.0):.2f})"
+            )
 
     except Exception as e:
         logger.error(f"vision_extraction: Failed to extract metadata: {e}")
