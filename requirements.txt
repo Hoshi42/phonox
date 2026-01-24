@@ -17,7 +17,13 @@ pytest>=7.4.0
 pytest-cov>=4.1.0
 pytest-mock>=3.11.1
 
-# Development
+# Development & Type Safety
+mypy>=1.7.0
+types-requests>=2.31.0
+
+# Frontend (Node.js managed separately in frontend/package.json)
+# React, Vite, TypeScript, Playwright are installed via npm
+
 mypy>=1.5.0
 ruff>=0.1.0
 python-dotenv>=1.0.0

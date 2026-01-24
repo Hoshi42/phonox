@@ -1,0 +1,123 @@
+.resultsContainer {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 2rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.header h2 {
+  margin: 0;
+  color: #333;
+}
+
+.autoApprovedBadge,
+.reviewBadge {
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.autoApprovedBadge {
+  background: #d4edda;
+  color: #155724;
+}
+
+.reviewBadge {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.metadata {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+.field {
+  border-bottom: 1px solid #eee;
+  padding-bottom: 1rem;
+}
+
+.field label {
+  display: block;
+  font-weight: 600;
+  color: #667eea;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+}
+
+.field p {
+  margin: 0;
+  color: #333;
+  font-size: 1.1rem;
+}
+
+.genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.genre {
+  background: #f0f0f0;
+  padding: 0.4rem 0.8rem;
+  border-radius: 16px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.confidenceBar {
+  position: relative;
+  height: 30px;
+  background: #f0f0f0;
+  border-radius: 15px;
+  overflow: hidden;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.confidenceFill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.confidenceText {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #333;
+}
+
+.error,
+.failed {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border-radius: 4px;
+  background: #fee;
+  border-left: 4px solid #f44;
+  color: #c22;
+}
+
+@media (max-width: 640px) {
+  .resultsContainer {
+    padding: 1rem;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

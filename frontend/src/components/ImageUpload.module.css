@@ -1,0 +1,92 @@
+.uploadContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.uploadBox {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.dragArea {
+  padding: 3rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  border: 2px dashed #667eea;
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+
+.dragArea:hover {
+  border-color: #764ba2;
+  background: #f5f3ff;
+}
+
+.dragArea p {
+  margin: 0.5rem 0;
+  color: #667eea;
+}
+
+.dragArea p:first-child {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.hint {
+  font-size: 0.85rem;
+  color: #999;
+}
+
+.previewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.preview {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 2px solid #667eea;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.uploadBtn,
+.clearBtn {
+  flex: 1;
+  padding: 0.75rem;
+  font-size: 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 600;
+}
+
+.uploadBtn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.uploadBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.clearBtn {
+  background: #f0f0f0;
+  color: #666;
+}
+
+.clearBtn:hover {
+  background: #e0e0e0;
+}
