@@ -10,13 +10,14 @@ export class ApiClient {
   private baseUrl: string
 
   constructor(baseUrl?: string) {
-    // Use environment variable if available, otherwise fallback to default
+    // Use provided baseUrl, environment variable, or default to /api (Vite proxies this)
     if (baseUrl) {
       this.baseUrl = baseUrl
     } else if (import.meta.env.VITE_API_URL) {
       this.baseUrl = import.meta.env.VITE_API_URL
     } else {
-      this.baseUrl = 'http://localhost:8000'
+      // Default: use relative /api path which Vite proxies to the backend
+      this.baseUrl = ''
     }
   }
 
