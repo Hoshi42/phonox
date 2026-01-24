@@ -39,7 +39,7 @@ class TestEvidenceType:
     def test_evidence_sources_recognized(self):
         """Evidence can be created with all recognized sources."""
         now = datetime.now()
-        valid_sources = ["discogs", "musicbrainz", "image", "user_input"]
+        valid_sources = ["discogs", "musicbrainz", "image", "vision", "websearch", "user_input"]
         
         for source in valid_sources:
             evidence: Evidence = {
@@ -259,7 +259,7 @@ class TestConfidenceCalculation:
         assert confidence == pytest.approx(expected, rel=0.01)
     
     def test_calculate_confidence_all_sources(self):
-        """All three sources weighted together."""
+        """All four sources weighted together."""
         now = datetime.now()
         evidence: list[Evidence] = [
             {
@@ -275,19 +275,26 @@ class TestConfidenceCalculation:
                 "timestamp": now,
             },
             {
-                "source": "image",
+                "source": "vision",
                 "confidence": 0.70,
+                "data": {},
+                "timestamp": now,
+            },
+            {
+                "source": "websearch",
+                "confidence": 0.65,
                 "data": {},
                 "timestamp": now,
             },
         ]
         
         confidence = calculate_overall_confidence(evidence)
-        # discogs: 0.95 * 0.50 = 0.475
-        # musicbrainz: 0.80 * 0.30 = 0.240
-        # image: 0.70 * 0.20 = 0.140
-        # Total: 0.855 / 1.00 = 0.855
-        expected = (0.95 * 0.50 + 0.80 * 0.30 + 0.70 * 0.20) / 1.0
+        # discogs: 0.95 * 0.45 = 0.4275
+        # musicbrainz: 0.80 * 0.25 = 0.200
+        # vision: 0.70 * 0.20 = 0.140
+        # websearch: 0.65 * 0.10 = 0.065
+        # Total: 0.8325 / 1.00 = 0.8325
+        expected = (0.95 * 0.45 + 0.80 * 0.25 + 0.70 * 0.20 + 0.65 * 0.10) / 1.0
         assert confidence == pytest.approx(expected, rel=0.01)
     
     def test_calculate_confidence_unrecognized_source(self):
@@ -325,8 +332,49 @@ class TestConfidenceCalculation:
         ]
         
         confidence = calculate_overall_confidence(evidence)
-        # Only discogs counts: 0.95 * 0.50 / 0.50 = 0.95
+        # Only discogs counts: 0.95 * 0.45 / 0.45 = 0.95
         assert confidence == pytest.approx(0.95, rel=0.01)
+    
+    def test_calculate_confidence_vision_source(self):
+        """Vision (Claude 3) source contributes correctly."""
+        now = datetime.now()
+        evidence: list[Evidence] = [
+            {
+                "source": "vision",
+                "confidence": 0.80,
+                "data": {"artist": "Pink Floyd", "confidence": 0.80},
+                "timestamp": now,
+            }
+        ]
+        
+        confidence = calculate_overall_confidence(evidence)
+        # vision: 0.80 * 0.20 / 0.20 = 0.80
+        assert confidence == pytest.approx(0.80, rel=0.01)
+    
+    def test_calculate_confidence_websearch_source(self):
+        """Websearch source contributes with lower weight."""
+        now = datetime.now()
+        evidence: list[Evidence] = [
+            {
+                "source": "discogs",
+                "confidence": 0.85,
+                "data": {},
+                "timestamp": now,
+            },
+            {
+                "source": "websearch",
+                "confidence": 0.70,
+                "data": {"url": "https://example.com"},
+                "timestamp": now,
+            },
+        ]
+        
+        confidence = calculate_overall_confidence(evidence)
+        # discogs: 0.85 * 0.45 = 0.3825
+        # websearch: 0.70 * 0.10 = 0.07
+        # Total: 0.4525 / 0.55 = 0.8227
+        expected = (0.85 * 0.45 + 0.70 * 0.10) / 0.55
+        assert confidence == pytest.approx(expected, rel=0.01)
 
 
 class TestConfidenceThresholds:
@@ -379,12 +427,13 @@ class TestConfidenceWeights:
     
     def test_weights_values(self):
         """Weight values are reasonable."""
-        assert CONFIDENCE_WEIGHTS["discogs"] == 0.50
-        assert CONFIDENCE_WEIGHTS["musicbrainz"] == 0.30
-        assert CONFIDENCE_WEIGHTS["image"] == 0.20
+        assert CONFIDENCE_WEIGHTS["discogs"] == 0.45
+        assert CONFIDENCE_WEIGHTS["musicbrainz"] == 0.25
+        assert CONFIDENCE_WEIGHTS["vision"] == 0.20
+        assert CONFIDENCE_WEIGHTS["websearch"] == 0.10
     
     def test_weights_reflect_reliability(self):
         """Weights decrease with less reliable sources."""
-        reliability_order = ["discogs", "musicbrainz", "image"]
+        reliability_order = ["discogs", "musicbrainz", "vision", "websearch"]
         weights = [CONFIDENCE_WEIGHTS[s] for s in reliability_order]
         assert weights == sorted(weights, reverse=True)

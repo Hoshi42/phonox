@@ -14,12 +14,12 @@ class Evidence(TypedDict):
     Single piece of evidence about a vinyl record.
     
     Attributes:
-        source: Origin of this evidence ("discogs", "musicbrainz", "image")
+        source: Origin of this evidence ("discogs", "musicbrainz", "image", "vision", "websearch")
         confidence: Numeric confidence score (0.0 to 1.0)
         data: Raw tool response or extracted features
         timestamp: When this evidence was collected
     """
-    source: str  # "discogs", "musicbrainz", "image", "user_input"
+    source: str  # "discogs", "musicbrainz", "image", "vision", "websearch", "user_input"
     confidence: float  # Range: [0.0, 1.0]
     data: dict  # Tool-specific response format
     timestamp: datetime
@@ -65,20 +65,25 @@ class VinylState(TypedDict):
         evidence_chain: Complete history of all evidence collected
         status: Processing status ("pending", "processing", "complete", "failed")
         error: Error message if status is "failed"
+        vision_extraction: Claude 3 multimodal analysis output (NEW)
+        websearch_results: Tavily web search results (NEW)
     """
     images: List[str]  # Base64 strings or file paths
     metadata: Optional[VinylMetadata]  # None until processing completes
     evidence_chain: List[Evidence]  # Append-only list
     status: str  # "pending" | "processing" | "complete" | "failed"
     error: Optional[str]  # Only set if status == "failed"
+    vision_extraction: Optional[dict]  # Claude 3 vision output (NEW)
+    websearch_results: Optional[List[dict]]  # Tavily results (NEW)
 
 
 # Confidence scoring weights (must sum to 1.0)
 # Used to calculate overall_confidence in VinylMetadata
 CONFIDENCE_WEIGHTS = {
-    "discogs": 0.50,      # Most reliable (official database)
-    "musicbrainz": 0.30,  # Reliable (crowdsourced but verified)
-    "image": 0.20,        # Less reliable (ML-based)
+    "discogs": 0.45,        # Most reliable (official database)
+    "musicbrainz": 0.25,    # Reliable (crowdsourced but verified)
+    "vision": 0.20,         # Claude 3 multimodal analysis (NEW)
+    "websearch": 0.10,      # Web search fallback (NEW)
 }
 
 # Confidence thresholds for decision gates
