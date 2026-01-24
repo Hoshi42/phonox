@@ -3,20 +3,24 @@
 **Project**: Phonox  
 **Goal**: Vinyl Collection Agent with LangGraph Orchestration  
 **Last Updated**: 2026-01-24  
-**Status**: Phase 0 (Planning)
+**Status**: Phase 0 – Ready for Implementation  
+**Integration Strategy**: See [`.github/agents/integration-plan.md`](.github/agents/integration-plan.md)
 
 ---
 
 ## Executive Summary
 
-This plan structures the implementation into **4 phases** and **12 iterations** over 6-8 weeks.
+This plan structures the implementation into **5 increments** and **12 iterations** over 6 weeks.
 
 Each iteration:
 - ✅ Has clear acceptance criteria
-- ✅ Produces working code + tests
-- ✅ Updates this document
-- ✅ Runs in Docker locally
-- ✅ Includes all roles (Architect, Agent Engineer, Tool Engineer, Frontend Dev)
+- ✅ Produces working, testable code
+- ✅ Updates this document when COMPLETED
+- ✅ Passes Docker integration test locally
+- ✅ Has test coverage ≥80%
+- ✅ Can be merged to main without breaking builds
+
+**What is a "Working Increment"?** See [integration-plan.md](integration-plan.md#what-makes-an-iteration-complete)
 
 ---
 
@@ -64,24 +68,76 @@ Error handling, monitoring, production readiness
 
 ---
 
-#### Iteration 0.2: Agent Configuration & State Models ⏳ IN PROGRESS
-**Status**: STARTED (agent.md completed, now needs validation)  
+#### Iteration 0.2: Agent Configuration & State Models ⏳ READY TO START
+**Status**: READY FOR IMPLEMENTATION  
+**Owner**: Agent Engineer  
 **Deliverables**:
-- [x] `agent.md` with TypedDict state models
-- [x] Confidence scoring system
-- [x] Node specifications
-- [ ] Python state type stubs (`backend/agent/state.py`)
-- [ ] State validation tests
+- [x] `agent.md` with TypedDict state models (reference)
+- [ ] `backend/agent/__init__.py` (empty module)
+- [ ] `backend/agent/state.py` with TypedDict definitions
+- [ ] `tests/unit/test_state.py` with validation tests
+- [ ] Type stubs pass mypy checking
 
-**Acceptance Criteria**:
-- VinylState, Evidence, VinylMetadata defined in Python
-- Type checking passes (mypy/pylance)
-- State creation/mutation tests pass
-- State diagram matches agent flow
+**Code to Implement** (from agent.md):
 
-**Dependencies**: None (Foundation step)  
+```python
+# backend/agent/state.py
+from typing import TypedDict, Optional, List
+from datetime import datetime
+
+class Evidence(TypedDict):
+    source: str  # "discogs", "musicbrainz", "image"
+    confidence: float  # 0.0-1.0
+    data: dict  # Tool response
+    timestamp: datetime
+
+class VinylMetadata(TypedDict):
+    artist: str
+    title: str
+    year: Optional[int]
+    label: str
+    catalog_number: Optional[str]
+    genres: List[str]
+    evidence: List[Evidence]
+    overall_confidence: float
+
+class VinylState(TypedDict):
+    images: List[str]  # Base64 or paths
+    metadata: Optional[VinylMetadata]
+    evidence_chain: List[Evidence]
+    status: str  # "pending", "processing", "complete", "failed"
+    error: Optional[str]
+```
+
+**Test Requirements** (in `tests/unit/test_state.py`):
+- State creation with valid data
+- Type validation (Pydantic or manual)
+- State mutation (adding evidence)
+- Confidence calculation (weighted average)
+- Error cases (invalid state, missing fields)
+
+**Acceptance Criteria** (Working Increment):
+- ✅ `backend/agent/state.py` exists with all types
+- ✅ `pytest tests/unit/test_state.py -v` passes all tests
+- ✅ `mypy backend/agent/state.py --ignore-missing-imports` passes (0 errors)
+- ✅ Test coverage ≥95% for state.py
+- ✅ Code has docstrings for all TypedDicts
+- ✅ `docker compose exec backend pytest tests/unit/test_state.py -v` passes
+- ✅ No uncommitted changes, clean git status
+- ✅ PR created, code reviewed, ready to merge
+
+**Integration Test**:
+```bash
+docker compose up -d
+docker compose exec backend pytest tests/unit/ -v --cov=backend/agent
+# Should show: tests PASSED, coverage ≥80%
+```
+
 **Timeline**: 1-2 days  
-**Next**: 0.3
+**Dependencies**: None  
+**Blocker**: None  
+**Next**: 0.3 (can run in parallel)  
+**Merge**: After review, before 0.3 starts
 
 ---
 
@@ -549,6 +605,107 @@ Use this for each new iteration update:
 | 4: Frontend | 🔴 NOT STARTED | 0% | Awaiting Phase 1 |
 | 5: Deploy | 🔴 NOT STARTED | 0% | Awaiting all phases |
 
+---
+
+## 🚀 Ready to Code: Iteration 0.2 is Open
+
+**Current Status**: Phase 0 Foundation is ready  
+**What's Ready**:
+- ✅ Git repository with 3 clean commits
+- ✅ Docker environment (postgres, redis, backend, frontend)
+- ✅ Agent state models defined in agent.md
+- ✅ Testing strategy documented
+- ✅ GitHub Actions CI/CD configured
+
+**What to Do Now**:
+
+### Option 1: Start Iteration 0.2 (Recommended)
+```bash
+# Create feature branch
+git checkout -b feat/iteration-0.2-state-models
+
+# Create the required files
+mkdir -p backend/agent
+touch backend/agent/__init__.py
+# Edit: backend/agent/state.py (copy from above)
+# Edit: tests/unit/test_state.py (create test file)
+
+# Run tests locally
+docker compose exec backend pytest tests/unit/test_state.py -v
+
+# Commit when tests pass
+git add backend/agent/state.py tests/unit/test_state.py
+git commit -m "[Agent Engineer] feat: Implement agent state models (iteration 0.2)"
+
+# Create PR for review
+# Merge to main after review
+```
+
+### Option 2: Start Iteration 0.3 (Parallel)
+If someone else is doing 0.2, you can start 0.3 in parallel:
+```bash
+git checkout -b feat/iteration-0.3-testing-setup
+
+# Create test config
+touch pytest.ini
+touch tests/conftest.py
+# Add pytest configuration and shared fixtures
+
+# Verify existing tests still work
+docker compose exec backend pytest tests/ -v
+
+# Commit and create PR
+```
+
+### Integration Gate: Before Merging Iteration 0.2
+
+```bash
+# 1. Ensure local state
+docker compose down -v
+docker compose up -d
+sleep 10
+
+# 2. Run all tests
+docker compose exec backend pytest tests/ -v --cov=backend/agent
+
+# 3. Check types
+docker compose exec backend mypy backend/agent/ --ignore-missing-imports
+
+# 4. Verify logs are clean
+docker compose logs backend | grep -i error
+
+# 5. Merge PR to main
+# 6. Verify main is still green
+```
+
+---
+
+## Notes for Agent Team
+
+**Communication**:
+- Update this document when iteration status changes
+- Link PRs to iteration number (e.g., "Iteration 0.2")
+- Report blockers in daily standup
+
+**Code Quality**:
+- All new code must have tests (≥80% coverage)
+- All functions must have docstrings
+- All types must pass mypy checking
+- All commits must reference iteration
+
+**Integration**:
+- After each iteration, run the "Integration Gate" test above
+- Don't merge if tests fail
+- Mark iteration as "COMPLETED" only after merge
+
+**Timeline**:
+- Phase 0 (Foundation): Target 5 days, currently 3 days (on track)
+- Phase 1 (Agent): Starts after 0.2 complete
+- Full system: Target 6 weeks to v1.0.0 release
+
+---
+
+**Let's build Phonox! 🎵**
 **Legend**: 🟢 On Track | 🟡 In Progress | 🟠 Blocked | 🔴 Not Started | 🔵 Completed
 
 ---
