@@ -4,6 +4,7 @@ import ImageUpload from './components/ImageUpload'
 import LoadingSpinner from './components/LoadingSpinner'
 import ResultsView from './components/ResultsView'
 import ReviewForm from './components/ReviewForm'
+import ChatPanel from './components/ChatPanel'
 import { apiClient } from './api/client'
 
 // Environment configuration
@@ -29,6 +30,7 @@ export interface VinylRecord {
 function App() {
   const [recordId, setRecordId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [showChat, setShowChat] = useState(false)
   const [record, setRecord] = useState<VinylRecord | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null)
@@ -111,9 +113,48 @@ function App() {
         {record && (
           <>
             <ResultsView record={record} />
-            {record.needs_review && !record.auto_commit && (
-              <ReviewForm recordId={recordId || ''} onReview={handleReview} />
+            
+            {!showChat ? (
+              <>
+                {record.needs_review && !record.auto_commit && (
+                  <ReviewForm recordId={recordId || ''} onReview={handleReview} />
+                )}
+                {record.status === 'complete' && (
+                  <button onClick={() => setShowChat(true)} className={styles.chatButton}>
+                    💬 Refine With Chat
+                  </button>
+                )}
+              </>
+            ) : (
+              <ChatPanel
+                recordId={recordId || ''}
+                currentMetadata={{
+                  artist: record.artist,
+                  title: record.title,
+                  year: record.year,
+                  label: record.label,
+                  catalog_number: record.catalog_number,
+                  genres: record.genres,
+                }}
+                onMetadataUpdate={(metadata) => {
+                  setRecord((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          artist: (metadata.artist as string) || prev.artist,
+                          title: (metadata.title as string) || prev.title,
+                          year: (metadata.year as number) || prev.year,
+                          label: (metadata.label as string) || prev.label,
+                          catalog_number: (metadata.catalog_number as string) || prev.catalog_number,
+                          genres: (metadata.genres as string[]) || prev.genres,
+                        }
+                      : null,
+                  )
+                }}
+                onClose={() => setShowChat(false)}
+              />
             )}
+            
             <button onClick={handleReset} className={styles.resetButton}>
               Identify Another Record
             </button>

@@ -193,3 +193,60 @@ class ErrorResponse(BaseModel):
                 "timestamp": "2026-01-24T10:30:00"
             }
         }
+
+
+class ChatMessage(BaseModel):
+    """Chat message model."""
+    role: str  # "user" or "assistant"
+    content: str
+    timestamp: datetime = Field(default_factory=datetime.now)
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class ChatRequest(BaseModel):
+    """Chat message request."""
+    message: str = Field(..., min_length=1, max_length=2000)
+    metadata: Optional[Dict[str, str]] = None  # e.g. {"pressing": "first", "condition": "VG+"}
+
+    class Config:
+        """Pydantic config."""
+        json_schema_extra = {
+            "example": {
+                "message": "This is actually a 1987 Japanese remaster, not the original 1969 pressing",
+                "metadata": {
+                    "pressing_year": "1987",
+                    "country": "Japan"
+                }
+            }
+        }
+
+
+class ChatResponse(BaseModel):
+    """Chat response with updated record info."""
+    record_id: str
+    message: str  # Agent's response
+    updated_metadata: Optional[VinylMetadataModel] = None
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    requires_review: bool = False
+    chat_history: List[ChatMessage] = Field(default_factory=list)
+    timestamp: datetime = Field(default_factory=datetime.now)
+
+    class Config:
+        """Pydantic config."""
+        json_schema_extra = {
+            "example": {
+                "record_id": "550e8400-e29b-41d4-a716-446655440000",
+                "message": "Got it! I've updated the record to 1987 Japanese remaster. Confidence is now 0.95.",
+                "updated_metadata": {
+                    "artist": "The Beatles",
+                    "title": "Abbey Road",
+                    "year": 1987,
+                    "label": "Apple Records",
+                    "genres": ["Rock"]
+                },
+                "confidence": 0.95,
+                "requires_review": False,
+                "chat_history": []
+            }
+        }
+

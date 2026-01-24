@@ -18,6 +18,9 @@ from backend.api.models import (
     ErrorResponse,
     EvidenceModel,
     VinylMetadataModel,
+    ChatRequest,
+    ChatResponse,
+    ChatMessage,
 )
 from backend.agent.graph import build_agent_graph
 from backend.agent.state import VinylState
@@ -350,6 +353,131 @@ async def review_vinyl(
         raise
     except Exception as e:
         logger.error(f"Error reviewing record {record_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
+
+
+@router.post("/identify/{record_id}/chat", response_model=ChatResponse)
+async def chat_with_agent(
+    record_id: str,
+    request: ChatRequest,
+    db: Session = Depends(get_db),
+) -> ChatResponse:
+    """
+    Chat with the agent about a specific vinyl record.
+    
+    Allows manual input of corrections and metadata refinement.
+    """
+    try:
+        # Fetch the vinyl record
+        vinyl_record = db.query(VinylRecord).filter(VinylRecord.id == record_id).first()
+        if not vinyl_record:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Record {record_id} not found",
+            )
+
+        logger.info(f"Chat message for record {record_id}: {request.message[:100]}")
+
+        # Create chat context from current record state
+        current_metadata = {
+            "artist": vinyl_record.artist,
+            "title": vinyl_record.title,
+            "year": vinyl_record.year,
+            "label": vinyl_record.label,
+            "catalog_number": vinyl_record.catalog_number,
+            "genres": vinyl_record.get_genres() if hasattr(vinyl_record, 'get_genres') else [],
+        }
+
+        # Build chat input for agent
+        chat_input = f"""
+User feedback on vinyl record:
+{request.message}
+
+Current metadata:
+Artist: {current_metadata.get('artist', 'Unknown')}
+Title: {current_metadata.get('title', 'Unknown')}
+Year: {current_metadata.get('year', 'Unknown')}
+Label: {current_metadata.get('label', 'Unknown')}
+Catalog: {current_metadata.get('catalog_number', 'Unknown')}
+Genres: {', '.join(current_metadata.get('genres', []))}
+
+Additional metadata hints: {request.metadata if request.metadata else 'None'}
+
+Based on user feedback, please:
+1. Validate and update the metadata if user provided corrections
+2. Respond conversationally to the user
+3. Update confidence score based on the clarity of user input
+4. Indicate if review is still needed
+"""
+
+        # For now, we'll do a simple update without running the full agent
+        # In a full implementation, this would invoke the agent graph
+        updated_metadata = current_metadata.copy()
+        agent_response = f"Thank you for the feedback on '{vinyl_record.title}'. I've noted your input and updated the record accordingly."
+        
+        # If metadata was provided in request, use it
+        if request.metadata:
+            if "artist" in request.metadata:
+                updated_metadata["artist"] = request.metadata["artist"]
+                vinyl_record.artist = request.metadata["artist"]
+            if "title" in request.metadata:
+                updated_metadata["title"] = request.metadata["title"]
+                vinyl_record.title = request.metadata["title"]
+            if "year" in request.metadata:
+                try:
+                    updated_metadata["year"] = int(request.metadata["year"])
+                    vinyl_record.year = int(request.metadata["year"])
+                except ValueError:
+                    pass
+            if "label" in request.metadata:
+                updated_metadata["label"] = request.metadata["label"]
+                vinyl_record.label = request.metadata["label"]
+            if "genres" in request.metadata:
+                genres_str = request.metadata["genres"]
+                genres = [g.strip() for g in genres_str.split(",")]
+                updated_metadata["genres"] = genres
+                vinyl_record.set_genres(genres)
+            
+            # Increment confidence based on user input
+            vinyl_record.confidence = min(1.0, vinyl_record.confidence + 0.1)
+            agent_response = f"Updated record with your input. Confidence increased to {vinyl_record.confidence:.2f}"
+
+        # Add user note
+        vinyl_record.user_notes = (vinyl_record.user_notes or "") + f"\nChat: {request.message[:200]}"
+
+        # Commit changes
+        db.commit()
+        db.refresh(vinyl_record)
+
+        # Build response
+        metadata_dict = VinylMetadataModel(
+            artist=updated_metadata.get("artist", "Unknown"),
+            title=updated_metadata.get("title", "Unknown"),
+            year=updated_metadata.get("year"),
+            label=updated_metadata.get("label", "Unknown"),
+            catalog_number=updated_metadata.get("catalog_number"),
+            genres=updated_metadata.get("genres", []),
+        )
+
+        return ChatResponse(
+            record_id=record_id,
+            message=agent_response,
+            updated_metadata=metadata_dict,
+            confidence=vinyl_record.confidence,
+            requires_review=vinyl_record.needs_review,
+            chat_history=[
+                ChatMessage(role="user", content=request.message),
+                ChatMessage(role="assistant", content=agent_response),
+            ],
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in chat for record {record_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),
