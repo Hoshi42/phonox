@@ -15,19 +15,19 @@
   padding: 3rem 2rem;
   text-align: center;
   cursor: pointer;
-  border: 2px dashed #667eea;
+  border: 2px dashed #007bff;
   border-radius: 8px;
   transition: all 0.3s;
 }
 
 .dragArea:hover {
-  border-color: #764ba2;
-  background: #f5f3ff;
+  border-color: #0056b3;
+  background: #f0f8ff;
 }
 
 .dragArea p {
   margin: 0.5rem 0;
-  color: #667eea;
+  color: #007bff;
 }
 
 .dragArea p:first-child {
@@ -42,17 +42,84 @@
 
 .previewGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 1rem;
   padding: 1rem;
 }
 
+.imageCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.imageWrapper {
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+  border: 2px solid #e5e7eb;
+  aspect-ratio: 1;
+  background: #f9fafb;
+}
+
 .preview {
   width: 100%;
-  height: 120px;
+  height: 100%;
   object-fit: cover;
+  transition: transform 0.2s;
+}
+
+.imageWrapper:hover .preview {
+  transform: scale(1.05);
+}
+
+.analyzedBadge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 28px;
+  height: 28px;
+  background: #10b981;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 1.2rem;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+  z-index: 1;
+}
+
+.imageActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.analyzeBtn,
+.removeBtn {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
   border-radius: 4px;
-  border: 2px solid #667eea;
+  background: white;
+  color: #6b7280;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 600;
+}
+
+.analyzeBtn:hover {
+  background: #007bff;
+  border-color: #007bff;
+  color: white;
+}
+
+.removeBtn:hover {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: white;
 }
 
 .actions {

@@ -1,48 +1,80 @@
 import { useRef, useState } from 'react'
 import styles from './ImageUpload.module.css'
 
-interface ImageUploadProps {
-  onUpload: (files: File[]) => void
+export interface UploadedImage {
+  id: string
+  file: File
+  preview: string
+  analyzed: boolean
 }
 
-export default function ImageUpload({ onUpload }: ImageUploadProps) {
-  const [preview, setPreview] = useState<string[]>([])
+interface ImageUploadProps {
+  onUpload: (files: File[]) => void
+  onAnalyzeSingle?: (file: File, imageId: string) => void
+}
+
+export default function ImageUpload({ onUpload, onAnalyzeSingle }: ImageUploadProps) {
+  const [images, setImages] = useState<UploadedImage[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     
-    if (files.length < 1 || files.length > 5) {
-      alert('Please select between 1 and 5 images')
+    if (files.length < 1) {
+      alert('Please select at least 1 image')
       return
     }
 
-    const previews: string[] = []
+    if (images.length + files.length > 5) {
+      alert('Maximum 5 images allowed')
+      return
+    }
+
     let loadedCount = 0
+    const newImages: UploadedImage[] = []
 
     files.forEach(file => {
       const reader = new FileReader()
       reader.onload = (event) => {
-        previews.push(event.target?.result as string)
+        newImages.push({
+          id: `img_${Date.now()}_${Math.random()}`,
+          file,
+          preview: event.target?.result as string,
+          analyzed: false,
+        })
         loadedCount++
 
         if (loadedCount === files.length) {
-          setPreview(previews)
+          setImages([...images, ...newImages])
         }
       }
       reader.readAsDataURL(file)
     })
   }
 
-  const handleUpload = () => {
-    if (fileInputRef.current?.files) {
-      const files = Array.from(fileInputRef.current.files)
-      onUpload(files)
+  const handleRemoveImage = (id: string) => {
+    setImages(images.filter(img => img.id !== id))
+  }
+
+  const handleAnalyzeSingle = (image: UploadedImage) => {
+    if (onAnalyzeSingle) {
+      onAnalyzeSingle(image.file, image.id)
+      // Mark as analyzed after sending
+      setImages(images.map(img => 
+        img.id === image.id ? { ...img, analyzed: true } : img
+      ))
     }
   }
 
+  const handleAnalyzeAll = () => {
+    const files = images.map(img => img.file)
+    onUpload(files)
+    // Mark all as analyzed
+    setImages(images.map(img => ({ ...img, analyzed: true })))
+  }
+
   const handleClear = () => {
-    setPreview([])
+    setImages([])
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -61,7 +93,7 @@ export default function ImageUpload({ onUpload }: ImageUploadProps) {
           style={{ display: 'none' }}
         />
         
-        {preview.length === 0 ? (
+        {images.length === 0 ? (
           <div
             className={styles.dragArea}
             onClick={() => fileInputRef.current?.click()}
@@ -75,30 +107,61 @@ export default function ImageUpload({ onUpload }: ImageUploadProps) {
               }
             }}
           >
-            <p>📸 Click to upload or drag and drop</p>
-            <p className={styles.hint}>PNG, JPG, GIF up to 10MB (1-5 images)</p>
+            <p>📸 Click oder Drag & Drop</p>
+            <p className={styles.hint}>PNG, JPG, GIF bis 10MB (1-5 Bilder)</p>
           </div>
         ) : (
           <div className={styles.previewGrid}>
-            {preview.map((src, idx) => (
-              <img
-                key={idx}
-                src={src}
-                alt={`Preview ${idx + 1}`}
-                className={styles.preview}
-              />
+            {images.map((image) => (
+              <div key={image.id} className={styles.imageCard}>
+                <div className={styles.imageWrapper}>
+                  <img
+                    src={image.preview}
+                    alt={`Preview`}
+                    className={styles.preview}
+                  />
+                  {image.analyzed && (
+                    <div className={styles.analyzedBadge}>✓</div>
+                  )}
+                </div>
+                <div className={styles.imageActions}>
+                  {onAnalyzeSingle && !image.analyzed && (
+                    <button
+                      onClick={() => handleAnalyzeSingle(image)}
+                      className={styles.analyzeBtn}
+                      title="Dieses Bild analysieren"
+                    >
+                      📊 Analyse
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleRemoveImage(image.id)}
+                    className={styles.removeBtn}
+                    title="Bild entfernen"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         )}
       </div>
 
-      {preview.length > 0 && (
+      {images.length > 0 && (
         <div className={styles.actions}>
-          <button onClick={handleUpload} className={styles.uploadBtn}>
-            Upload {preview.length} Image{preview.length !== 1 ? 's' : ''}
-          </button>
+          {onAnalyzeSingle && images.some(img => !img.analyzed) && (
+            <button onClick={handleAnalyzeAll} className={styles.uploadBtn}>
+              Alle {images.filter(img => !img.analyzed).length} analysieren
+            </button>
+          )}
+          {!onAnalyzeSingle && (
+            <button onClick={handleAnalyzeAll} className={styles.uploadBtn}>
+              {images.length} Bild{images.length !== 1 ? 'er' : ''} analysieren
+            </button>
+          )}
           <button onClick={handleClear} className={styles.clearBtn}>
-            Clear
+            Löschen
           </button>
         </div>
       )}

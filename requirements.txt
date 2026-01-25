@@ -8,10 +8,17 @@ fastapi>=0.100.0
 uvicorn>=0.23.0
 sqlalchemy>=2.0.0
 python-multipart>=0.0.6
+psycopg2-binary>=2.9.9
+Pillow>=10.1.0
 
 # LLM & AI APIs
 anthropic>=0.7.0
 tavily-python>=0.3.0
+
+# Web scraping & requests
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
 
 # Testing
 pytest>=7.4.0
