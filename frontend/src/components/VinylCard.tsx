@@ -3,7 +3,10 @@ import { VinylRecord } from '../App'
 import styles from './VinylCard.module.css'
 import { registerApiClient } from '../services/registerApi'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API_BASE = import.meta.env.VITE_API_URL
+  || (typeof window !== 'undefined' && window.location.hostname
+    ? `http://${window.location.hostname}:8000`
+    : 'http://localhost:8000')
 
 interface VinylCardProps {
   record: VinylRecord | null
@@ -14,7 +17,9 @@ interface VinylCardProps {
   onAddToRegister?: (record: VinylRecord) => void
   onUpdateRegister?: (record: VinylRecord) => void
   onRegisterSuccess?: () => void
+  onReanalyze?: (images: File[]) => void
   isInRegister?: boolean
+  currentUser?: string
 }
 
 export default function VinylCard({ 
@@ -26,7 +31,9 @@ export default function VinylCard({
   onAddToRegister,
   onUpdateRegister,
   onRegisterSuccess,
-  isInRegister = false
+  onReanalyze,
+  isInRegister = false,
+  currentUser
 }: VinylCardProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editData, setEditData] = useState({
@@ -36,6 +43,7 @@ export default function VinylCard({
     label: '',
     spotify_url: '',
     catalog_number: '',
+    barcode: '',
     genres: '',
   })
   const [showRawData, setShowRawData] = useState(false)
@@ -44,7 +52,13 @@ export default function VinylCard({
 
   // Determine condition from image analysis (simulated)
   const getCondition = () => {
-    if (!record || uploadedImages.length === 0) return null
+    if (!record) return null
+    
+    // Check if we have ANY images (uploaded OR database)
+    const hasUploadedImages = uploadedImages.length > 0
+    const hasDatabaseImages = record.metadata?.image_urls && record.metadata.image_urls.length > 0
+    
+    if (!hasUploadedImages && !hasDatabaseImages) return null
     
     // In real implementation, this would analyze image quality
     // For now, simulate based on confidence and some randomness
@@ -114,6 +128,7 @@ export default function VinylCard({
         label: record.metadata?.label || record.label || '',
         spotify_url: record.metadata?.spotify_url || '',
         catalog_number: record.metadata?.catalog_number || record.catalog_number || '',
+        barcode: record.metadata?.barcode || record.barcode || '',
         genres: Array.isArray(record.metadata?.genres || record.genres) 
           ? (record.metadata?.genres || record.genres)?.join(', ') || ''
           : '',
@@ -131,6 +146,7 @@ export default function VinylCard({
         label: editData.label || undefined,
         spotify_url: editData.spotify_url || undefined,
         catalog_number: editData.catalog_number || undefined,
+        barcode: editData.barcode || undefined,
         genres: editData.genres ? editData.genres.split(',').map(g => g.trim()).filter(Boolean) : undefined,
       })
     }
@@ -233,6 +249,9 @@ export default function VinylCard({
     const estimatedValue = getEstimatedValue()
     const condition = getCondition()
     
+    // Use edited spotify_url if available, otherwise use record metadata
+    const spotifyUrlToSave = editData.spotify_url || record.metadata?.spotify_url || undefined
+    
     try {
       if (isInRegister) {
         // Update existing record in register
@@ -241,7 +260,8 @@ export default function VinylCard({
           estimated_value_eur: estimatedValue,
           condition: condition,
           user_notes: `Condition: ${condition} - Updated ${new Date().toLocaleDateString()}`,
-          spotify_url: record.metadata?.spotify_url
+          spotify_url: spotifyUrlToSave,
+          user_tag: currentUser
         })
         onUpdateRegister?.(record)
       } else {
@@ -256,7 +276,8 @@ export default function VinylCard({
           estimated_value_eur: estimatedValue,
           condition: condition,
           user_notes: `Condition: ${condition} - Added ${new Date().toLocaleDateString()}`,
-          spotify_url: record.metadata?.spotify_url
+          spotify_url: spotifyUrlToSave,
+          user_tag: currentUser
         })
         onAddToRegister?.(record)
       }
@@ -272,7 +293,7 @@ export default function VinylCard({
 
   const handleCancel = () => {
     setIsEditing(false)
-    setEditData({ artist: '', title: '', year: '', label: '', spotify_url: '', catalog_number: '', genres: '' })
+    setEditData({ artist: '', title: '', year: '', label: '', spotify_url: '', catalog_number: '', barcode: '', genres: '' })
   }
 
   if (!record) {
@@ -378,11 +399,27 @@ export default function VinylCard({
               type="file" 
               multiple 
               accept="image/*"
-              onChange={(e) => e.target.files && onImageAdd?.(e.target.files)}
+              onChange={(e) => {
+                if (e.target.files) {
+                  console.log('VinylCard: Adding images:', e.target.files.length)
+                  onImageAdd?.(e.target.files)
+                  // Reset the input value to allow selecting the same files again (mobile fix)
+                  e.target.value = ''
+                }
+              }}
               style={{ display: 'none' }}
             />
             + Add More Images
           </label>
+          {uploadedImages.length > 0 && onReanalyze && (
+            <button 
+              onClick={() => onReanalyze(uploadedImages)}
+              className={styles.reanalyzeBtn}
+              title="Re-analyze record with all available images"
+            >
+              🔄 Re-analyze with {uploadedImages.length + (record.metadata?.image_urls?.length || 0)} total images
+            </button>
+          )}
         </div>
       )}
 
@@ -420,6 +457,10 @@ export default function VinylCard({
             <div className={styles.field}>
               <label>Catalog #</label>
               <span>{record.metadata?.catalog_number || record.catalog_number || 'Unknown'}</span>
+            </div>
+            <div className={styles.field}>
+              <label>Barcode</label>
+              <span>{record.metadata?.barcode || record.barcode || 'Unknown'}</span>
             </div>
             <div className={styles.field}>
               <label>Genres</label>
@@ -479,6 +520,15 @@ export default function VinylCard({
                 type="text" 
                 value={editData.catalog_number}
                 onChange={(e) => setEditData(prev => ({...prev, catalog_number: e.target.value}))}
+              />
+            </div>
+            <div className={styles.field}>
+              <label>Barcode (UPC/EAN)</label>
+              <input 
+                type="text" 
+                value={editData.barcode}
+                onChange={(e) => setEditData(prev => ({...prev, barcode: e.target.value}))}
+                placeholder="123456789012"
               />
             </div>
             <div className={styles.field}>

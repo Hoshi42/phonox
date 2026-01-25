@@ -3,20 +3,49 @@
 import os
 import uuid
 import json
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from backend.database import get_db, VinylRecord, VinylImage
 
-router = APIRouter(prefix="/register", tags=["register"])
+router = APIRouter(prefix="/api/register", tags=["register"])
 
 # Upload directory
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/app/uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+# Explicit OPTIONS handlers for mobile CORS compatibility
+@router.options("/")
+async def options_register():
+    """Handle OPTIONS requests for register endpoint."""
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Max-Age": "86400",
+        }
+    )
+
+
+@router.options("/users")
+async def options_users():
+    """Handle OPTIONS requests for users endpoint."""
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Max-Age": "86400",
+        }
+    )
 
 
 class RegisterRecordRequest(BaseModel):
@@ -25,6 +54,7 @@ class RegisterRecordRequest(BaseModel):
     condition: Optional[str] = None
     user_notes: Optional[str] = None
     spotify_url: Optional[str] = None
+    user_tag: Optional[str] = None
 
 
 class RegisterRecordResponse(BaseModel):
@@ -35,6 +65,7 @@ class RegisterRecordResponse(BaseModel):
     label: Optional[str] = None
     spotify_url: Optional[str] = None
     catalog_number: Optional[str] = None
+    barcode: Optional[str] = None  # UPC/EAN barcode
     genres: Optional[List[str]] = None
     estimated_value_eur: Optional[float] = None
     condition: Optional[str] = None
@@ -43,15 +74,19 @@ class RegisterRecordResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     image_urls: List[str] = []
+    user_tag: Optional[str] = None
 
     class Config:
         from_attributes = True
 
 
 @router.get("/", response_model=List[RegisterRecordResponse])
-async def get_register(db: Session = Depends(get_db)):
+async def get_register(user_tag: Optional[str] = None, db: Session = Depends(get_db)):
     """Get all records in the user's register."""
-    records = db.query(VinylRecord).filter(VinylRecord.in_register == True).all()
+    query = db.query(VinylRecord).filter(VinylRecord.in_register == True)
+    if user_tag:
+        query = query.filter(VinylRecord.user_tag == user_tag)
+    records = query.all()
     
     result = []
     for record in records:
@@ -64,7 +99,7 @@ async def get_register(db: Session = Depends(get_db)):
                 genres = []
         
         # Get image URLs
-        image_urls = [f"/register/images/{img.id}" for img in record.images]
+        image_urls = [f"/api/register/images/{img.id}" for img in record.images]
         
         result.append(RegisterRecordResponse(
             id=record.id,
@@ -74,6 +109,7 @@ async def get_register(db: Session = Depends(get_db)):
             label=record.label,
             spotify_url=record.spotify_url,
             catalog_number=record.catalog_number,
+            barcode=record.barcode,
             genres=genres,
             estimated_value_eur=record.estimated_value_eur,
             condition=record.condition,
@@ -81,10 +117,22 @@ async def get_register(db: Session = Depends(get_db)):
             confidence=record.confidence,
             created_at=record.created_at,
             updated_at=record.updated_at,
-            image_urls=image_urls
+            image_urls=image_urls,
+            user_tag=record.user_tag
         ))
     
     return result
+
+
+@router.get("/users", response_model=List[str])
+async def get_users(db: Session = Depends(get_db)):
+    """Get all distinct users who have records."""
+    result = db.query(VinylRecord.user_tag).filter(
+        VinylRecord.user_tag.isnot(None),
+        VinylRecord.user_tag != ""
+    ).distinct().all()
+    
+    return [row[0] for row in result if row[0]]
 
 
 @router.post("/add", response_model=RegisterRecordResponse)
@@ -105,6 +153,8 @@ async def add_to_register(
     record.user_notes = request.user_notes
     if request.spotify_url is not None:
         record.spotify_url = request.spotify_url
+    if request.user_tag is not None:
+        record.user_tag = request.user_tag
     record.updated_at = datetime.utcnow()
     
     db.commit()
@@ -119,7 +169,7 @@ async def add_to_register(
             genres = []
     
     # Get image URLs
-    image_urls = [f"/register/images/{img.id}" for img in record.images]
+    image_urls = [f"/api/register/images/{img.id}" for img in record.images]
     
     return RegisterRecordResponse(
         id=record.id,
@@ -129,6 +179,7 @@ async def add_to_register(
         label=record.label,
         spotify_url=record.spotify_url,
         catalog_number=record.catalog_number,
+        barcode=record.barcode,
         genres=genres,
         estimated_value_eur=record.estimated_value_eur,
         condition=record.condition,
@@ -136,7 +187,8 @@ async def add_to_register(
         confidence=record.confidence,
         created_at=record.created_at,
         updated_at=record.updated_at,
-        image_urls=image_urls
+        image_urls=image_urls,
+        user_tag=record.user_tag
     )
 
 
@@ -163,6 +215,8 @@ async def update_register_record(
         record.user_notes = request.user_notes
     if request.spotify_url is not None:
         record.spotify_url = request.spotify_url
+    if request.user_tag is not None:
+        record.user_tag = request.user_tag
     
     record.updated_at = datetime.utcnow()
     
@@ -178,7 +232,7 @@ async def update_register_record(
             genres = []
     
     # Get image URLs
-    image_urls = [f"/register/images/{img.id}" for img in record.images]
+    image_urls = [f"/api/register/images/{img.id}" for img in record.images]
     
     return RegisterRecordResponse(
         id=record.id,
@@ -188,6 +242,7 @@ async def update_register_record(
         label=record.label,
         spotify_url=record.spotify_url,
         catalog_number=record.catalog_number,
+        barcode=record.barcode,
         genres=genres,
         estimated_value_eur=record.estimated_value_eur,
         condition=record.condition,
@@ -195,17 +250,22 @@ async def update_register_record(
         confidence=record.confidence,
         created_at=record.created_at,
         updated_at=record.updated_at,
-        image_urls=image_urls
+        image_urls=image_urls,
+        user_tag=record.user_tag
     )
 
 
 @router.delete("/{record_id}")
-async def remove_from_register(record_id: str, db: Session = Depends(get_db)):
+async def remove_from_register(record_id: str, user_tag: Optional[str] = None, db: Session = Depends(get_db)):
     """Remove a record from the register."""
-    record = db.query(VinylRecord).filter(
+    query = db.query(VinylRecord).filter(
         VinylRecord.id == record_id,
         VinylRecord.in_register == True
-    ).first()
+    )
+    if user_tag:
+        query = query.filter(VinylRecord.user_tag == user_tag)
+    
+    record = query.first()
     if not record:
         raise HTTPException(status_code=404, detail="Record not found in register")
     
@@ -276,9 +336,62 @@ async def upload_images(
         uploaded_images.append({
             "id": vinyl_image.id,
             "filename": vinyl_image.filename,
-            "url": f"/register/images/{vinyl_image.id}"
+            "url": f"/api/register/images/{vinyl_image.id}"
         })
     
     db.commit()
     
     return {"uploaded_images": uploaded_images}
+
+
+class UpdateSpotifyUrlRequest(BaseModel):
+    """Request model for updating Spotify URLs."""
+    updates: List[Dict[str, Optional[str]]] = []
+    # updates is list of {record_id: str, spotify_url: str}
+
+
+@router.put("/batch-update-spotify")
+async def batch_update_spotify_urls(
+    request: UpdateSpotifyUrlRequest,
+    db: Session = Depends(get_db)
+):
+    """Batch update Spotify URLs for multiple records."""
+    results = []
+    
+    for update in request.updates:
+        record_id = update.get("record_id")
+        spotify_url = update.get("spotify_url")
+        
+        if not record_id or not spotify_url:
+            results.append({
+                "record_id": record_id,
+                "success": False,
+                "error": "Missing record_id or spotify_url"
+            })
+            continue
+        
+        record = db.query(VinylRecord).filter(VinylRecord.id == record_id).first()
+        if not record:
+            results.append({
+                "record_id": record_id,
+                "success": False,
+                "error": "Record not found"
+            })
+            continue
+        
+        record.spotify_url = spotify_url
+        results.append({
+            "record_id": record_id,
+            "success": True,
+            "artist": record.artist,
+            "title": record.title,
+            "spotify_url": spotify_url
+        })
+    
+    db.commit()
+    
+    return {
+        "updated": sum(1 for r in results if r.get("success")),
+        "total": len(results),
+        "results": results
+    }
