@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobile Network Debug</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test { margin: 15px 0; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .loading { background-color: #fff3cd; border-color: #ffeaa7; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        button { padding: 10px 20px; font-size: 16px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Mobile Network Debug Tool</h1>
+    <button onclick="runAllTests()">Run All Tests</button>
+    <button onclick="clearResults()">Clear Results</button>
+    
+    <div id="results"></div>
+
+    <script>
+        const results = document.getElementById('results');
+        
+        function addResult(title, content, type = 'test') {
+            const div = document.createElement('div');
+            div.className = `test ${type}`;
+            div.innerHTML = `<h3>${title}</h3><pre>${content}</pre>`;
+            results.appendChild(div);
+        }
+        
+        function clearResults() {
+            results.innerHTML = '';
+        }
+        
+        async function testAPI(url, description) {
+            addResult(description, 'Testing...', 'loading');
+            const startTime = Date.now();
+            
+            try {
+                console.log(`Testing ${url}`);
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const endTime = Date.now();
+                const responseTime = endTime - startTime;
+                
+                const data = await response.text();
+                
+                results.removeChild(results.lastChild);
+                addResult(
+                    description,
+                    `Status: ${response.status}\nResponse Time: ${responseTime}ms\nResponse:\n${data}`,
+                    response.ok ? 'success' : 'error'
+                );
+                
+                return { success: true, status: response.status, data, responseTime };
+            } catch (error) {
+                const endTime = Date.now();
+                const responseTime = endTime - startTime;
+                
+                results.removeChild(results.lastChild);
+                addResult(
+                    description,
+                    `Error: ${error.message}\nResponse Time: ${responseTime}ms\nStack: ${error.stack}`,
+                    'error'
+                );
+                
+                return { success: false, error: error.message, responseTime };
+            }
+        }
+        
+        async function testRegisterAPI(apiUrl) {
+            // Test health
+            await testAPI(`${apiUrl}/health`, `Health Check (${apiUrl})`);
+            
+            // Test register endpoint
+            await testAPI(`${apiUrl}/api/register/`, `Register Endpoint (${apiUrl})`);
+            
+            // Test users endpoint
+            await testAPI(`${apiUrl}/api/register/users`, `Users Endpoint (${apiUrl})`);
+            
+            // Test Jan's register
+            await testAPI(`${apiUrl}/api/register/users/Jan`, `Jan's Register (${apiUrl})`);
+        }
+        
+        async function runAllTests() {
+            clearResults();
+            
+            // Get current hostname info
+            const currentHost = window.location.hostname;
+            const currentPort = window.location.port;
+            addResult(
+                'Current Location Info',
+                `Hostname: ${currentHost}\nPort: ${currentPort}\nFull URL: ${window.location.href}`,
+                'test'
+            );
+            
+            // Test different API endpoints
+            const apiUrls = [
+                `http://${currentHost}:8000`,
+                'http://192.168.178.132:8000',
+                'http://172.21.83.112:8000',
+                'http://localhost:8000'
+            ];
+            
+            for (const apiUrl of apiUrls) {
+                await testRegisterAPI(apiUrl);
+            }
+            
+            // Test what the frontend would actually use
+            const frontendApiUrl = window.location.hostname + ':8000';
+            addResult(
+                'Frontend API Detection',
+                `Frontend would use: http://${frontendApiUrl}`,
+                'test'
+            );
+        }
+        
+        // Auto-run tests on page load
+        window.onload = function() {
+            setTimeout(runAllTests, 1000);
+        };
+    </script>
+</body>
+</html>

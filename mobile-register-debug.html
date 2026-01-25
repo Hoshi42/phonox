@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Mobile Register Flow</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 10px; 
+            background: #1a1a1a;
+            color: #fff;
+            margin: 0;
+        }
+        .container { 
+            max-width: 800px; 
+            margin: 0 auto;
+        }
+        h1 { 
+            text-align: center; 
+            color: #4CAF50;
+            font-size: 1.8em;
+            margin: 15px 0;
+        }
+        .step { 
+            background: #2d2d2d; 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 8px; 
+            border-left: 4px solid #4CAF50;
+        }
+        .step h3 { 
+            margin: 0 0 10px 0; 
+            color: #4CAF50; 
+        }
+        button { 
+            background: #4CAF50; 
+            color: white; 
+            padding: 10px 15px; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            margin: 5px 5px 5px 0;
+            font-size: 14px;
+        }
+        button:hover { 
+            background: #45a049; 
+        }
+        button.secondary {
+            background: #2196F3;
+        }
+        .log { 
+            background: #000; 
+            color: #00ff00; 
+            padding: 8px; 
+            margin: 5px 0; 
+            border-radius: 3px; 
+            font-family: 'Courier New', monospace; 
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #333;
+        }
+        .success { 
+            color: #4CAF50; 
+        }
+        .error { 
+            color: #f44336; 
+        }
+        .warning { 
+            color: #ff9800; 
+        }
+        .info { 
+            color: #2196F3; 
+        }
+        .status {
+            text-align: center;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .status.success { background: #4CAF50; }
+        .status.error { background: #f44336; }
+        .status.warning { background: #ff9800; }
+        .status.info { background: #2196F3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔬 Mobile Register Debug</h1>
+        
+        <div class="status info" id="status">
+            Ready to debug mobile register flow
+        </div>
+        
+        <div class="step">
+            <h3>Step 1: Environment Check</h3>
+            <button onclick="checkEnvironment()">🌍 Check Environment</button>
+            <div id="env-log" class="log"></div>
+        </div>
+        
+        <div class="step">
+            <h3>Step 2: Test Users Endpoint</h3>
+            <button onclick="testUsersEndpoint()">👥 Test Users</button>
+            <div id="users-log" class="log"></div>
+        </div>
+        
+        <div class="step">
+            <h3>Step 3: Test Jan's Register</h3>
+            <button onclick="testJanRegister()">🎵 Test Jan's Records</button>
+            <div id="register-log" class="log"></div>
+        </div>
+        
+        <div class="step">
+            <h3>Step 4: Simulate Frontend Flow</h3>
+            <button onclick="simulateFrontendFlow()">🔄 Simulate Frontend</button>
+            <div id="frontend-log" class="log"></div>
+        </div>
+        
+        <div class="step">
+            <h3>Step 5: Console Debug</h3>
+            <button onclick="enableConsoleLogging()">📊 Enable Console Debug</button>
+            <button onclick="checkBrowserConsole()" class="secondary">📋 Check Console</button>
+            <div id="console-log" class="log"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = `http://${window.location.hostname}:8000`;
+        
+        function log(containerId, message, type = 'info') {
+            const container = document.getElementById(containerId);
+            const timestamp = new Date().toLocaleTimeString();
+            const span = document.createElement('span');
+            span.className = type;
+            span.textContent = `[${timestamp}] ${message}\n`;
+            container.appendChild(span);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function setStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        function checkEnvironment() {
+            const containerId = 'env-log';
+            document.getElementById(containerId).innerHTML = '';
+            
+            log(containerId, 'ENVIRONMENT CHECK', 'info');
+            log(containerId, `URL: ${window.location.href}`, 'info');
+            log(containerId, `Hostname: ${window.location.hostname}`, 'info');
+            log(containerId, `User Agent: ${navigator.userAgent}`, 'info');
+            log(containerId, `Online: ${navigator.onLine}`, 'info');
+            log(containerId, `API Base: ${API_BASE}`, 'warning');
+            
+            // Check localStorage
+            const keys = Object.keys(localStorage);
+            log(containerId, `localStorage keys: ${keys.join(', ')}`, 'info');
+            
+            // Check if it's mobile
+            const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+            log(containerId, `Mobile detected: ${isMobile}`, isMobile ? 'success' : 'warning');
+        }
+
+        async function testUsersEndpoint() {
+            const containerId = 'users-log';
+            document.getElementById(containerId).innerHTML = '';
+            
+            log(containerId, 'TESTING USERS ENDPOINT', 'info');
+            
+            const url = `${API_BASE}/api/register/users?_t=${Date.now()}`;
+            log(containerId, `URL: ${url}`, 'info');
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    cache: 'no-cache',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                log(containerId, `Status: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
+                
+                if (response.ok) {
+                    const users = await response.json();
+                    log(containerId, `Users: ${JSON.stringify(users)}`, 'success');
+                    
+                    if (users.includes('Jan')) {
+                        log(containerId, '✅ Jan found in users list!', 'success');
+                        setStatus('Users endpoint working', 'success');
+                    } else {
+                        log(containerId, '❌ Jan not found in users', 'error');
+                    }
+                } else {
+                    const errorText = await response.text();
+                    log(containerId, `Error: ${errorText}`, 'error');
+                    setStatus('Users endpoint failed', 'error');
+                }
+                
+            } catch (error) {
+                log(containerId, `Exception: ${error.message}`, 'error');
+                setStatus('Users endpoint exception', 'error');
+            }
+        }
+
+        async function testJanRegister() {
+            const containerId = 'register-log';
+            document.getElementById(containerId).innerHTML = '';
+            
+            log(containerId, 'TESTING JAN\'S REGISTER', 'info');
+            
+            const url = `${API_BASE}/api/register/?user_tag=Jan&_t=${Date.now()}`;
+            log(containerId, `URL: ${url}`, 'info');
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    cache: 'no-cache',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                log(containerId, `Status: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
+                
+                if (response.ok) {
+                    const records = await response.json();
+                    log(containerId, `Found ${records.length} records`, records.length > 0 ? 'success' : 'warning');
+                    
+                    records.forEach((record, index) => {
+                        log(containerId, `Record ${index + 1}: ${record.artist} - ${record.title}`, 'success');
+                    });
+                    
+                    if (records.length > 0) {
+                        setStatus(`✅ Found ${records.length} records for Jan`, 'success');
+                    } else {
+                        setStatus('⚠️ No records found for Jan', 'warning');
+                    }
+                } else {
+                    const errorText = await response.text();
+                    log(containerId, `Error: ${errorText}`, 'error');
+                    setStatus('Register endpoint failed', 'error');
+                }
+                
+            } catch (error) {
+                log(containerId, `Exception: ${error.message}`, 'error');
+                setStatus('Register endpoint exception', 'error');
+            }
+        }
+
+        async function simulateFrontendFlow() {
+            const containerId = 'frontend-log';
+            document.getElementById(containerId).innerHTML = '';
+            
+            log(containerId, 'SIMULATING FRONTEND FLOW', 'info');
+            
+            // Step 1: Simulate registerApiClient initialization
+            const API_BASE_FRONTEND = (() => {
+                if (typeof window !== 'undefined' && window.location.hostname) {
+                    const fallbackUrl = `http://${window.location.hostname}:8000`;
+                    return fallbackUrl;
+                }
+                return 'http://localhost:8000';
+            })();
+            
+            const baseUrl = `${API_BASE_FRONTEND}/api/register`;
+            log(containerId, `Frontend API Base: ${API_BASE_FRONTEND}`, 'info');
+            log(containerId, `Register API Base: ${baseUrl}`, 'info');
+            
+            // Step 2: Simulate getRegister call
+            const userTag = 'Jan';
+            const url = `${baseUrl}/?user_tag=${encodeURIComponent(userTag)}&_t=${Date.now()}`;
+            
+            log(containerId, `Simulating registerApiClient.getRegister('${userTag}')`, 'info');
+            log(containerId, `Full URL: ${url}`, 'info');
+            
+            try {
+                const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+                const cacheHeaders = {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                };
+                
+                if (isMobile) {
+                    cacheHeaders['X-Mobile-Cache-Bust'] = Date.now().toString();
+                    log(containerId, 'Added mobile cache busting headers', 'info');
+                }
+                
+                log(containerId, `Headers: ${JSON.stringify(cacheHeaders)}`, 'info');
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...cacheHeaders
+                    },
+                    cache: 'no-cache'
+                });
+                
+                log(containerId, `Response: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    log(containerId, `❌ Frontend simulation failed: ${errorText}`, 'error');
+                    setStatus('Frontend simulation failed', 'error');
+                    return;
+                }
+                
+                const data = await response.json();
+                log(containerId, `✅ Frontend simulation success: ${data.length} records`, 'success');
+                
+                if (data.length > 0) {
+                    data.forEach((record, index) => {
+                        log(containerId, `  ${index + 1}. ${record.artist} - ${record.title}`, 'success');
+                    });
+                    setStatus('✅ Frontend simulation successful!', 'success');
+                } else {
+                    log(containerId, '⚠️ Frontend simulation returned 0 records', 'warning');
+                    setStatus('⚠️ Simulation returned 0 records', 'warning');
+                }
+                
+            } catch (error) {
+                log(containerId, `❌ Frontend simulation exception: ${error.message}`, 'error');
+                setStatus('Frontend simulation exception', 'error');
+            }
+        }
+
+        function enableConsoleLogging() {
+            const containerId = 'console-log';
+            document.getElementById(containerId).innerHTML = '';
+            
+            log(containerId, 'ENABLING CONSOLE DEBUG', 'info');
+            
+            // Override console methods to capture logs
+            const originalLog = console.log;
+            const originalError = console.error;
+            const originalWarn = console.warn;
+            
+            console.log = function(...args) {
+                originalLog.apply(console, args);
+                log(containerId, `LOG: ${args.join(' ')}`, 'info');
+            };
+            
+            console.error = function(...args) {
+                originalError.apply(console, args);
+                log(containerId, `ERROR: ${args.join(' ')}`, 'error');
+            };
+            
+            console.warn = function(...args) {
+                originalWarn.apply(console, args);
+                log(containerId, `WARN: ${args.join(' ')}`, 'warning');
+            };
+            
+            log(containerId, '✅ Console logging enabled', 'success');
+            log(containerId, 'Now reload the main app and watch console output here', 'info');
+        }
+
+        function checkBrowserConsole() {
+            const containerId = 'console-log';
+            
+            log(containerId, '=== BROWSER CONSOLE CHECK ===', 'info');
+            log(containerId, 'Open browser DevTools (F12) and check Console tab', 'warning');
+            log(containerId, 'Look for errors or failed network requests', 'warning');
+            log(containerId, 'Common issues to look for:', 'info');
+            log(containerId, '- Failed to fetch errors', 'warning');
+            log(containerId, '- CORS errors', 'warning');
+            log(containerId, '- 404 Not Found errors', 'warning');
+            log(containerId, '- registerApiClient errors', 'warning');
+            log(containerId, '=== END CHECK ===', 'info');
+        }
+
+        // Auto-run environment check on load
+        window.addEventListener('load', () => {
+            checkEnvironment();
+        });
+    </script>
+</body>
+</html>

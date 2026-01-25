@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobile Register Debug - Live</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 10px; 
+            background: #000;
+            color: #00ff00;
+            margin: 0;
+            font-size: 14px;
+        }
+        .container { 
+            max-width: 100%;
+        }
+        h1 { 
+            color: #fff;
+            text-align: center;
+            font-size: 1.5em;
+            margin: 10px 0;
+        }
+        .section { 
+            background: #1a1a1a; 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+            border: 1px solid #333;
+        }
+        .section h3 { 
+            margin: 0 0 10px 0; 
+            color: #4CAF50; 
+            font-size: 1.1em;
+        }
+        button { 
+            background: #4CAF50; 
+            color: white; 
+            padding: 8px 12px; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            margin: 5px 5px 5px 0;
+            font-size: 12px;
+            width: auto;
+        }
+        button:hover { 
+            background: #45a049; 
+        }
+        .log { 
+            background: #000; 
+            color: #00ff00; 
+            padding: 5px; 
+            margin: 3px 0; 
+            font-family: 'Courier New', monospace; 
+            font-size: 11px;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #333;
+        }
+        .error { color: #ff4444; }
+        .success { color: #4CAF50; }
+        .warning { color: #ffaa00; }
+        .info { color: #4444ff; }
+        .status {
+            text-align: center;
+            padding: 8px;
+            border-radius: 4px;
+            margin: 8px 0;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        .status.success { background: #4CAF50; color: white; }
+        .status.error { background: #f44336; color: white; }
+        .status.warning { background: #ff9800; color: white; }
+        .status.info { background: #2196F3; color: white; }
+        select {
+            padding: 5px;
+            font-size: 14px;
+            width: 100%;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 Live Mobile Debug</h1>
+        
+        <div class="status info" id="main-status">
+            Diagnose wird gestartet...
+        </div>
+        
+        <div class="section">
+            <h3>🎯 Direkte API Tests</h3>
+            <button onclick="testAllAPIs()">Alle APIs testen</button>
+            <div id="api-log" class="log"></div>
+        </div>
+        
+        <div class="section">
+            <h3>👥 Benutzer Simulation</h3>
+            <label>Benutzer auswählen:</label>
+            <select id="user-select" onchange="simulateUserSelection()">
+                <option value="">-- Benutzer wählen --</option>
+            </select>
+            <button onclick="loadUsersList()">Benutzer laden</button>
+            <div id="user-log" class="log"></div>
+        </div>
+        
+        <div class="section">
+            <h3>🎵 Register Test</h3>
+            <button onclick="testRegisterDirectly()">Jan's Register laden</button>
+            <div id="register-log" class="log"></div>
+        </div>
+        
+        <div class="section">
+            <h3>🔄 Frontend Simulation</h3>
+            <button onclick="simulateFullFlow()">Kompletten Flow simulieren</button>
+            <div id="flow-log" class="log"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = `http://${window.location.hostname}:8000`;
+        let debugLog = [];
+        
+        function log(containerId, message, type = 'info') {
+            const container = document.getElementById(containerId);
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}\n`;
+            
+            // Add to debug log
+            debugLog.push({time: timestamp, message, type, container: containerId});
+            
+            const span = document.createElement('span');
+            span.className = type;
+            span.textContent = logEntry;
+            container.appendChild(span);
+            container.scrollTop = container.scrollHeight;
+            
+            // Also log to console if available
+            try {
+                console.log(`[${containerId}] ${message}`);
+            } catch(e) {}
+        }
+
+        function setStatus(message, type = 'info') {
+            const statusEl = document.getElementById('main-status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        async function testAllAPIs() {
+            const containerId = 'api-log';
+            document.getElementById(containerId).innerHTML = '';
+            
+            log(containerId, '=== API VOLLTEST GESTARTET ===', 'info');
+            setStatus('Teste alle APIs...', 'info');
+            
+            const tests = [
+                {
+                    name: 'Health Check',
+                    url: `${API_BASE}/health`,
+                    expect: 'Health status'
+                },
+                {
+                    name: 'Benutzer Liste',
+                    url: `${API_BASE}/api/register/users?_t=${Date.now()}`,
+                    expect: 'Benutzer Array'
+                },
+                {
+                    name: 'Jan Register',
+                    url: `${API_BASE}/api/register/?user_tag=Jan&_t=${Date.now()}`,
+                    expect: 'Jan Records'
+                }
+            ];
+            
+            let allPassed = true;
+            
+            for (const test of tests) {
+                try {
+                    log(containerId, `Teste ${test.name}...`, 'info');
+                    log(containerId, `URL: ${test.url}`, 'info');
+                    
+                    const startTime = Date.now();
+                    const response = await fetch(test.url, {
+                        method: 'GET',
+                        cache: 'no-cache',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    const endTime = Date.now();
+                    
+                    log(containerId, `Status: ${response.status} (${endTime - startTime}ms)`, response.ok ? 'success' : 'error');
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (Array.isArray(data)) {
+                            log(containerId, `✅ ${test.name}: ${data.length} Einträge gefunden`, 'success');
+                            if (test.name === 'Jan Register' && data.length > 0) {
+                                data.forEach((record, i) => {
+                                    log(containerId, `  ${i+1}. ${record.artist} - ${record.title}`, 'success');
+                                });
+                            } else if (test.name === 'Benutzer Liste') {
+                                log(containerId, `  Benutzer: ${data.join(', ')}`, 'success');
+                            }
+                        } else {
+                            log(containerId, `✅ ${test.name}: OK`, 'success');
+                        }
+                    } else {
+                        const errorText = await response.text();
+                        log(containerId, `❌ ${test.name} Fehler: ${errorText}`, 'error');
+                        allPassed = false;
+                    }
+                    
+                } catch (error) {
+                    log(containerId, `❌ ${test.name} Exception: ${error.message}`, 'error');
+                    allPassed = false;
+                }
+                
+                // Kleine Pause zwischen Tests
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+            
+            if (allPassed) {
+                setStatus('✅ Alle APIs funktionieren!', 'success');
+                log(containerId, '=== ALLE TESTS BESTANDEN ===', 'success');
+            } else {
+                setStatus('❌ Einige APIs fehlgeschlagen', 'error');
+                log(containerId, '=== EINIGE TESTS FEHLGESCHLAGEN ===', 'error');
+            }
+        }
+
+        async function loadUsersList() {
+            const containerId = 'user-log';
+            const selectEl = document.getElementById('user-select');
+            
+            document.getElementById(containerId).innerHTML = '';
+            log(containerId, 'Lade Benutzerliste...', 'info');
+            
+            try {
+                const url = `${API_BASE}/api/register/users?_t=${Date.now()}`;
+                log(containerId, `URL: ${url}`, 'info');
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    cache: 'no-cache',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const users = await response.json();
+                    log(containerId, `✅ ${users.length} Benutzer gefunden: ${users.join(', ')}`, 'success');
+                    
+                    // Update select dropdown
+                    selectEl.innerHTML = '<option value="">-- Benutzer wählen --</option>';
+                    users.forEach(user => {
+                        const option = document.createElement('option');
+                        option.value = user;
+                        option.textContent = user;
+                        selectEl.appendChild(option);
+                    });
+                    
+                    log(containerId, 'Dropdown aktualisiert', 'success');
+                } else {
+                    const errorText = await response.text();
+                    log(containerId, `❌ Fehler beim Laden der Benutzer: ${errorText}`, 'error');
+                }
+                
+            } catch (error) {
+                log(containerId, `❌ Exception: ${error.message}`, 'error');
+            }
+        }
+
+        async function simulateUserSelection() {
+            const containerId = 'user-log';
+            const selectedUser = document.getElementById('user-select').value;
+            
+            if (!selectedUser) {
+                log(containerId, 'Kein Benutzer ausgewählt', 'warning');
+                return;
+            }
+            
+            log(containerId, `Benutzer gewählt: ${selectedUser}`, 'info');
+            
+            // Simulate what the frontend should do
+            await simulateRegisterLoad(selectedUser);
+        }
+
+        async function simulateRegisterLoad(userTag) {
+            const containerId = 'user-log';
+            
+            log(containerId, `Simuliere Register-Ladung für ${userTag}...`, 'info');
+            
+            try {
+                // This is what registerApiClient.getRegister should do
+                const API_BASE_FRONTEND = `http://${window.location.hostname}:8000`;
+                const baseUrl = `${API_BASE_FRONTEND}/api/register`;
+                const url = `${baseUrl}/?user_tag=${encodeURIComponent(userTag)}&_t=${Date.now()}`;
+                
+                log(containerId, `Register API URL: ${url}`, 'info');
+                
+                const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+                const cacheHeaders = {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                };
+                
+                if (isMobile) {
+                    cacheHeaders['X-Mobile-Cache-Bust'] = Date.now().toString();
+                    log(containerId, 'Mobile Cache-Busting hinzugefügt', 'info');
+                }
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...cacheHeaders
+                    },
+                    cache: 'no-cache'
+                });
+                
+                if (response.ok) {
+                    const records = await response.json();
+                    log(containerId, `✅ Register geladen: ${records.length} Einträge`, 'success');
+                    
+                    if (records.length > 0) {
+                        records.forEach((record, i) => {
+                            log(containerId, `  ${i+1}. ${record.artist} - ${record.title}`, 'success');
+                        });
+                        setStatus(`✅ ${userTag} hat ${records.length} Einträge!`, 'success');
+                    } else {
+                        log(containerId, `⚠️ Keine Einträge für ${userTag}`, 'warning');
+                        setStatus(`⚠️ Keine Einträge für ${userTag}`, 'warning');
+                    }
+                } else {
+                    const errorText = await response.text();
+                    log(containerId, `❌ Register-Fehler: ${errorText}`, 'error');
+                    setStatus('❌ Register-Ladung fehlgeschlagen', 'error');
+                }
+                
+            } catch (error) {
+                log(containerId, `❌ Register Exception: ${error.message}`, 'error');
+                setStatus('❌ Register Exception', 'error');
+            }
+        }
+
+        async function testRegisterDirectly() {
+            const containerId = 'register-log';
+            document.getElementById(containerId).innerHTML = '';
+            
+            log(containerId, 'Teste Jan\'s Register direkt...', 'info');
+            
+            const url = `${API_BASE}/api/register/?user_tag=Jan&_t=${Date.now()}`;
+            
+            try {
+                log(containerId, `URL: ${url}`, 'info');
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    cache: 'no-cache'
+                });
+                
+                if (response.ok) {
+                    const records = await response.json();
+                    log(containerId, `✅ Direkter Test erfolgreich: ${records.length} Einträge`, 'success');
+                    
+                    records.forEach((record, i) => {
+                        log(containerId, `${i+1}. ${record.artist} - ${record.title} (${record.year || 'Unbekannt'})`, 'success');
+                        log(containerId, `   Wert: €${record.estimated_value_eur || '?'}, Zustand: ${record.condition || '?'}`, 'info');
+                    });
+                    
+                    setStatus(`✅ Jan hat ${records.length} Vinyl-Platten!`, 'success');
+                } else {
+                    const errorText = await response.text();
+                    log(containerId, `❌ Direkter Test fehlgeschlagen: ${errorText}`, 'error');
+                    setStatus('❌ Direkter Test fehlgeschlagen', 'error');
+                }
+            } catch (error) {
+                log(containerId, `❌ Exception: ${error.message}`, 'error');
+                setStatus('❌ Verbindungsfehler', 'error');
+            }
+        }
+
+        async function simulateFullFlow() {
+            const containerId = 'flow-log';
+            document.getElementById(containerId).innerHTML = '';
+            
+            log(containerId, '=== KOMPLETTER FRONTEND-FLOW ===', 'info');
+            setStatus('Simuliere kompletten Flow...', 'info');
+            
+            // Schritt 1: Benutzer laden
+            log(containerId, 'Schritt 1: Benutzer laden...', 'info');
+            try {
+                const usersResponse = await fetch(`${API_BASE}/api/register/users?_t=${Date.now()}`);
+                if (!usersResponse.ok) {
+                    log(containerId, '❌ Benutzer-Ladung fehlgeschlagen', 'error');
+                    return;
+                }
+                const users = await usersResponse.json();
+                log(containerId, `✅ ${users.length} Benutzer geladen`, 'success');
+                
+                if (!users.includes('Jan')) {
+                    log(containerId, '❌ Jan nicht in Benutzerliste gefunden', 'error');
+                    return;
+                }
+                log(containerId, '✅ Jan in Benutzerliste gefunden', 'success');
+            } catch (error) {
+                log(containerId, `❌ Benutzer-Ladung Exception: ${error.message}`, 'error');
+                return;
+            }
+            
+            // Schritt 2: Jan's Register laden
+            log(containerId, 'Schritt 2: Jan\'s Register laden...', 'info');
+            try {
+                await simulateRegisterLoadInFlow('Jan', containerId);
+            } catch (error) {
+                log(containerId, `❌ Register-Ladung Exception: ${error.message}`, 'error');
+                setStatus('❌ Flow fehlgeschlagen', 'error');
+                return;
+            }
+            
+            log(containerId, '=== FLOW ABGESCHLOSSEN ===', 'success');
+        }
+
+        async function simulateRegisterLoadInFlow(userTag, containerId) {
+            const url = `${API_BASE}/api/register/?user_tag=${userTag}&_t=${Date.now()}`;
+            log(containerId, `Register URL: ${url}`, 'info');
+            
+            const response = await fetch(url, {
+                method: 'GET',
+                cache: 'no-cache',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const records = await response.json();
+                log(containerId, `✅ Register geladen: ${records.length} Einträge`, 'success');
+                
+                if (records.length > 0) {
+                    setStatus(`🎉 ERFOLG! Jan hat ${records.length} Vinyl-Platten`, 'success');
+                    log(containerId, '🎉 DAS SOLLTE IN DER HAUPTAPP FUNKTIONIEREN!', 'success');
+                } else {
+                    setStatus('⚠️ Register leer', 'warning');
+                }
+            } else {
+                const errorText = await response.text();
+                log(containerId, `❌ Register-Fehler: ${errorText}`, 'error');
+                throw new Error(`Register API failed: ${response.status}`);
+            }
+        }
+
+        // Auto-start beim Laden
+        window.addEventListener('load', () => {
+            log('api-log', 'Debug-Tool gestartet', 'success');
+            setStatus('Debug-Tool bereit - Klicken Sie auf "Alle APIs testen"', 'info');
+            
+            // Info über das Problem
+            setTimeout(() => {
+                log('api-log', 'PROBLEM: Mobile App lädt Benutzer aber nicht das Register', 'warning');
+                log('api-log', 'Dieser Test zeigt, ob die APIs funktionieren', 'info');
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

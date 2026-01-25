@@ -30,6 +30,7 @@ class VinylRecord(Base):  # type: ignore[misc,valid-type]
     label: ColumnType = Column(String(255), nullable=True)
     spotify_url: ColumnType = Column(String(500), nullable=True)
     catalog_number: ColumnType = Column(String(50), nullable=True)
+    barcode: ColumnType = Column(String(20), nullable=True)  # UPC/EAN barcodes typically 12-13 digits
     genres: ColumnType = Column(Text, nullable=True)  # JSON array stored as string
 
     # Workflow state
@@ -51,6 +52,7 @@ class VinylRecord(Base):  # type: ignore[misc,valid-type]
     in_register: ColumnType = Column(Boolean, default=False, nullable=False)
     estimated_value_eur: ColumnType = Column(Float, nullable=True)
     condition: ColumnType = Column(String(50), nullable=True)  # poor, fair, good, excellent, near_mint
+    user_tag: ColumnType = Column(String(50), nullable=True, index=True)  # Simple user identifier
     
     # Relationships
     images = relationship("VinylImage", back_populates="record", cascade="all, delete-orphan")
@@ -102,6 +104,7 @@ class VinylRecord(Base):  # type: ignore[misc,valid-type]
                 "label": self.label,
                 "spotify_url": self.spotify_url,
                 "catalog_number": self.catalog_number,
+                "barcode": self.barcode,
                 "genres": self.get_genres(),
             },
             "evidence_chain": self.get_evidence_chain(),

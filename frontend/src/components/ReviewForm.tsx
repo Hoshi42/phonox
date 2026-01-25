@@ -13,6 +13,7 @@ export default function ReviewForm({ onReview }: ReviewFormProps) {
     year: '',
     label: '',
     catalog_number: '',
+    barcode: '',
     genres: '',
     notes: '',
   })
@@ -108,6 +109,18 @@ export default function ReviewForm({ onReview }: ReviewFormProps) {
             value={formData.catalog_number}
             onChange={handleChange}
             placeholder="Enter catalog number"
+          />
+        </div>
+
+        <div className={styles.formGroup}>
+          <label htmlFor="barcode">Barcode (UPC/EAN)</label>
+          <input
+            type="text"
+            id="barcode"
+            name="barcode"
+            value={formData.barcode}
+            onChange={handleChange}
+            placeholder="123456789012"
           />
         </div>
 

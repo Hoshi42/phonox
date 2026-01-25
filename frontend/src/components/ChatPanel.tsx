@@ -200,7 +200,10 @@ The vinyl card has been updated with all the details. You can edit any informati
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
+      console.log('ChatPanel: Handling file selection:', e.target.files.length)
       handleImageUpload(Array.from(e.target.files))
+      // Reset the input value to allow selecting the same files again (mobile fix)
+      e.target.value = ''
     }
   }
 

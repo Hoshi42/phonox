@@ -2,7 +2,7 @@
 
 import logging
 import uuid
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
 
 from fastapi import APIRouter, File, UploadFile, HTTPException, Depends, status
@@ -25,6 +25,7 @@ from backend.api.models import (
 )
 from backend.agent.graph import build_agent_graph
 from backend.agent.state import VinylState
+from backend.agent.metadata import estimate_vinyl_value
 from backend.tools import EnhancedChatTools
 
 logger = logging.getLogger(__name__)
@@ -64,14 +65,13 @@ def _serialize_evidence_chain(evidence_chain: List[dict]) -> List[dict]:
 
 @router.post(
     "/identify",
-    response_model=VinylIdentifyResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def identify_vinyl(
     files: List[UploadFile] = File(...),
     user_notes: Optional[str] = None,
     db: Session = Depends(get_db),
-) -> VinylIdentifyResponse:
+) -> Union[VinylIdentifyResponse, VinylRecordResponse]:
     """
     Identify a vinyl record from images.
 
@@ -92,18 +92,19 @@ async def identify_vinyl(
                 detail="Maximum 5 images allowed",
             )
 
-        # Create vinyl record in database
+        # Create vinyl record in database with TEMPORARY status
+        # Will only be moved to "complete" when user explicitly saves via API
         record_id = str(uuid.uuid4())
         vinyl_record = VinylRecord(
             id=record_id,
-            status="processing",
+            status="temporary",  # Mark as temporary until user saves
             user_notes=user_notes,
         )
         db.add(vinyl_record)
         db.commit()
         db.refresh(vinyl_record)
 
-        logger.info(f"Created vinyl record {record_id} for identification")
+        logger.info(f"Created temporary vinyl record {record_id} for identification")
 
         # For now, return immediately (in production, would queue async job)
         # In a real implementation, this would trigger an async Celery task
@@ -141,7 +142,8 @@ async def identify_vinyl(
             result_state = graph.invoke(initial_state, config=config)
 
             # Update record with results
-            vinyl_record.status = "complete"
+            # Keep status as "analyzed" (not yet in register)
+            vinyl_record.status = "analyzed"
             vinyl_record.validation_passed = result_state.get("validation_passed", False)
 
             # Extract metadata
@@ -153,8 +155,25 @@ async def identify_vinyl(
                 vinyl_record.label = vision_data.get("label")
                 vinyl_record.spotify_url = vision_data.get("spotify_url") or vision_data.get("spotify_link")
                 vinyl_record.catalog_number = vision_data.get("catalog_number")
+                vinyl_record.barcode = vision_data.get("barcode")  # Store barcode from vision extraction
                 if vision_data.get("genres"):
                     vinyl_record.set_genres(vision_data["genres"])
+                
+                # Estimate value based on extracted metadata
+                try:
+                    value_estimate = estimate_vinyl_value(
+                        artist=vinyl_record.artist or "",
+                        title=vinyl_record.title or "",
+                        year=vinyl_record.year,
+                        label=vinyl_record.label,
+                        genres=vinyl_record.get_genres()
+                    )
+                    # Store estimated values in metadata
+                    vision_data["estimated_value_eur"] = value_estimate.get("estimated_value_eur")
+                    vision_data["estimated_value_usd"] = value_estimate.get("estimated_value_usd")
+                    logger.info(f"Value estimate for {vinyl_record.artist} - {vinyl_record.title}: €{value_estimate.get('estimated_value_eur')}")
+                except Exception as e:
+                    logger.warning(f"Failed to estimate value: {e}")
 
             # Store evidence chain
             evidence_chain = result_state.get("evidence_chain", [])
@@ -186,10 +205,33 @@ async def identify_vinyl(
             vinyl_record.error = str(e)
             db.commit()
 
+        # Return analyzed record response (whether successful analysis or not)
+        # Status is "analyzed" (not yet saved to register) or "failed"
+        if vinyl_record.status in ["analyzed", "failed"]:
+            logger.info(f"Identification complete, returning record response for {record_id}")
+            record_dict = vinyl_record.to_dict()
+            metadata_dict = record_dict.get("metadata", {})
+            # Filter out None values from metadata for Pydantic validation
+            metadata_dict_clean = {k: v for k, v in metadata_dict.items() if v is not None}
+            return VinylRecordResponse(
+                record_id=record_id,
+                created_at=vinyl_record.created_at,
+                updated_at=vinyl_record.updated_at,
+                status=vinyl_record.status,
+                metadata=VinylMetadataModel(**metadata_dict_clean),
+                evidence_chain=record_dict.get("evidence_chain", []),
+                confidence=vinyl_record.confidence or 0.0,
+                auto_commit=vinyl_record.auto_commit or False,
+                needs_review=vinyl_record.needs_review or True,
+                error=vinyl_record.error,
+                user_notes=vinyl_record.user_notes,
+            )
+        
+        # Otherwise return initial response
         return VinylIdentifyResponse(
             record_id=record_id,
-            status="processing",
-            message="Vinyl identification started",
+            status=vinyl_record.status,
+            message="Vinyl identification started" if vinyl_record.status == "processing" else f"Identification {vinyl_record.status}",
             job_id=record_id,
         )
 
@@ -245,6 +287,7 @@ async def get_vinyl_record(
                 label=vinyl_record.label or "Unknown",
                 spotify_url=vinyl_record.spotify_url,
                 catalog_number=vinyl_record.catalog_number,
+                barcode=vinyl_record.barcode,
                 genres=vinyl_record.get_genres(),
             )
 
@@ -345,6 +388,7 @@ async def review_vinyl(
                 label=vinyl_record.label or "Unknown",
                 spotify_url=vinyl_record.spotify_url,
                 catalog_number=vinyl_record.catalog_number,
+                barcode=vinyl_record.barcode,
                 genres=vinyl_record.get_genres(),
             )
 
@@ -576,6 +620,7 @@ When users ask questions, search for current information. When they provide corr
             label=updated_metadata.get("label", "Unknown"),
             spotify_url=updated_metadata.get("spotify_url"),
             catalog_number=updated_metadata.get("catalog_number"),
+            barcode=updated_metadata.get("barcode"),
             genres=updated_metadata.get("genres", []),
             estimated_value_eur=updated_metadata.get("estimated_value_eur"),
             estimated_value_usd=updated_metadata.get("estimated_value_usd"),
@@ -675,6 +720,141 @@ async def general_chat(
     
     except Exception as e:
         logger.error(f"Error in general chat: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
+
+
+@router.post(
+    "/reanalyze/{record_id}",
+    response_model=VinylIdentifyResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def reanalyze_vinyl(
+    record_id: str,
+    files: List[UploadFile] = File(...),
+    db: Session = Depends(get_db),
+) -> VinylIdentifyResponse:
+    """
+    Re-analyze a vinyl record with additional images.
+    
+    This endpoint combines existing database images with new uploaded images
+    for a more comprehensive analysis.
+    """
+    try:
+        # Get existing record
+        existing_record = db.query(VinylRecord).filter(VinylRecord.id == record_id).first()
+        if not existing_record:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Record not found"
+            )
+            
+        # Validate new files
+        if not files or len(files) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="At least one image file is required for re-analysis",
+            )
+            
+        logger.info(f"Re-analyzing record {record_id} with {len(files)} new images")
+        
+        # Update record status
+        existing_record.status = "processing"
+        db.commit()
+        
+        try:
+            # Initialize agent graph
+            graph = build_agent_graph()
+            
+            # Convert new uploaded files to image dicts
+            import base64
+            new_image_dicts = []
+            for file in files:
+                content = await file.read()
+                file_content = base64.b64encode(content).decode('utf-8')
+                new_image_dicts.append({
+                    "path": file.filename or f"new_image_{len(new_image_dicts)}",
+                    "content": file_content,
+                    "content_type": file.content_type or "image/jpeg"
+                })
+            
+            # For now, just use the new images (in the future, we could fetch existing images from URLs)
+            # This is a limitation we'll note in the response
+            all_images = new_image_dicts
+            
+            logger.info(f"Re-analysis will process {len(all_images)} images ({len(new_image_dicts)} new)")
+            
+            initial_state: VinylState = {  # type: ignore
+                "images": all_images,
+                "validation_passed": False,
+                "image_features": {},
+                "vision_extraction": {},
+                "evidence_chain": [],
+                "confidence": 0.0,
+                "auto_commit": False,
+                "needs_review": True,
+            }
+            
+            # Invoke graph with config for checkpointer
+            config = {"configurable": {"thread_id": record_id + "_reanalysis"}}
+            result_state = graph.invoke(initial_state, config=config)
+            
+            # Update record with new results
+            existing_record.status = "complete"
+            existing_record.validation_passed = result_state.get("validation_passed", False)
+            
+            # Extract metadata
+            if result_state.get("vision_extraction"):
+                vision_data = result_state["vision_extraction"]
+                existing_record.artist = vision_data.get("artist")
+                existing_record.title = vision_data.get("title")
+                existing_record.year = vision_data.get("year")
+                existing_record.label = vision_data.get("label")
+                existing_record.spotify_url = vision_data.get("spotify_url") or vision_data.get("spotify_link")
+                existing_record.catalog_number = vision_data.get("catalog_number")
+                existing_record.barcode = vision_data.get("barcode")
+                if vision_data.get("genres"):
+                    existing_record.set_genres(vision_data["genres"])
+            
+            # Store evidence chain
+            evidence_chain = result_state.get("evidence_chain", [])
+            if evidence_chain:
+                existing_record.set_evidence_chain(_serialize_evidence_chain(evidence_chain))
+            
+            # Store confidence and routing flags
+            existing_record.confidence = result_state.get("confidence", 0.0)
+            existing_record.auto_commit = result_state.get("auto_commit", False)
+            existing_record.needs_review = result_state.get("needs_review", True)
+            
+            # Handle errors
+            if result_state.get("error"):
+                existing_record.status = "failed"
+                existing_record.error = result_state["error"]
+            
+            db.commit()
+            db.refresh(existing_record)
+            
+            logger.info(f"Completed re-analysis for {record_id}: confidence={existing_record.confidence:.2f}")
+            
+        except Exception as e:
+            logger.error(f"Error during re-analysis: {e}")
+            existing_record.status = "failed"
+            existing_record.error = str(e)
+            db.commit()
+        
+        return VinylIdentifyResponse(
+            record_id=record_id,
+            status="processing",
+            message=f"Vinyl re-analysis started with {len(files)} new images",
+            job_id=record_id,
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in reanalyze_vinyl: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),

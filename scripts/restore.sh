@@ -14,7 +14,9 @@ if [ -z "$1" ]; then
 fi
 
 TIMESTAMP="$1"
-BACKUP_DIR="${PWD}/backups"
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+BACKUP_DIR="${ROOT_DIR}/backups"
+UPLOADS_VOLUME="phonox_phonox_uploads"
 
 echo "Stopping containers..."
 docker compose down
@@ -26,7 +28,7 @@ if [ -f "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql" ]; then
     sleep 10
     
     # Restore database
-    docker exec -i phonox_db psql -U phonox -d phonox < "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql"
+    docker compose exec -T db psql -U phonox -d phonox < "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql"
     echo "Database restored successfully!"
 else
     echo "Database backup file not found: ${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql"
@@ -35,8 +37,10 @@ fi
 echo "Restoring uploads..."
 if [ -f "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" ]; then
     # Clear existing uploads and restore
-    rm -rf data/uploads/*
-    tar -xzf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C data/uploads/
+        docker run --rm \
+            -v "${UPLOADS_VOLUME}:/data" \
+            -v "${BACKUP_DIR}:/backup" \
+            alpine sh -c "rm -rf /data/* && tar -xzf /backup/phonox_uploads_${TIMESTAMP}.tar.gz -C /data"
     echo "Uploads restored successfully!"
 else
     echo "Uploads backup file not found: ${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz"

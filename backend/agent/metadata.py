@@ -75,7 +75,9 @@ def lookup_discogs_metadata(
             search_url,
             params=params,
             timeout=API_TIMEOUT,
-            headers={"User-Agent": "Phonox/1.0"},
+            headers={
+                "User-Agent": "Phonox/1.0 (vinyl identification app; contact: https://github.com/hoshhie/phonox)"
+            },
         )
         response.raise_for_status()
 
@@ -99,7 +101,9 @@ def lookup_discogs_metadata(
         detail_response = requests.get(
             release_url,
             timeout=API_TIMEOUT,
-            headers={"User-Agent": "Phonox/1.0"},
+            headers={
+                "User-Agent": "Phonox/1.0 (vinyl identification app; contact: https://github.com/hoshhie/phonox)"
+            },
         )
         detail_response.raise_for_status()
 
@@ -207,6 +211,8 @@ def lookup_metadata_from_both(
 ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
     """
     Lookup metadata from both Discogs and MusicBrainz.
+    
+    Note: Discogs API now requires authentication, so we skip it for now.
 
     Args:
         artist: Artist or group name
@@ -214,9 +220,12 @@ def lookup_metadata_from_both(
 
     Returns:
         Tuple of (discogs_result, musicbrainz_result)
-        Either can be None if lookup fails
+        discogs_result will be None due to authentication requirement
     """
-    discogs_result = lookup_discogs_metadata(artist, title, fallback_on_error=True)
+    # Skip Discogs due to authentication requirement
+    logger.info(f"Skipping Discogs lookup (requires auth) for {artist} - {title}")
+    discogs_result = None
+    
     musicbrainz_result = lookup_musicbrainz_metadata(artist, title, fallback_on_error=True)
 
     return discogs_result, musicbrainz_result
@@ -303,3 +312,96 @@ def _extract_musicbrainz_genres(release: Dict[str, Any]) -> List[str]:
     if tags:
         return [tag.get("name", "") for tag in tags if tag.get("name")]
     return []
+
+
+
+
+def estimate_vinyl_value(
+    artist: str,
+    title: str,
+    year: Optional[int] = None,
+    label: Optional[str] = None,
+    genres: Optional[List[str]] = None,
+) -> Dict[str, float]:
+    """
+    Estimate vinyl record market value based on metadata.
+
+    Uses heuristics based on:
+    - Release year (older = more valuable)
+    - Label prestige (Blue Note, Stax, etc. command premium)
+    - Genre (Jazz, Prog Rock tend to be more valuable)
+    - Rarity indicators
+
+    Args:
+        artist: Artist name
+        title: Album title
+        year: Release year
+        label: Record label
+        genres: List of genres
+
+    Returns:
+        Dict with estimated_value_eur and estimated_value_usd
+    """
+    # Base value for a standard vinyl record
+    base_value_eur = 10.0
+
+    # Year-based multiplier (older records typically more valuable)
+    year_multiplier = 1.0
+    if year:
+        if year < 1960:
+            year_multiplier = 4.0  # Very rare (pre-60s)
+        elif year < 1970:
+            year_multiplier = 2.5  # Rare (60s)
+        elif year < 1980:
+            year_multiplier = 1.8  # Less common (70s)
+        elif year < 1990:
+            year_multiplier = 1.2  # Still somewhat valuable (80s)
+        else:
+            year_multiplier = 1.0  # Modern pressings
+
+    # Label prestige multiplier
+    label_multiplier = 1.0
+    if label:
+        label_lower = label.lower()
+        # Premium jazz labels
+        if any(premium in label_lower for premium in ['blue note', 'verve', 'prestige', 'riverside']):
+            label_multiplier = 3.5
+        # Prog rock / collectible labels
+        elif any(prog in label_lower for prog in ['atlantic', 'warner', 'virgin', 'rainbow']):
+            label_multiplier = 2.0
+        # Classical / specialized
+        elif any(classical in label_lower for classical in ['decca', 'philips', 'emi', 'deutsche grammophon']):
+            label_multiplier = 1.8
+        # Major labels (standard)
+        elif any(major in label_lower for major in ['emi', 'sony', 'universal', 'bmi']):
+            label_multiplier = 1.1
+
+    # Genre multiplier (some genres command higher prices)
+    genre_multiplier = 1.0
+    if genres:
+        genres_lower = [g.lower() for g in genres]
+        # High-value genres
+        if any(genre in ' '.join(genres_lower) for genre in ['jazz', 'prog', 'soul', 'funk']):
+            genre_multiplier = 1.8
+        elif any(genre in ' '.join(genres_lower) for genre in ['classical', 'electronic', 'ambient']):
+            genre_multiplier = 1.4
+        elif any(genre in ' '.join(genres_lower) for genre in ['rock', 'pop']):
+            genre_multiplier = 1.0
+
+    # Calculate final values
+    estimated_eur = base_value_eur * year_multiplier * label_multiplier * genre_multiplier
+
+    # Cap values between €5 and €500 (realistic for common vinyl)
+    estimated_eur = max(5.0, min(500.0, estimated_eur))
+    estimated_usd = estimated_eur / 0.92  # Rough EUR to USD conversion
+
+    logger.debug(
+        f"Value estimate for {artist} - {title}: "
+        f"€{estimated_eur:.2f} (multipliers: year={year_multiplier:.2f}, "
+        f"label={label_multiplier:.2f}, genre={genre_multiplier:.2f})"
+    )
+
+    return {
+        "estimated_value_eur": round(estimated_eur, 2),
+        "estimated_value_usd": round(estimated_usd, 2),
+    }

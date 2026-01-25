@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Mobile Image Test</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { 
+            width: 100%;
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+        }
+        body { 
+            background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+            color: #fff;
+            padding: 10px;
+            overflow-y: auto;
+        }
+        .container { 
+            max-width: 100%;
+            margin: 0 auto;
+        }
+        h1 { 
+            text-align: center;
+            color: #4CAF50;
+            margin: 20px 0;
+            font-size: 1.5em;
+        }
+        .section {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #4CAF50;
+        }
+        .section h2 {
+            color: #4CAF50;
+            margin-bottom: 10px;
+            font-size: 1em;
+        }
+        .file-input-wrapper {
+            margin: 10px 0;
+        }
+        input[type="file"] {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            background: rgba(255,255,255,0.1);
+            border: 2px dashed #4CAF50;
+            color: #0f0;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        input[type="file"]::file-selector-button {
+            background: #4CAF50;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        button:active { 
+            background: #45a049;
+            transform: scale(0.98);
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .preview {
+            margin: 10px 0;
+            max-width: 100%;
+            width: 100%;
+            border-radius: 4px;
+            max-height: 400px;
+            object-fit: cover;
+        }
+        .info {
+            background: rgba(76, 175, 80, 0.1);
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .log {
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        .log-entry { 
+            padding: 2px 0;
+            border-bottom: 1px solid #333;
+        }
+        .success { color: #4CAF50; }
+        .error { color: #ff6b6b; }
+        .warning { color: #ffd700; }
+        .info-text { color: #87ceeb; }
+        .upload-progress {
+            margin: 10px 0;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 24px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            width: 0%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 Simple Image Upload Test</h1>
+        
+        <div class="section">
+            <h2>📸 Choose Image Method</h2>
+            <button onclick="selectImage()">📂 Pick from Gallery</button>
+            <button onclick="captureImage()">📷 Take Photo</button>
+        </div>
+
+        <div class="section" id="file-section" style="display:none;">
+            <h2>Selected File Info</h2>
+            <img id="preview" class="preview" style="display:none;" alt="preview"/>
+            <div id="file-info" class="info"></div>
+        </div>
+
+        <div class="section">
+            <h2>🚀 Upload</h2>
+            <button id="uploadBtn" onclick="uploadFile()" disabled>Upload to Server</button>
+            <div class="upload-progress" id="progress-section" style="display:none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill">0%</div>
+                </div>
+                <div id="progress-text" class="info-text"></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📋 Logs</h2>
+            <button onclick="clearLogs()" style="margin-bottom: 10px;">Clear Logs</button>
+            <div id="log" class="log"></div>
+        </div>
+
+        <!-- Hidden file input -->
+        <input 
+            type="file" 
+            id="fileInput" 
+            accept="image/*"
+            style="display:none;"
+            onchange="handleFileSelect(event)"
+        />
+        <input 
+            type="file" 
+            id="cameraInput" 
+            accept="image/*"
+            capture="environment"
+            style="display:none;"
+            onchange="handleFileSelect(event)"
+        />
+    </div>
+
+    <script>
+        const API_BASE = `http://${window.location.hostname}:8000`;
+        let selectedFile = null;
+
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const time = new Date().toLocaleTimeString();
+            entry.textContent = `[${time}] ${message}`;
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function clearLogs() {
+            document.getElementById('log').innerHTML = '';
+            log('Logs cleared', 'info');
+        }
+
+        function selectImage() {
+            log('Opening file picker...', 'info');
+            document.getElementById('fileInput').click();
+        }
+
+        function captureImage() {
+            log('Opening camera...', 'info');
+            document.getElementById('cameraInput').click();
+        }
+
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            if (!files || files.length === 0) {
+                log('No file selected', 'warning');
+                return;
+            }
+
+            selectedFile = files[0];
+            log(`File selected: ${selectedFile.name}`, 'success');
+            log(`Size: ${(selectedFile.size / 1024).toFixed(2)} KB`, 'info');
+            log(`Type: ${selectedFile.type}`, 'info');
+            log(`Last modified: ${new Date(selectedFile.lastModified).toLocaleString()}`, 'info');
+
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const preview = document.getElementById('preview');
+                preview.src = e.target?.result;
+                preview.style.display = 'block';
+                log('✅ Image preview loaded', 'success');
+            };
+            reader.onerror = () => {
+                log('❌ Failed to load image preview', 'error');
+            };
+            reader.readAsDataURL(selectedFile);
+
+            // Update UI
+            document.getElementById('file-section').style.display = 'block';
+            const fileInfo = document.getElementById('file-info');
+            fileInfo.innerHTML = `
+                <div><strong>Name:</strong> ${selectedFile.name}</div>
+                <div><strong>Size:</strong> ${(selectedFile.size / 1024).toFixed(2)} KB</div>
+                <div><strong>Type:</strong> ${selectedFile.type}</div>
+                <div><strong>Ready to upload:</strong> ✅ Yes</div>
+            `;
+
+            document.getElementById('uploadBtn').disabled = false;
+            log('Ready to upload', 'success');
+        }
+
+        async function uploadFile() {
+            if (!selectedFile) {
+                log('❌ No file selected', 'error');
+                return;
+            }
+
+            log(`🚀 Starting upload of ${selectedFile.name}...`, 'info');
+            log(`API Base: ${API_BASE}`, 'info');
+
+            const uploadBtn = document.getElementById('uploadBtn');
+            uploadBtn.disabled = true;
+
+            try {
+                // Create FormData
+                const formData = new FormData();
+                formData.append('files', selectedFile);
+                log('✅ FormData created with file', 'success');
+
+                // Send request with progress
+                const xhr = new XMLHttpRequest();
+
+                // Track progress
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const percentComplete = (e.loaded / e.total) * 100;
+                        const progressFill = document.getElementById('progressFill');
+                        const progressText = document.getElementById('progress-text');
+                        progressFill.style.width = percentComplete + '%';
+                        progressFill.textContent = Math.round(percentComplete) + '%';
+                        progressText.textContent = `Uploading: ${(e.loaded / 1024).toFixed(1)} / ${(e.total / 1024).toFixed(1)} KB`;
+                        log(`Upload progress: ${Math.round(percentComplete)}%`, 'info');
+                    }
+                });
+
+                // Handle completion
+                xhr.addEventListener('load', () => {
+                    document.getElementById('progress-section').style.display = 'none';
+                    
+                    log(`Server response status: ${xhr.status}`, 'info');
+
+                    if (xhr.status === 202 || xhr.status === 200) {
+                        try {
+                            const result = JSON.parse(xhr.responseText);
+                            log(`✅ Upload successful!`, 'success');
+                            log(`Record ID: ${result.record_id || result.id}`, 'success');
+                            log(`Status: ${result.status || 'processing'}`, 'success');
+                        } catch (e) {
+                            log(`✅ Upload sent, response: ${xhr.responseText.substring(0, 100)}`, 'success');
+                        }
+                    } else {
+                        log(`❌ Upload failed with status ${xhr.status}`, 'error');
+                        log(`Response: ${xhr.responseText}`, 'error');
+                    }
+
+                    uploadBtn.disabled = false;
+                });
+
+                // Handle errors
+                xhr.addEventListener('error', () => {
+                    log(`❌ Upload error: ${xhr.statusText}`, 'error');
+                    document.getElementById('progress-section').style.display = 'none';
+                    uploadBtn.disabled = false;
+                });
+
+                xhr.addEventListener('abort', () => {
+                    log('⚠️ Upload aborted', 'warning');
+                    document.getElementById('progress-section').style.display = 'none';
+                    uploadBtn.disabled = false;
+                });
+
+                // Show progress bar
+                document.getElementById('progress-section').style.display = 'block';
+                log(`Sending POST to ${API_BASE}/api/v1/identify`, 'info');
+
+                // Send request
+                xhr.open('POST', `${API_BASE}/api/v1/identify`);
+                xhr.send(formData);
+
+            } catch (e) {
+                log(`❌ Error: ${e}`, 'error');
+                uploadBtn.disabled = false;
+            }
+        }
+
+        // Initialize
+        log('📱 Mobile Upload Test loaded', 'success');
+        log(`Device: ${navigator.userAgent.substring(0, 50)}...`, 'info');
+        log(`API: ${API_BASE}`, 'info');
+        log(`Online: ${navigator.onLine ? '✅' : '❌'}`, 'info');
+    </script>
+</body>
+</html>

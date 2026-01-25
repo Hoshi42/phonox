@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobile Phonox Diagnostic</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 10px;
+            font-size: 14px;
+        }
+        .test {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .pass { background: #d4edda; border-color: #c3e6cb; }
+        .fail { background: #f8d7da; border-color: #f5c6cb; }
+        .running { background: #d1ecf1; border-color: #bee5eb; }
+        button {
+            width: 100%;
+            padding: 15px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            margin: 5px 0;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Mobile Phonox Diagnostic</h1>
+    
+    <div id="deviceInfo" class="test">
+        <h3>Device Info</h3>
+        <div id="deviceDetails">Loading...</div>
+    </div>
+    
+    <div id="networkTest" class="test">
+        <h3>Network Test</h3>
+        <div id="networkResult">Not started</div>
+    </div>
+    
+    <div id="apiTest" class="test">
+        <h3>API Test</h3>
+        <div id="apiResult">Not started</div>
+    </div>
+    
+    <div id="registerTest" class="test">
+        <h3>Register Test</h3>
+        <div id="registerResult">Not started</div>
+    </div>
+    
+    <button onclick="runAllTests()">🔍 Run All Tests</button>
+    <button onclick="clearStorageAndTest()" style="background: #dc3545;">🔄 Clear Cache & Test</button>
+    <button onclick="window.location.href='/'" style="background: #28a745;">➡️ Go to Phonox</button>
+    
+    <div class="log" id="log"></div>
+    
+    <script>
+        const log = [];
+        
+        function addLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = `[${timestamp}] ${message}`;
+            log.push(entry);
+            const logDiv = document.getElementById('log');
+            logDiv.innerHTML = log.join('\n');
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(entry);
+        }
+        
+        function setTestResult(testId, result, success = null) {
+            const div = document.getElementById(testId);
+            const resultDiv = document.getElementById(testId.replace('Test', 'Result'));
+            
+            if (success === true) {
+                div.className = 'test pass';
+            } else if (success === false) {
+                div.className = 'test fail';
+            } else {
+                div.className = 'test running';
+            }
+            
+            resultDiv.innerHTML = result;
+        }
+        
+        function showDeviceInfo() {
+            const info = {
+                userAgent: navigator.userAgent,
+                hostname: window.location.hostname,
+                href: window.location.href,
+                isMobile: /Mobi|Android/i.test(navigator.userAgent),
+                onLine: navigator.onLine,
+                language: navigator.language,
+                cookiesEnabled: navigator.cookieEnabled,
+                localStorageAvailable: typeof(Storage) !== "undefined"
+            };
+            
+            let html = '';
+            for (const [key, value] of Object.entries(info)) {
+                html += `<strong>${key}:</strong> ${value}<br>`;
+            }
+            document.getElementById('deviceDetails').innerHTML = html;
+            addLog(`Device info loaded - Mobile: ${info.isMobile}, Online: ${info.onLine}`);
+        }
+        
+        async function testNetwork() {
+            setTestResult('networkTest', 'Testing network...', null);
+            addLog('Testing network connectivity...');
+            
+            try {
+                // Test external connectivity
+                const response = await fetch('https://httpbin.org/get', {
+                    method: 'GET',
+                    mode: 'cors'
+                });
+                
+                if (response.ok) {
+                    setTestResult('networkTest', '✅ Network connectivity OK', true);
+                    addLog('Network test passed');
+                    return true;
+                } else {
+                    throw new Error(`Network test failed: ${response.status}`);
+                }
+            } catch (error) {
+                setTestResult('networkTest', `❌ Network error: ${error.message}`, false);
+                addLog(`Network test failed: ${error.message}`);
+                return false;
+            }
+        }
+        
+        async function testAPI() {
+            setTestResult('apiTest', 'Testing API...', null);
+            addLog('Testing API connectivity...');
+            
+            try {
+                const apiBase = window.location.hostname ? 
+                    `http://${window.location.hostname}:8000` : 
+                    'http://localhost:8000';
+                
+                addLog(`API Base: ${apiBase}`);
+                
+                // Test health endpoint
+                const healthResponse = await fetch(`${apiBase}/health`);
+                if (!healthResponse.ok) {
+                    throw new Error(`Health check failed: ${healthResponse.status}`);
+                }
+                
+                const health = await healthResponse.json();
+                addLog(`Health check passed: ${health.status}`);
+                
+                // Test users endpoint
+                const usersResponse = await fetch(`${apiBase}/register/users`);
+                if (!usersResponse.ok) {
+                    throw new Error(`Users endpoint failed: ${usersResponse.status}`);
+                }
+                
+                const users = await usersResponse.json();
+                addLog(`Users endpoint passed: ${users.length} users found`);
+                
+                setTestResult('apiTest', `✅ API OK - Users: ${users.join(', ')}`, true);
+                return { apiBase, users };
+                
+            } catch (error) {
+                setTestResult('apiTest', `❌ API error: ${error.message}`, false);
+                addLog(`API test failed: ${error.message}`);
+                return null;
+            }
+        }
+        
+        async function testRegister(apiBase) {
+            setTestResult('registerTest', 'Testing register...', null);
+            addLog('Testing Jan register access...');
+            
+            try {
+                const url = `${apiBase}/register/?user_tag=Jan&_t=${Date.now()}`;
+                addLog(`Register URL: ${url}`);
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Register request failed: ${response.status} ${response.statusText}`);
+                }
+                
+                const records = await response.json();
+                addLog(`Register response: ${records.length} records`);
+                
+                if (records.length > 0) {
+                    const sample = records[0];
+                    addLog(`Sample record: ${sample.artist} - ${sample.title}`);
+                    setTestResult('registerTest', `✅ Jan has ${records.length} records: ${records.map(r => `${r.artist}-${r.title}`).join(', ')}`, true);
+                } else {
+                    setTestResult('registerTest', '⚠️ Jan has 0 records in register', false);
+                }
+                
+                return records;
+                
+            } catch (error) {
+                setTestResult('registerTest', `❌ Register error: ${error.message}`, false);
+                addLog(`Register test failed: ${error.message}`);
+                return null;
+            }
+        }
+        
+        async function runAllTests() {
+            addLog('=== Starting diagnostic tests ===');
+            
+            // Test network
+            const networkOk = await testNetwork();
+            if (!networkOk) {
+                addLog('Network test failed - stopping tests');
+                return;
+            }
+            
+            // Test API
+            const apiResult = await testAPI();
+            if (!apiResult) {
+                addLog('API test failed - stopping tests');
+                return;
+            }
+            
+            // Test register
+            const registerResult = await testRegister(apiResult.apiBase);
+            
+            if (registerResult && registerResult.length > 0) {
+                addLog('=== ALL TESTS PASSED ===');
+                addLog('If tests pass but main app fails, it may be a UI/cache issue');
+                addLog('Try: Clear Cache & Test, then go to main app');
+            } else {
+                addLog('=== TESTS COMPLETED WITH ISSUES ===');
+                addLog('Check the failed tests above for details');
+            }
+        }
+        
+        async function clearStorageAndTest() {
+            addLog('=== Clearing all storage ===');
+            
+            // Clear localStorage
+            localStorage.clear();
+            addLog('localStorage cleared');
+            
+            // Clear sessionStorage  
+            sessionStorage.clear();
+            addLog('sessionStorage cleared');
+            
+            // Clear service workers
+            if ('serviceWorker' in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                for (let registration of registrations) {
+                    await registration.unregister();
+                }
+                addLog('Service workers cleared');
+            }
+            
+            // Clear caches
+            if ('caches' in window) {
+                const cacheNames = await caches.keys();
+                for (let cacheName of cacheNames) {
+                    await caches.delete(cacheName);
+                }
+                addLog('Browser caches cleared');
+            }
+            
+            addLog('=== Storage cleared - running tests ===');
+            setTimeout(runAllTests, 1000);
+        }
+        
+        // Auto-run on load
+        window.onload = function() {
+            showDeviceInfo();
+            addLog('Mobile diagnostic tool loaded');
+            setTimeout(runAllTests, 1000);
+        };
+    </script>
+</body>
+</html>
