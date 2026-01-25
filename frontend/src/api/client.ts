@@ -27,7 +27,7 @@ export class ApiClient {
     console.log('[API] window.location.hostname:', typeof window !== 'undefined' ? window.location.hostname : 'N/A')
   }
 
-  async identify(files: File[]): Promise<{ id: string }> {
+  async identify(files: File[]): Promise<{ record_id: string; id?: string }> {
     const formData = new FormData()
     files.forEach((file) => {
       // Use 'files' as the field name to match FastAPI's List[UploadFile] parameter
@@ -36,7 +36,7 @@ export class ApiClient {
 
     const url = `${this.baseUrl}/api/v1/identify`
     console.log('[API] identify() - Uploading to:', url)
-    console.log('[API] identify() - Files:', files.map(f => ({ name: f.name, size: f.size, type: f.type })))
+    console.log('[API] identify() - Files count:', files.length, files.map(f => ({ name: f.name, size: f.size, type: f.type })))
 
     try {
       const response = await fetch(url, {
@@ -59,8 +59,10 @@ export class ApiClient {
 
       const result = await response.json()
       console.log('[API] identify() - Success:', result)
-      // Backend returns record_id, but we need id
-      return { id: result.record_id || result.id }
+      return {
+        record_id: result.record_id || result.id,
+        id: result.record_id || result.id,
+      }
     } catch (error) {
       console.error('[API] identify() - Network error:', error)
       throw error
@@ -109,6 +111,17 @@ export class ApiClient {
   }
 
   async chat(recordId: string, message: string, metadata?: Record<string, unknown>): Promise<Record<string, unknown>> {
+    // Convert metadata values to strings for API compatibility
+    const stringMetadata = metadata
+      ? Object.entries(metadata).reduce(
+          (acc, [key, value]) => {
+            acc[key] = String(value)
+            return acc
+          },
+          {} as Record<string, string>
+        )
+      : undefined
+
     const response = await fetch(`${this.baseUrl}/api/v1/identify/${recordId}/chat`, {
       method: 'POST',
       headers: {
@@ -116,15 +129,20 @@ export class ApiClient {
       },
       body: JSON.stringify({
         message,
-        metadata,
+        metadata: stringMetadata,
       }),
     })
 
     if (!response.ok) {
       try {
         const error = (await response.json()) as ApiError
-        throw new Error(error.detail || 'Chat failed')
-      } catch {
+        console.error('[API] Chat error response:', error)
+        throw new Error(error.detail || `Chat failed: ${error.detail}`)
+      } catch (e) {
+        if (e instanceof Error && e.message.includes('Chat failed')) {
+          throw e
+        }
+        console.error('[API] Chat error (no JSON response):', response.statusText)
         throw new Error(`Chat failed: ${response.statusText}`)
       }
     }

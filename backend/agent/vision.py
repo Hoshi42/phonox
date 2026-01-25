@@ -109,9 +109,9 @@ Do NOT include any text outside the JSON object. If you cannot read the cover cl
         logger.info("Starting Claude 3 Sonnet vision extraction...")
         logger.info(f"Image format: {image_format}, Image data length: {len(image_base64)}")
 
-        # Try with the model name - Claude 3 Sonnet (vision capable)
+        # Try with the model name - Claude Sonnet 4.5 (vision capable)
         message = client.messages.create(
-            model="claude-3-sonnet-20240229",
+            model="claude-sonnet-4-5-20250929",
             max_tokens=500,
             messages=cast(
                 Any,

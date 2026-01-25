@@ -88,3 +88,11 @@ docker-compose.override.yml
 local_data/
 uploads/
 tmp/
+
+# Persistent volume data (keep data but ignore in git)
+data/postgres/*
+data/uploads/*
+
+# Keep the directory structure but ignore contents
+!data/postgres/.gitkeep
+!data/uploads/.gitkeep

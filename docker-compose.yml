@@ -1,6 +1,26 @@
 version: '3.9'
 
 services:
+  db:
+    image: postgres:15
+    container_name: phonox_db
+    environment:
+      POSTGRES_DB: phonox
+      POSTGRES_USER: phonox
+      POSTGRES_PASSWORD: phonox123
+    ports:
+      - "5432:5432"
+    volumes:
+      - phonox_db_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U phonox -d phonox"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - phonox_network
+
   backend:
     build:
       context: .
@@ -12,10 +32,16 @@ services:
       PYTHONUNBUFFERED: "1"
       PYTHONDONTWRITEBYTECODE: "1"
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      TAVILY_API_KEY: ${TAVILY_API_KEY}
+      DATABASE_URL: postgresql://phonox:phonox123@db:5432/phonox
     volumes:
       - ./backend:/app/backend
-      - ./phonox.db:/app/phonox.db
       - ./tests:/app/tests
+      - phonox_uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure
     networks:
       - phonox_network
 
@@ -36,6 +62,20 @@ services:
       - backend
     networks:
       - phonox_network
+
+volumes:
+  phonox_db_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/data/postgres/data
+  phonox_uploads:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/data/uploads
 
 networks:
   phonox_network:
