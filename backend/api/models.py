@@ -39,12 +39,13 @@ class EvidenceModel(BaseModel):
 
 class VinylMetadataModel(BaseModel):
     """Vinyl record metadata."""
-    artist: str
-    title: str
+    artist: Optional[str] = None
+    title: Optional[str] = None
     year: Optional[int] = None
-    label: str
+    label: Optional[str] = None
     spotify_url: Optional[str] = None
     catalog_number: Optional[str] = None
+    barcode: Optional[str] = None  # UPC/EAN barcode
     genres: List[str] = Field(default_factory=list)
     estimated_value_eur: Optional[float] = None
     estimated_value_usd: Optional[float] = None

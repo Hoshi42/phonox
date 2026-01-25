@@ -22,7 +22,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from backend.agent.state import VinylState, Evidence, EvidenceType
 from backend.agent.vision import extract_vinyl_metadata
 from backend.agent.metadata import lookup_metadata_from_both
-from backend.agent.websearch import search_vinyl_metadata
+from backend.agent.websearch import search_vinyl_metadata, search_vinyl_by_barcode, search_spotify_album
 
 logger = logging.getLogger(__name__)
 
@@ -134,12 +134,16 @@ def vision_extraction_node(state: VinylState) -> VinylState:
     """
     Use Claude 3 Sonnet to analyze album artwork and extract metadata.
 
+    Processes ALL images and aggregates results for better accuracy.
+    Special focus on barcode detection and catalog numbers.
+
     Extracts:
     - Artist name
     - Album title
     - Release year
     - Label
     - Catalog number
+    - Barcodes (UPC/EAN)
     - Genres
 
     Confidence: 0.20 weight in 4-way system
@@ -159,40 +163,92 @@ def vision_extraction_node(state: VinylState) -> VinylState:
         logger.warning("vision_extraction: No images provided")
         return state
 
-    # Use first image for metadata extraction (Phase 1.2)
-    # In Phase 1.4+, we'll analyze all images and aggregate results
+    # Process ALL images and aggregate results for better accuracy
+    all_results = []
+    best_confidence = 0.0
+    best_result = None
     
     try:
-        first_image = images[0]
-        logger.info(f"vision_extraction: Processing image: {first_image.get('path')}")
+        for idx, image in enumerate(images):
+            logger.info(f"vision_extraction: Processing image {idx + 1}/{len(images)}: {image.get('path')}")
+            
+            # Extract image data
+            image_content = image.get("content", "")
+            image_format = image.get("content_type", "image/jpeg").replace("image/", "")
+            
+            if not image_content:
+                logger.warning(f"vision_extraction: No content for image {idx + 1}")
+                continue
+                
+            # Call Claude 3 Sonnet for metadata extraction
+            logger.info(f"vision_extraction: Analyzing image {idx + 1} with Claude 3 Sonnet (format: {image_format})...")
+            result = extract_vinyl_metadata(
+                image_base64=image_content,
+                image_format=image_format,
+                fallback_on_error=True
+            )
+            
+            result["image_index"] = idx + 1
+            result["image_path"] = image.get("path", f"image_{idx + 1}")
+            all_results.append(result)
+            
+            # Track the result with highest confidence
+            confidence = result.get("confidence", 0.0)
+            if confidence > best_confidence:
+                best_confidence = confidence
+                best_result = result
+                
+            logger.info(
+                f"vision_extraction: Image {idx + 1} - {result.get('artist', 'Unknown')} / {result.get('title', 'Unknown')} "
+                f"(confidence: {confidence:.2f})"
+            )
         
-        # Extract image data
-        image_content = first_image.get("content", "")
-        image_format = first_image.get("content_type", "image/jpeg").replace("image/", "")
-        
-        if not image_content:
-            logger.warning("vision_extraction: No image content to analyze")
+        # Use the result with highest confidence, but aggregate barcodes and catalog numbers from all images
+        if best_result:
+            vision_results = best_result.copy()
+            
+            # Aggregate barcodes and catalog numbers from all images
+            all_barcodes = set()
+            all_catalog_numbers = set()
+            
+            for result in all_results:
+                if result.get("barcode"):
+                    all_barcodes.add(result["barcode"])
+                if result.get("catalog_number"):
+                    all_catalog_numbers.add(result["catalog_number"])
+            
+            # Add aggregated data
+            vision_results["all_barcodes"] = list(all_barcodes)
+            vision_results["all_catalog_numbers"] = list(all_catalog_numbers)
+            vision_results["processed_images"] = len(all_results)
+            vision_results["image_results"] = all_results
+            
+            logger.info(
+                f"vision_extraction: FINAL RESULT - {vision_results.get('artist', 'Unknown')} / {vision_results.get('title', 'Unknown')} "
+                f"(confidence: {vision_results.get('confidence', 0.0):.2f}, processed {len(all_results)} images)"
+            )
+            
+            if all_barcodes:
+                logger.info(f"vision_extraction: Found barcodes: {list(all_barcodes)}")
+            if all_catalog_numbers:
+                logger.info(f"vision_extraction: Found catalog numbers: {list(all_catalog_numbers)}")
+        else:
+            # Fallback if no results
+            logger.warning("vision_extraction: No successful extractions from any image")
             vision_results = {
                 "artist": "Unknown",
                 "title": "Unknown",
                 "year": None,
                 "label": "Unknown",
                 "catalog_number": None,
+                "barcode": None,
                 "genres": [],
                 "confidence": 0.0,
+                "processed_images": len(images),
+                "all_barcodes": [],
+                "all_catalog_numbers": [],
+                "image_results": []
             }
-        else:
-            # Call Claude 3 Sonnet for actual metadata extraction
-            logger.info(f"vision_extraction: Calling Claude 3 Sonnet API (format: {image_format})...")
-            vision_results = extract_vinyl_metadata(
-                image_base64=image_content,
-                image_format=image_format,
-                fallback_on_error=True
-            )
-            logger.info(
-                f"vision_extraction: Extracted metadata - {vision_results.get('artist', 'Unknown')} / {vision_results.get('title', 'Unknown')} "
-                f"(confidence: {vision_results.get('confidence', 0.0):.2f})"
-            )
 
     except Exception as e:
         logger.error(f"vision_extraction: Failed to extract metadata: {e}")
@@ -202,6 +258,7 @@ def vision_extraction_node(state: VinylState) -> VinylState:
             "year": None,
             "label": "Unknown",
             "catalog_number": None,
+            "barcode": None,
             "genres": [],
             "confidence": 0.0,
         }
@@ -288,9 +345,17 @@ def lookup_metadata_node(state: VinylState) -> VinylState:
     except Exception as e:
         logger.error(f"lookup_metadata: Error querying metadata APIs: {e}")
 
-    state["evidence_chain"] = evidence_chain
+    # Try to find Spotify album link
+    try:
+        spotify_result = search_spotify_album(artist, title)
+        if spotify_result:
+            # Add the Spotify URL to the vision_extraction data
+            state["vision_extraction"]["spotify_url"] = spotify_result["spotify_url"]
+            logger.info(f"lookup_metadata: Found Spotify album: {spotify_result['spotify_url']}")
+    except Exception as e:
+        logger.warning(f"lookup_metadata: Spotify search failed: {e}")
 
-    return state
+    state["evidence_chain"] = evidence_chain
 
     return state
 
@@ -298,12 +363,15 @@ def lookup_metadata_node(state: VinylState) -> VinylState:
 def websearch_fallback_node(state: VinylState) -> VinylState:
     """
     Use Tavily API for websearch when primary sources don't have sufficient confidence.
+    
+    Enhanced with barcode-based search capabilities for more accurate results.
 
     Triggers when: confidence < 0.75
 
     Returns structured websearch results with:
     - Top match from search results
     - Confidence score
+    - Barcode-specific results if available
 
     Returns:
         VinylState: Updated state with websearch_results (optional)
@@ -319,41 +387,65 @@ def websearch_fallback_node(state: VinylState) -> VinylState:
     vision_data = state.get("vision_extraction", {})
     artist = vision_data.get("artist", "")
     title = vision_data.get("title", "")
+    barcode = vision_data.get("barcode", "")
 
-    if not artist or not title:
-        logger.warning("websearch_fallback: Insufficient data for websearch query")
+    # Try barcode search first if available (more accurate)
+    websearch_results = []
+    search_strategy = "none"
+    
+    if barcode and len(barcode.strip()) >= 12:
+        try:
+            logger.info(f"websearch_fallback: Trying barcode search for: {barcode}")
+            websearch_results = search_vinyl_by_barcode(
+                barcode, 
+                artist=artist or None, 
+                title=title or None, 
+                fallback_on_error=True
+            )
+            if websearch_results:
+                search_strategy = "barcode"
+                logger.info(f"websearch_fallback: Barcode search found {len(websearch_results)} results")
+            else:
+                logger.info("websearch_fallback: Barcode search returned no results, falling back to text search")
+        except Exception as e:
+            logger.warning(f"websearch_fallback: Barcode search failed: {e}")
+
+    # Fallback to traditional artist/title search if barcode search didn't work
+    if not websearch_results and artist and title:
+        try:
+            logger.info(f"websearch_fallback: Trying text search for: {artist} - {title}")
+            websearch_results = search_vinyl_metadata(artist, title, fallback_on_error=True)
+            if websearch_results:
+                search_strategy = "text"
+                logger.info(f"websearch_fallback: Text search found {len(websearch_results)} results")
+        except Exception as e:
+            logger.warning(f"websearch_fallback: Text search failed: {e}")
+
+    if not websearch_results:
+        logger.warning(f"websearch_fallback: No results found (tried barcode: {bool(barcode)}, text: {bool(artist and title)})")
         return state
 
-    try:
-        # Search using Tavily API
-        websearch_results = search_vinyl_metadata(artist, title, fallback_on_error=True)
+    state["websearch_results"] = websearch_results
 
-        if not websearch_results:
-            logger.warning(f"websearch_fallback: No results for {artist} - {title}")
-            return state
+    # Add websearch evidence with enhanced metadata
+    evidence_chain = state.get("evidence_chain", [])
+    websearch_evidence: Evidence = {
+        "source": EvidenceType.WEBSEARCH,
+        # Barcode searches are more reliable than text searches
+        "confidence": 0.65 if search_strategy == "barcode" else 0.50,
+        "data": {
+            "search_strategy": search_strategy,
+            "query": f"barcode:{barcode}" if search_strategy == "barcode" else f"{artist} {title}",
+            "barcode_used": barcode if search_strategy == "barcode" else None,
+            "top_result": websearch_results[0] if websearch_results else None,
+            "results_count": len(websearch_results),
+        },
+        "timestamp": datetime.now(),
+    }
+    evidence_chain.append(websearch_evidence)
+    state["evidence_chain"] = evidence_chain
 
-        state["websearch_results"] = websearch_results
-
-        # Add websearch evidence
-        evidence_chain = state.get("evidence_chain", [])
-        websearch_evidence: Evidence = {
-            "source": EvidenceType.WEBSEARCH,
-            "confidence": 0.50,  # Websearch is less reliable than direct API calls
-            "data": {
-                "query": f"{artist} {title}",
-                "top_result": websearch_results[0] if websearch_results else None,
-                "results_count": len(websearch_results),
-            },
-            "timestamp": datetime.now(),
-        }
-        evidence_chain.append(websearch_evidence)
-        state["evidence_chain"] = evidence_chain
-
-        logger.info(f"websearch_fallback: Found {len(websearch_results)} results for {artist} - {title}")
-
-    except Exception as e:
-        logger.error(f"websearch_fallback: Error during websearch: {e}")
-        # Continue with existing evidence even if websearch fails
+    logger.info(f"websearch_fallback: Found {len(websearch_results)} results using {search_strategy} search")
 
     return state
 

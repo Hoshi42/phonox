@@ -8,6 +8,10 @@
       content="Phonox - AI-powered vinyl record identification"
     />
     <meta name="theme-color" content="#667eea" />
+    <!-- Force cache refresh for mobile browsers -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <link rel="manifest" href="/manifest.json" />
     <title>Phonox - Vinyl Record Identifier</title>
     <style>
@@ -35,11 +39,11 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-        })
-      }
+      // if ('serviceWorker' in navigator) {
+        // window.addEventListener('load', () => {
+          // navigator.serviceWorker.register('/sw.js')
+        // })
+      // }
     </script>
   </body>
 </html>

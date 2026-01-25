@@ -1,17 +1,22 @@
 #!/bin/bash
 
 # Backup script for Phonox database and uploads
-BACKUP_DIR="${PWD}/backups"
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+BACKUP_DIR="${ROOT_DIR}/backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+UPLOADS_VOLUME="phonox_phonox_uploads"
 
 echo "Creating backup directory..."
 mkdir -p "${BACKUP_DIR}"
 
 echo "Backing up PostgreSQL database..."
-docker exec phonox_db pg_dump -U phonox phonox > "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql"
+docker compose exec -T db pg_dump -U phonox phonox > "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql"
 
 echo "Backing up uploads..."
-tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C data/uploads .
+docker run --rm \
+	-v "${UPLOADS_VOLUME}:/data" \
+	-v "${BACKUP_DIR}:/backup" \
+	alpine sh -c "cd /data && tar -czf /backup/phonox_uploads_${TIMESTAMP}.tar.gz ."
 
 echo "Backup completed!"
 echo "Database backup: ${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql"

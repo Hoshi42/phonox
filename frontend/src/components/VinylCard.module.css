@@ -231,20 +231,54 @@
 .addImageBtn {
   display: block;
   width: 100%;
-  padding: 8px;
+  padding: 12px 8px;  /* Increased padding for mobile touch */
   text-align: center;
-  background: rgba(102, 126, 234, 0.1);
+  background: rgba(102, 126, 234, 0.15);  /* More visible background */
   color: #667eea;
-  border: 1px dashed rgba(102, 126, 234, 0.3);
-  border-radius: 6px;
+  border: 2px dashed rgba(102, 126, 234, 0.4);  /* Thicker border */
+  border-radius: 8px;  /* Larger border radius */
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.95rem;  /* Slightly larger text */
+  font-weight: 500;  /* Bolder text for better visibility */
+  transition: all 0.2s;
+  min-height: 48px;  /* Minimum touch target for mobile */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
   transition: all 0.2s;
 }
 
-.addImageBtn:hover {
-  background: rgba(102, 126, 234, 0.2);
-  border-color: rgba(102, 126, 234, 0.4);
+.addImageBtn:hover, .addImageBtn:active {
+  background: rgba(102, 126, 234, 0.25);
+  border-color: rgba(102, 126, 234, 0.6);
+  transform: translateY(-1px);  /* Subtle lift effect */
+}
+
+.reanalyzeBtn {
+  width: 100%;
+  padding: 10px 12px;
+  margin-top: 8px;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 6px;
+  color: #fbbf24;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.reanalyzeBtn:hover {
+  background: rgba(251, 191, 36, 0.2);
+  border-color: rgba(251, 191, 36, 0.4);
+  transform: translateY(-1px);
 }
 
 .metadata {
@@ -310,6 +344,30 @@
 
 .field input::placeholder {
   color: rgba(255, 255, 255, 0.4);
+}
+
+.conditionSelect {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: #e0e7ff;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+  width: 100%;
+  cursor: pointer;
+}
+
+.conditionSelect:focus {
+  outline: none;
+  border-color: rgba(102, 126, 234, 0.4);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.conditionSelect option {
+  background: #1a1625;
+  color: #e0e7ff;
+  padding: 8px;
 }
 
 .valueSection {

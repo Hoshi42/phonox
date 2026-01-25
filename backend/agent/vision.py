@@ -14,6 +14,7 @@ import json
 from typing import Optional, Dict, Any, cast
 
 from anthropic import Anthropic
+from backend.agent.barcode_utils import validate_barcode, format_barcode_for_search
 
 logger = logging.getLogger(__name__)
 
@@ -81,29 +82,48 @@ def extract_vinyl_metadata(
     """
     client = Anthropic()
 
-    # Construct the prompt for vinyl metadata extraction
-    extraction_prompt = """Analyze this vinyl record album cover image and extract the following metadata:
+    # Construct the prompt for vinyl metadata extraction with enhanced barcode detection
+    extraction_prompt = """Analyze this vinyl record image (could be album cover, back cover, spine, or label) and extract the following metadata:
 
 1. Artist/Group Name
 2. Album Title
-3. Release Year (if visible, otherwise "unknown")
+3. Release Year (if visible, otherwise null)
 4. Record Label
-5. Catalog Number (if visible, otherwise "unknown")
-6. Genres (comma-separated list)
-7. Confidence Score (0.0-1.0) indicating how confident you are in the accuracy of the extracted information
+5. Catalog Number (alphanumeric code like "ABC-123", "DEF 456", etc.)
+6. Barcode/UPC (long numeric code, typically 12-13 digits)
+7. Genres (comma-separated list)
+8. Confidence Score (0.0-1.0) indicating how confident you are in the accuracy
 
-IMPORTANT: Return your response ONLY as a valid JSON object with this exact structure:
+CRITICAL BARCODE IDENTIFICATION INSTRUCTIONS:
+- UPC/EAN barcodes appear as BLACK AND WHITE VERTICAL LINES (like |||||| ||| | |||) with numbers below
+- Look VERY CAREFULLY for barcode patterns - they are often small and in corners
+- Barcode numbers are typically 12-13 digits (examples: 123456789012, 1234567890123)
+- Common locations: back cover (bottom left/right corners), spine, inner sleeve
+- May be prefixed with "UPC:", "EAN:", or just raw numbers
+- DIFFERENT from catalog numbers (which are usually shorter like "ABC-123")
+- Even if barcode lines are unclear, try to read any long numeric sequences (12+ digits)
+
+LOOK EXTRA HARD FOR BARCODES - they are critical for identification!
+
+EXAMPLES OF VALID BARCODES:
+- "886979578623" (12 digits)
+- "4050538642823" (13 digits) 
+- "075021234567" (with leading zero)
+- "UPC: 123456789012"
+
+IMPORTANT: Return ONLY a valid JSON object with this exact structure:
 {
     "artist": "extracted artist name",
     "title": "extracted album title",
-    "year": 1969 or null if unknown,
+    "year": 1969 or null,
     "label": "extracted label name",
     "catalog_number": "extracted catalog number or null",
+    "barcode": "extracted barcode/UPC or null",
     "genres": ["genre1", "genre2"],
     "confidence": 0.85
 }
 
-Do NOT include any text outside the JSON object. If you cannot read the cover clearly, still provide your best guess with a lower confidence score."""
+Do NOT include any text outside the JSON. FOCUS MAXIMUM ATTENTION on finding barcode numbers!"""
 
     try:
         logger.info("Starting Claude 3 Sonnet vision extraction...")
@@ -182,9 +202,23 @@ Do NOT include any text outside the JSON object. If you cannot read the cover cl
             except (ValueError, TypeError):
                 metadata["confidence"] = 0.5
 
+            # Validate and clean barcode if present
+            if metadata.get("barcode"):
+                is_valid, cleaned_barcode, error = validate_barcode(metadata["barcode"])
+                if is_valid and cleaned_barcode:
+                    metadata["barcode"] = cleaned_barcode
+                    logger.info(f"Vision extraction: Valid barcode detected: {cleaned_barcode}")
+                else:
+                    logger.warning(f"Vision extraction: Invalid barcode '{metadata['barcode']}': {error}")
+                    metadata["barcode"] = None
+            
+            # Log barcode detection success
+            barcode_info = f" (barcode: {metadata.get('barcode', 'none')})" if metadata.get('barcode') else ""
+            # Log barcode detection success
+            barcode_info = f" (barcode: {metadata.get('barcode', 'none')})" if metadata.get('barcode') else ""
             logger.info(
                 f"Vision extraction successful: {metadata['artist']} - {metadata['title']} "
-                f"(confidence: {metadata['confidence']:.2f})"
+                f"(confidence: {metadata['confidence']:.2f}){barcode_info}"
             )
 
             return metadata
@@ -206,6 +240,7 @@ Do NOT include any text outside the JSON object. If you cannot read the cover cl
                 "year": None,
                 "label": "Unknown Label",
                 "catalog_number": None,
+                "barcode": None,
                 "genres": ["Unknown"],
                 "confidence": 0.0,  # 0 confidence for fallback
             }

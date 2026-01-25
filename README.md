@@ -31,6 +31,33 @@ docker compose exec backend pytest tests/ -v
 
 ---
 
+## Phonox CLI
+
+Use the bundled `phonox-cli` to install, configure API keys, and manage backups/restores.
+
+```bash
+# Install (build images) and optionally start containers
+./phonox-cli install --up
+
+# Configure API keys
+./phonox-cli configure --anthropic YOUR_KEY --tavily YOUR_KEY
+
+# Backup DB + uploads
+./phonox-cli backup
+
+# Restore from a timestamp
+./phonox-cli restore 20260125_021500
+
+# Start/stop containers
+./phonox-cli start
+./phonox-cli stop
+
+# Alternate launcher
+./start-cli.sh <command> [args]
+```
+
+---
+
 ## Documentation
 
 ### For Implementation Teams

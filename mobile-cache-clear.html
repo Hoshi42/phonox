@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cache Clear & Mobile Fix</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container { 
+            max-width: 600px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 30px; 
+            border-radius: 15px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            color: #333;
+        }
+        h1 { 
+            text-align: center; 
+            color: #333; 
+            margin-bottom: 30px;
+            font-size: 2.2em;
+        }
+        .step {
+            background: #f8f9fa;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 10px;
+            border-left: 5px solid #28a745;
+        }
+        .step h3 {
+            margin: 0 0 15px 0;
+            color: #28a745;
+            font-size: 1.3em;
+        }
+        button {
+            background: #dc3545;
+            color: white;
+            padding: 15px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 5px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #c82333;
+        }
+        button.success {
+            background: #28a745;
+        }
+        button.success:hover {
+            background: #218838;
+        }
+        .log {
+            background: #343a40;
+            color: #fff;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 14px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: bold;
+            text-align: center;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 2px solid #28a745;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 2px solid #dc3545;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 2px solid #17a2b8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Mobile Cache Fix</h1>
+        
+        <div class="status info" id="status">
+            Ready to clear cache and fix mobile register access
+        </div>
+        
+        <div class="step">
+            <h3>Step 1: Clear All Caches</h3>
+            <p>This will clear browser cache, localStorage, and service worker cache to remove old API endpoints.</p>
+            <button onclick="clearAllCaches()">🗑️ Clear All Caches</button>
+        </div>
+        
+        <div class="step">
+            <h3>Step 2: Test Fixed API</h3>
+            <p>Test the corrected API endpoints to verify they're working.</p>
+            <button onclick="testNewAPI()" class="success">✅ Test Register API</button>
+        </div>
+        
+        <div class="step">
+            <h3>Step 3: Go to Main App</h3>
+            <p>Once cache is cleared and API is confirmed working, return to the main app.</p>
+            <button onclick="goToMainApp()" class="success">🚀 Go to Main App</button>
+        </div>
+        
+        <div id="logs"></div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const logsContainer = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            
+            if (!logsContainer.querySelector('.log')) {
+                const logDiv = document.createElement('div');
+                logDiv.className = 'log';
+                logsContainer.appendChild(logDiv);
+            }
+            
+            const logDiv = logsContainer.querySelector('.log');
+            logDiv.textContent += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function setStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        async function clearAllCaches() {
+            setStatus('Clearing all caches...', 'info');
+            log('🧹 Starting cache clearing process');
+            
+            try {
+                // Clear localStorage
+                const localStorageKeys = Object.keys(localStorage);
+                localStorage.clear();
+                log(`✅ Cleared localStorage (${localStorageKeys.length} items)`);
+                
+                // Clear sessionStorage
+                const sessionStorageKeys = Object.keys(sessionStorage);
+                sessionStorage.clear();
+                log(`✅ Cleared sessionStorage (${sessionStorageKeys.length} items)`);
+                
+                // Clear service worker caches
+                if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    for (const cacheName of cacheNames) {
+                        await caches.delete(cacheName);
+                        log(`✅ Cleared cache: ${cacheName}`);
+                    }
+                } else {
+                    log('ℹ️ Cache API not available');
+                }
+                
+                // Unregister service workers
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (const registration of registrations) {
+                        await registration.unregister();
+                        log(`✅ Unregistered service worker: ${registration.scope}`);
+                    }
+                } else {
+                    log('ℹ️ Service Worker API not available');
+                }
+                
+                log('🎉 All caches cleared successfully!');
+                setStatus('✅ All caches cleared! Ready to test API.', 'success');
+                
+            } catch (error) {
+                log(`❌ Error clearing caches: ${error.message}`);
+                setStatus('❌ Error clearing some caches', 'error');
+            }
+        }
+
+        async function testNewAPI() {
+            setStatus('Testing API...', 'info');
+            log('🧪 Testing corrected API endpoints');
+            
+            const apiBase = `http://${window.location.hostname}:8000`;
+            const tests = [
+                {
+                    name: 'Health Check',
+                    url: `${apiBase}/health`,
+                    expect: 'JSON response with status'
+                },
+                {
+                    name: 'Users List',
+                    url: `${apiBase}/api/register/users`,
+                    expect: 'Array of usernames'
+                },
+                {
+                    name: "Jan's Register",
+                    url: `${apiBase}/api/register/?user_tag=Jan&_t=${Date.now()}`,
+                    expect: "Array of Jan's records"
+                }
+            ];
+            
+            let allPassed = true;
+            
+            for (const test of tests) {
+                try {
+                    log(`🔍 Testing ${test.name}: ${test.url}`);
+                    
+                    const response = await fetch(test.url, {
+                        method: 'GET',
+                        mode: 'cors',
+                        cache: 'no-cache',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        log(`✅ ${test.name} OK: ${JSON.stringify(data).substring(0, 100)}...`);
+                        
+                        // Special check for Jan's register
+                        if (test.name === "Jan's Register" && Array.isArray(data) && data.length > 0) {
+                            log(`🎵 Found ${data.length} records for Jan!`);
+                        }
+                    } else {
+                        log(`❌ ${test.name} failed: ${response.status} ${response.statusText}`);
+                        allPassed = false;
+                    }
+                    
+                } catch (error) {
+                    log(`❌ ${test.name} error: ${error.message}`);
+                    allPassed = false;
+                    
+                    if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                        log('🚨 Network/CORS issue detected!');
+                    }
+                }
+            }
+            
+            if (allPassed) {
+                setStatus('✅ All API tests passed! Ready to use main app.', 'success');
+                log('🎉 All tests passed! The API is working correctly.');
+            } else {
+                setStatus('❌ Some API tests failed', 'error');
+                log('❌ Some tests failed. Check the logs above.');
+            }
+        }
+
+        function goToMainApp() {
+            setStatus('Redirecting to main app...', 'info');
+            log('🚀 Redirecting to main Phonox app');
+            
+            // Small delay to show the message
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1000);
+        }
+
+        // Show current environment on load
+        window.addEventListener('load', () => {
+            log(`📱 Environment: ${navigator.userAgent}`);
+            log(`🌐 Location: ${window.location.href}`);
+            log(`🔗 API Base: http://${window.location.hostname}:8000`);
+            log('💡 Click "Clear All Caches" to start the fix process');
+        });
+    </script>
+</body>
+</html>

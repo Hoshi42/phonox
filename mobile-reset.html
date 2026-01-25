@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reset Phonox Mobile</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            text-align: center;
+            background: #f0f0f0;
+        }
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            background: #ff5722;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            margin: 10px 0;
+            cursor: pointer;
+        }
+        .success {
+            background: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Reset Phonox Mobile</h2>
+        <p>If you're having issues accessing your register, click below to clear cache and reset:</p>
+        
+        <button onclick="resetApp()" id="resetBtn">
+            🔄 Reset App Cache
+        </button>
+        
+        <button onclick="goToApp()" style="background: #4CAF50;">
+            ➡️ Go to Phonox App
+        </button>
+        
+        <div id="status"></div>
+    </div>
+
+    <script>
+        function resetApp() {
+            const btn = document.getElementById('resetBtn');
+            const status = document.getElementById('status');
+            
+            btn.disabled = true;
+            btn.textContent = 'Resetting...';
+            
+            try {
+                // Clear all localStorage
+                localStorage.clear();
+                
+                // Clear sessionStorage
+                sessionStorage.clear();
+                
+                // Clear all cookies (if possible)
+                document.cookie.split(";").forEach(function(c) { 
+                    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+                });
+                
+                // Clear service worker cache
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                        for (let registration of registrations) {
+                            registration.unregister();
+                        }
+                    });
+                }
+                
+                // Clear cache storage
+                if ('caches' in window) {
+                    caches.keys().then(function(names) {
+                        for (let name of names) {
+                            caches.delete(name);
+                        }
+                    });
+                }
+                
+                status.innerHTML = '<div style="background: #d4edda; color: #155724; padding: 10px; border-radius: 4px; margin-top: 20px;">✅ Cache cleared successfully! You can now access the app with fresh settings.</div>';
+                btn.textContent = '✅ Reset Complete';
+                btn.className = 'success';
+                
+            } catch (error) {
+                console.error('Reset error:', error);
+                status.innerHTML = '<div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 4px; margin-top: 20px;">❌ Reset failed: ' + error.message + '</div>';
+                btn.textContent = '❌ Reset Failed';
+            } finally {
+                btn.disabled = false;
+            }
+        }
+        
+        function goToApp() {
+            window.location.href = '/';
+        }
+    </script>
+</body>
+</html>

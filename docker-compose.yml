@@ -5,16 +5,16 @@ services:
     image: postgres:15
     container_name: phonox_db
     environment:
-      POSTGRES_DB: phonox
-      POSTGRES_USER: phonox
-      POSTGRES_PASSWORD: phonox123
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "0.0.0.0:5432:5432"
     volumes:
       - phonox_db_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U phonox -d phonox"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -27,13 +27,13 @@ services:
       dockerfile: Dockerfile.backend
     container_name: phonox_backend
     ports:
-      - "8000:8000"
+      - "0.0.0.0:8000:8000"
     environment:
-      PYTHONUNBUFFERED: "1"
-      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: ${PYTHONUNBUFFERED}
+      PYTHONDONTWRITEBYTECODE: ${PYTHONDONTWRITEBYTECODE}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       TAVILY_API_KEY: ${TAVILY_API_KEY}
-      DATABASE_URL: postgresql://phonox:phonox123@db:5432/phonox
+      DATABASE_URL: ${DATABASE_URL}
     volumes:
       - ./backend:/app/backend
       - ./tests:/app/tests
@@ -51,9 +51,9 @@ services:
       dockerfile: Dockerfile.frontend
     container_name: phonox_frontend
     ports:
-      - "5173:5173"
+      - "0.0.0.0:5173:5173"
     environment:
-      VITE_API_URL: http://localhost:8000
+      VITE_API_URL: ${VITE_API_URL}
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -66,16 +66,8 @@ services:
 volumes:
   phonox_db_data:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${PWD}/data/postgres/data
   phonox_uploads:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${PWD}/data/uploads
 
 networks:
   phonox_network:

@@ -2,7 +2,10 @@ import { useState } from 'react'
 import { RegisterRecord } from '../services/registerApi'
 import styles from './VinylRegister.module.css'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API_BASE = import.meta.env.VITE_API_URL
+  || (typeof window !== 'undefined' && window.location.hostname
+    ? `http://${window.location.hostname}:8000`
+    : 'http://localhost:8000')
 
 interface VinylRegisterProps {
   records: RegisterRecord[]
@@ -64,6 +67,72 @@ export default function VinylRegister({
     records.flatMap(record => record.genres || [])
   )].sort()
 
+  const handleDownloadCsv = () => {
+    const csvEscape = (value: unknown) => {
+      if (value === null || value === undefined) return ''
+      const str = String(value)
+      if (/[",\n]/.test(str)) {
+        return `"${str.replace(/"/g, '""')}"`
+      }
+      return str
+    }
+
+    const headers = [
+      'Artist',
+      'Title',
+      'Year',
+      'Label',
+      'Catalog Number',
+      'Genres',
+      'Estimated Value (EUR)',
+      'Condition',
+      'Notes',
+      'Confidence (%)',
+      'Spotify URL',
+      'Images',
+      'Created At',
+      'Updated At'
+    ]
+
+    const rows = filteredRecords.map((record) => {
+      const value = getRecordValue(record)
+      const confidence = record.confidence != null ? Math.round(record.confidence * 100) : ''
+      const images = (record.image_urls || []).map((url) => `${API_BASE}${url}`).join('; ')
+      return [
+        record.artist || '',
+        record.title || '',
+        record.year ?? '',
+        record.label || '',
+        record.catalog_number || '',
+        (record.genres || []).join('; '),
+        value ? value.toFixed(2) : '',
+        record.condition || '',
+        record.user_notes || '',
+        confidence,
+        record.spotify_url || '',
+        images,
+        record.created_at || '',
+        record.updated_at || ''
+      ]
+    })
+
+    const csvContent = [
+      headers.map(csvEscape).join(','),
+      ...rows.map((row) => row.map(csvEscape).join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+    link.href = url
+    link.setAttribute('download', `phonox-register-${timestamp}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className={styles.registerOverlay}>
       <div className={styles.registerModal}>
@@ -76,6 +145,13 @@ export default function VinylRegister({
             </div>
           </div>
           <div className={styles.headerRight}>
+            <button
+              onClick={handleDownloadCsv}
+              className={styles.csvBtn}
+              title="Download CSV"
+            >
+              ⬇️ CSV
+            </button>
             <button 
               onClick={onClose}
               className={styles.closeBtn}
@@ -184,7 +260,14 @@ export default function VinylRegister({
                       <button 
                         onClick={(e) => {
                           e.stopPropagation()
-                          onDeleteRecord(record.id)
+                          const title = record.title || 'Unknown Title'
+                          const artist = record.artist || 'Unknown Artist'
+                          const ok = window.confirm(
+                            `Remove "${title}" by ${artist} from your register?`
+                          )
+                          if (ok) {
+                            onDeleteRecord(record.id)
+                          }
                         }}
                         className={styles.deleteBtn}
                         title="Remove from register"

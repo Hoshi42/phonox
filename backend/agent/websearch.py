@@ -77,6 +77,130 @@ def search_vinyl_metadata(
             raise WebsearchError(f"Websearch failed: {e}") from e
 
 
+def search_vinyl_by_barcode(
+    barcode: str,
+    artist: Optional[str] = None,
+    title: Optional[str] = None,
+    fallback_on_error: bool = True,
+) -> List[Dict[str, Any]]:
+    """
+    Search for vinyl record information using barcode/UPC.
+
+    Args:
+        barcode: UPC/EAN barcode number (12-13 digits)
+        artist: Optional artist name for additional context
+        title: Optional album title for additional context
+        fallback_on_error: If True, return empty list on API error; if False, raise exception
+
+    Returns:
+        List of search results with barcode-specific information
+
+    Raises:
+        WebsearchError: If search fails and fallback_on_error=False
+    """
+    if not barcode or not barcode.strip():
+        raise ValueError("Barcode is required")
+
+    # Clean and validate barcode
+    clean_barcode = barcode.strip().replace(" ", "").replace("-", "")
+    
+    # Basic barcode validation (12-13 digits)
+    if not clean_barcode.isdigit() or len(clean_barcode) not in [12, 13]:
+        logger.warning(f"Invalid barcode format: {barcode} (cleaned: {clean_barcode})")
+        if fallback_on_error:
+            return []
+        else:
+            raise ValueError(f"Invalid barcode format: {barcode}")
+
+    client = TavilyClient()
+
+    # Construct barcode-focused search queries
+    search_queries = [
+        f"UPC {clean_barcode} vinyl record album",
+        f"barcode {clean_barcode} vinyl LP",
+        f"{clean_barcode} record album discogs"
+    ]
+    
+    # Add context-specific queries if artist/title provided
+    if artist and title:
+        search_queries.insert(0, f'"{artist}" "{title}" UPC {clean_barcode} vinyl')
+    elif artist:
+        search_queries.insert(0, f'"{artist}" UPC {clean_barcode} vinyl album')
+    elif title:
+        search_queries.insert(0, f'"{title}" UPC {clean_barcode} vinyl record')
+
+    all_results = []
+    
+    try:
+        # Try multiple search strategies
+        for i, query in enumerate(search_queries[:2]):  # Limit to 2 searches to control costs
+            logger.info(f"Barcode search {i+1}: {query}")
+            
+            try:
+                response: Dict[str, Any] = client.search(
+                    query=query,
+                    include_images=False,
+                    max_results=3,  # Fewer results per query since we're doing multiple queries
+                )
+                
+                results = _parse_tavily_response(response)
+                all_results.extend(results)
+                
+                logger.info(f"Barcode search {i+1} found {len(results)} results")
+                
+            except Exception as e:
+                logger.warning(f"Barcode search {i+1} failed: {e}")
+                continue
+        
+        # Remove duplicates based on URL
+        seen_urls = set()
+        unique_results = []
+        for result in all_results:
+            url = result.get('url', '')
+            if url not in seen_urls:
+                seen_urls.add(url)
+                unique_results.append(result)
+        
+        logger.info(f"Found {len(unique_results)} unique barcode search results")
+        return unique_results[:5]  # Return top 5 unique results
+
+    except Exception as e:
+        logger.error(f"Barcode search failed for {clean_barcode}: {e}")
+        if fallback_on_error:
+            logger.warning("Returning empty results due to barcode search error")
+            return []
+        else:
+            raise WebsearchError(f"Barcode search failed: {e}") from e
+
+    client = TavilyClient()
+
+    # Construct search query
+    search_query = f"{artist} {title} vinyl record album"
+
+    try:
+        logger.info(f"Searching Tavily for: {search_query}")
+
+        response: Dict[str, Any] = client.search(
+            query=search_query,
+            include_images=False,
+            max_results=5,
+        )
+
+        # Parse Tavily response
+        results = _parse_tavily_response(response)
+        logger.info(f"Found {len(results)} search results")
+
+        return results
+
+    except Exception as e:
+        logger.error(f"Tavily search failed: {e}")
+        if fallback_on_error:
+            logger.warning("Returning empty results due to error")
+            return []
+        else:
+            raise WebsearchError(f"Websearch failed: {e}") from e
+
+
 def _parse_tavily_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     Parse Tavily API response into standardized format.
@@ -192,3 +316,89 @@ def search_vinyl_metadata_with_fallback(
         "error": error_msg,
         "query": f"{artist} {title}",
     }
+
+
+def search_spotify_album(
+    artist: str,
+    title: str,
+    fallback_on_error: bool = True,
+) -> Optional[Dict[str, Any]]:
+    """
+    Search for Spotify album link using Tavily websearch.
+
+    Args:
+        artist: Artist or group name
+        title: Album title
+        fallback_on_error: If True, return None on error; if False, raise exception
+
+    Returns:
+        Dictionary with:
+        - spotify_url: Direct Spotify album URL
+        - artist: Artist name
+        - title: Album title
+        - source: "spotify"
+
+    Raises:
+        WebsearchError: If search fails and fallback_on_error=False
+    """
+    if not artist or not title:
+        logger.warning("Artist and title are required for Spotify search")
+        return None
+
+    client = TavilyClient()
+
+    # Construct specific Spotify search query
+    search_query = f"{artist} {title} album site:spotify.com"
+
+    try:
+        logger.info(f"Searching Spotify for: {artist} - {title}")
+
+        response: Dict[str, Any] = client.search(
+            query=search_query,
+            include_images=False,
+            max_results=3,
+        )
+
+        # Look for Spotify URL in results
+        if response.get("results"):
+            for result in response["results"]:
+                url = result.get("url", "")
+                if "spotify.com/album/" in url:
+                    logger.info(f"Found Spotify album: {url}")
+                    return {
+                        "spotify_url": url,
+                        "artist": artist,
+                        "title": title,
+                        "source": "spotify",
+                    }
+
+        # If no direct Spotify link found, try without site restriction
+        logger.info(f"No Spotify link found with site restriction, trying broader search")
+        search_query = f"{artist} {title} spotify album"
+        response = client.search(
+            query=search_query,
+            include_images=False,
+            max_results=5,
+        )
+
+        if response.get("results"):
+            for result in response["results"]:
+                url = result.get("url", "")
+                if "spotify.com/album/" in url:
+                    logger.info(f"Found Spotify album (broader search): {url}")
+                    return {
+                        "spotify_url": url,
+                        "artist": artist,
+                        "title": title,
+                        "source": "spotify",
+                    }
+
+        logger.warning(f"No Spotify album found for {artist} - {title}")
+        return None
+
+    except Exception as e:
+        logger.error(f"Spotify search failed: {e}")
+        if fallback_on_error:
+            return None
+        else:
+            raise WebsearchError(f"Spotify search failed: {e}") from e
