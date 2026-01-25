@@ -3,9 +3,11 @@
 import json
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Any as ColumnType
-from sqlalchemy import Column, String, Float, Boolean, DateTime, Text, Integer
+from sqlalchemy import Column, String, Float, Boolean, DateTime, Text, Integer, LargeBinary, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, relationship
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
 
 Base = declarative_base()  # type: ignore[misc]
 
@@ -15,7 +17,7 @@ class VinylRecord(Base):  # type: ignore[misc,valid-type]
     __tablename__ = "vinyl_records"
 
     # Primary key
-    id: ColumnType = Column(String(36), primary_key=True, index=True)
+    id: ColumnType = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
 
     # Timestamps
     created_at: ColumnType = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -26,6 +28,7 @@ class VinylRecord(Base):  # type: ignore[misc,valid-type]
     title: ColumnType = Column(String(255), nullable=True)
     year: ColumnType = Column(Integer, nullable=True)
     label: ColumnType = Column(String(255), nullable=True)
+    spotify_url: ColumnType = Column(String(500), nullable=True)
     catalog_number: ColumnType = Column(String(50), nullable=True)
     genres: ColumnType = Column(Text, nullable=True)  # JSON array stored as string
 
@@ -39,14 +42,18 @@ class VinylRecord(Base):  # type: ignore[misc,valid-type]
     auto_commit: ColumnType = Column(Boolean, default=False, nullable=False)
     needs_review: ColumnType = Column(Boolean, default=True, nullable=False)
 
-    # Evidence chain (JSON)
-    evidence_chain: ColumnType = Column(Text, nullable=True)  # JSON array
-
-    # Error tracking
+    # Storage and workflow
+    evidence_chain: ColumnType = Column(Text, nullable=True)  # JSON stored as string
     error: ColumnType = Column(Text, nullable=True)
-
-    # User input
     user_notes: ColumnType = Column(Text, nullable=True)
+
+    # Register specific fields
+    in_register: ColumnType = Column(Boolean, default=False, nullable=False)
+    estimated_value_eur: ColumnType = Column(Float, nullable=True)
+    condition: ColumnType = Column(String(50), nullable=True)  # poor, fair, good, excellent, near_mint
+    
+    # Relationships
+    images = relationship("VinylImage", back_populates="record", cascade="all, delete-orphan")
 
     def set_genres(self, genres: List[str]) -> None:
         """Set genres from list."""
@@ -56,7 +63,10 @@ class VinylRecord(Base):  # type: ignore[misc,valid-type]
         """Get genres as list."""
         if not self.genres:
             return []
-        return json.loads(self.genres)
+        try:
+            return json.loads(self.genres)
+        except (json.JSONDecodeError, TypeError):
+            return []
 
     def set_evidence_chain(self, chain: List[Dict[str, Any]]) -> None:
         """Set evidence chain from list of dicts."""
@@ -73,7 +83,10 @@ class VinylRecord(Base):  # type: ignore[misc,valid-type]
         """Get evidence chain as list of dicts."""
         if not self.evidence_chain:
             return []
-        return json.loads(self.evidence_chain)
+        try:
+            return json.loads(self.evidence_chain)
+        except (json.JSONDecodeError, TypeError):
+            return []
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -87,6 +100,7 @@ class VinylRecord(Base):  # type: ignore[misc,valid-type]
                 "title": self.title,
                 "year": self.year,
                 "label": self.label,
+                "spotify_url": self.spotify_url,
                 "catalog_number": self.catalog_number,
                 "genres": self.get_genres(),
             },
@@ -99,6 +113,28 @@ class VinylRecord(Base):  # type: ignore[misc,valid-type]
         }
 
 
+class VinylImage(Base):  # type: ignore[misc,valid-type]
+    """Vinyl record image storage model."""
+    __tablename__ = "vinyl_images"
+
+    # Primary key
+    id: ColumnType = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
+    
+    # Foreign key
+    record_id: ColumnType = Column(String(36), ForeignKey('vinyl_records.id'), nullable=False)
+    
+    # Image data
+    filename: ColumnType = Column(String(255), nullable=False)
+    content_type: ColumnType = Column(String(100), nullable=False)
+    file_size: ColumnType = Column(Integer, nullable=False)
+    file_path: ColumnType = Column(String(500), nullable=False)  # Path to file on disk
+    
+    # Metadata
+    created_at: ColumnType = Column(DateTime, default=datetime.utcnow, nullable=False)
+    is_primary: ColumnType = Column(Boolean, default=False, nullable=False)
+    
+    # Relationship
+    record = relationship("VinylRecord", back_populates="images")
 def get_db() -> Session:
     """Dependency for getting database session."""
     # This will be configured in main.py

@@ -2,7 +2,7 @@
 
 import logging
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 from fastapi import APIRouter, File, UploadFile, HTTPException, Depends, status
@@ -25,11 +25,15 @@ from backend.api.models import (
 )
 from backend.agent.graph import build_agent_graph
 from backend.agent.state import VinylState
+from backend.tools import EnhancedChatTools
 
 logger = logging.getLogger(__name__)
 
 # Initialize Anthropic client for chat (using cheapest model: Claude 3.5 Haiku)
 anthropic_client = Anthropic()
+
+# Initialize enhanced chat tools
+chat_tools = EnhancedChatTools()
 
 router = APIRouter(prefix="/api/v1", tags=["vinyl"])
 
@@ -147,6 +151,7 @@ async def identify_vinyl(
                 vinyl_record.title = vision_data.get("title")
                 vinyl_record.year = vision_data.get("year")
                 vinyl_record.label = vision_data.get("label")
+                vinyl_record.spotify_url = vision_data.get("spotify_url") or vision_data.get("spotify_link")
                 vinyl_record.catalog_number = vision_data.get("catalog_number")
                 if vision_data.get("genres"):
                     vinyl_record.set_genres(vision_data["genres"])
@@ -238,6 +243,7 @@ async def get_vinyl_record(
                 title=vinyl_record.title or "Unknown",
                 year=vinyl_record.year,
                 label=vinyl_record.label or "Unknown",
+                spotify_url=vinyl_record.spotify_url,
                 catalog_number=vinyl_record.catalog_number,
                 genres=vinyl_record.get_genres(),
             )
@@ -295,6 +301,8 @@ async def review_vinyl(
             vinyl_record.year = review.year
         if review.label:
             vinyl_record.label = review.label
+        if review.spotify_url:
+            vinyl_record.spotify_url = review.spotify_url
         if review.catalog_number:
             vinyl_record.catalog_number = review.catalog_number
         if review.genres:
@@ -335,6 +343,7 @@ async def review_vinyl(
                 title=vinyl_record.title or "Unknown",
                 year=vinyl_record.year,
                 label=vinyl_record.label or "Unknown",
+                spotify_url=vinyl_record.spotify_url,
                 catalog_number=vinyl_record.catalog_number,
                 genres=vinyl_record.get_genres(),
             )
@@ -363,12 +372,12 @@ async def review_vinyl(
         )
 
 
-@router.post("/identify/{record_id}/chat", response_model=ChatResponse)
+@router.post("/identify/{record_id}/chat", response_model=Dict[str, Any])
 async def chat_with_agent(
     record_id: str,
     request: ChatRequest,
     db: Session = Depends(get_db),
-) -> ChatResponse:
+) -> Dict[str, Any]:
     """
     Chat with the agent about a specific vinyl record using Claude 3.5 Haiku.
     
@@ -394,19 +403,22 @@ async def chat_with_agent(
             "title": vinyl_record.title,
             "year": vinyl_record.year,
             "label": vinyl_record.label,
+            "spotify_url": vinyl_record.spotify_url,
             "catalog_number": vinyl_record.catalog_number,
             "genres": vinyl_record.get_genres() if hasattr(vinyl_record, 'get_genres') else [],
+            "estimated_value_eur": vinyl_record.estimated_value_eur,
         }
 
         # Build system prompt for Claude to understand vinyl record correction context
-        system_prompt = """You are a helpful vinyl record identification assistant. Users are providing feedback and corrections to vinyl record metadata.
+        system_prompt = """You are a helpful vinyl record identification assistant with access to web search and scraping tools. Users are providing feedback, corrections, and questions about vinyl record metadata.
 
 Your tasks:
 1. Acknowledge the user's input conversationally
-2. Validate their corrections against the current metadata
-3. Suggest any clarifications if needed
-4. Extract structured metadata from natural language corrections
-5. Keep responses concise and friendly
+2. Use web search to find additional information when needed
+3. Validate their corrections against current metadata and web sources
+4. Provide enriched information from web searches
+5. Extract structured metadata from natural language corrections
+6. Keep responses informative but concise
 
 Current vinyl record context:
 - Artist: {artist}
@@ -416,7 +428,7 @@ Current vinyl record context:
 - Catalog Number: {catalog_number}
 - Genres: {genres}
 
-When the user provides corrections, acknowledge them and confirm what will be updated.""".format(
+When users ask questions, search for current information. When they provide corrections, acknowledge and confirm updates.""".format(
             artist=current_metadata.get("artist", "Unknown"),
             title=current_metadata.get("title", "Unknown"),
             year=current_metadata.get("year", "Unknown"),
@@ -425,17 +437,68 @@ When the user provides corrections, acknowledge them and confirm what will be up
             genres=", ".join(current_metadata.get("genres", [])) or "Unknown",
         )
 
-        # Call Claude 3.5 Haiku (cheapest model) for intelligent response
-        logger.debug(f"Calling Claude 3.5 Haiku for chat message: {request.message[:100]}")
+        # Determine if we need web search based on user message or /web trigger
+        search_keywords = ["price", "value", "worth", "cost", "information", "about", "tell me", "details", "history", "when", "where", "who", "what"]
+        has_web_trigger = "/web" in request.message.lower()
+        needs_web_search = has_web_trigger or any(keyword in request.message.lower() for keyword in search_keywords)
+        
+        # Remove /web trigger from message if present
+        search_message = request.message.replace("/web", "").strip() if has_web_trigger else request.message
+        
+        web_context = ""
+        all_search_results = []  # Track all search results for response
+        if needs_web_search and vinyl_record.artist and vinyl_record.title:
+            logger.info(f"Performing web search for vinyl question: {request.message[:100]}")
+            try:
+                # Use web tools to get comprehensive information
+                web_info = chat_tools.get_vinyl_comprehensive_info(
+                    vinyl_record.artist, 
+                    vinyl_record.title
+                )
+                
+                # Collect search results for response
+                if web_info.get("general_info"):
+                    all_search_results.extend(web_info["general_info"])
+                if web_info.get("pricing_info"):
+                    all_search_results.extend(web_info["pricing_info"])
+                
+                # Format web information for Claude
+                web_context = "\n\nWeb Search Results:\n"
+                
+                # Add general info
+                if web_info.get("general_info"):
+                    web_context += "General Information:\n"
+                    for result in web_info["general_info"][:2]:
+                        web_context += f"- {result.get('title', '')}: {result.get('content', '')[:200]}...\n"
+                
+                # Add pricing info
+                if web_info.get("pricing_info"):
+                    web_context += "\nPricing Information:\n"
+                    for result in web_info["pricing_info"][:2]:
+                        web_context += f"- {result.get('title', '')}: {result.get('content', '')[:200]}...\n"
+                
+                # Add detailed scraped content
+                if web_info.get("detailed_content"):
+                    web_context += "\nDetailed Information:\n"
+                    for content in web_info["detailed_content"][:1]:  # Only first detailed result
+                        if content.get("success"):
+                            web_context += f"- {content.get('title', '')}: {content.get('content', '')[:300]}...\n"
+                
+            except Exception as e:
+                logger.error(f"Error performing web search: {e}")
+                web_context = "\nNote: Web search temporarily unavailable."
+
+        # Call Claude Haiku 4.5 (fastest, cheapest model) for intelligent response
+        logger.debug(f"Calling Claude Haiku 4.5 for chat message: {request.message[:100]}")
         try:
             response = anthropic_client.messages.create(
-                model="claude-3-5-haiku-20241022",  # Cheapest Claude model
-                max_tokens=500,
-                system=system_prompt,
+                model="claude-haiku-4-5-20251001",  # Fastest Claude model
+                max_tokens=800,  # Increased for web-enhanced responses
+                system=system_prompt + web_context,
                 messages=[
                     {
                         "role": "user",
-                        "content": request.message,
+                        "content": search_message,  # Use cleaned message without /web trigger
                     }
                 ],
             )
@@ -443,7 +506,11 @@ When the user provides corrections, acknowledge them and confirm what will be up
             logger.debug(f"Claude response: {agent_response[:100]}")
         except Exception as e:
             logger.error(f"Error calling Claude 3.5 Haiku: {e}")
-            agent_response = f"I understood your feedback about the record. I've processed your input for '{vinyl_record.title}'."
+            base_response = f"I understood your feedback about the record. I've processed your input for '{vinyl_record.title}'."
+            if web_context:
+                agent_response = base_response + " I also found some additional information from web sources that might be helpful."
+            else:
+                agent_response = base_response
 
         # Update metadata if provided in request
         updated_metadata = current_metadata.copy()
@@ -474,6 +541,19 @@ When the user provides corrections, acknowledge them and confirm what will be up
                 updated_metadata["genres"] = genres
                 vinyl_record.set_genres(genres)
                 confidence_increment = 0.1
+            if "estimated_value_eur" in request.metadata:
+                try:
+                    value = float(request.metadata["estimated_value_eur"])
+                    updated_metadata["estimated_value_eur"] = value
+                    vinyl_record.estimated_value_eur = value
+                    confidence_increment = 0.05  # Small increment for value updates
+                except (ValueError, TypeError):
+                    pass
+            if "spotify_url" in request.metadata or "spotify_link" in request.metadata:
+                spotify_value = request.metadata.get("spotify_url") or request.metadata.get("spotify_link")
+                updated_metadata["spotify_url"] = spotify_value
+                vinyl_record.spotify_url = spotify_value
+                confidence_increment = max(confidence_increment, 0.05)
 
             # Increment confidence based on quality of user input
             vinyl_record.confidence = min(1.0, vinyl_record.confidence + confidence_increment)
@@ -482,7 +562,7 @@ When the user provides corrections, acknowledge them and confirm what will be up
             vinyl_record.confidence = min(1.0, vinyl_record.confidence + 0.05)
 
         # Add user note
-        vinyl_record.user_notes = (vinyl_record.user_notes or "") + f"\nChat: {request.message[:200]}"
+        vinyl_record.user_notes = (vinyl_record.user_notes or "") + f"\nChat: {search_message[:200]}"
 
         # Commit changes
         db.commit()
@@ -494,26 +574,107 @@ When the user provides corrections, acknowledge them and confirm what will be up
             title=updated_metadata.get("title", "Unknown"),
             year=updated_metadata.get("year"),
             label=updated_metadata.get("label", "Unknown"),
+            spotify_url=updated_metadata.get("spotify_url"),
             catalog_number=updated_metadata.get("catalog_number"),
             genres=updated_metadata.get("genres", []),
+            estimated_value_eur=updated_metadata.get("estimated_value_eur"),
+            estimated_value_usd=updated_metadata.get("estimated_value_usd"),
         )
 
-        return ChatResponse(
-            record_id=record_id,
-            message=agent_response,
-            updated_metadata=metadata_dict,
-            confidence=vinyl_record.confidence,
-            requires_review=vinyl_record.needs_review,
-            chat_history=[
-                ChatMessage(role="user", content=request.message),
-                ChatMessage(role="assistant", content=agent_response),
+        return {
+            "record_id": record_id,
+            "message": agent_response,
+            "updated_metadata": metadata_dict.model_dump() if metadata_dict else None,
+            "confidence": vinyl_record.confidence,
+            "requires_review": vinyl_record.needs_review,
+            "chat_history": [
+                {"role": "user", "content": request.message, "timestamp": datetime.now()},
+                {"role": "assistant", "content": agent_response, "timestamp": datetime.now()},
             ],
-        )
+            "web_enhanced": needs_web_search,
+            "sources_used": len(all_search_results),
+            "search_results": all_search_results[:5],  # Limit to top 5 results
+        }
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error in chat for record {record_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
+
+
+@router.post("/chat", response_model=Dict[str, Any])
+async def general_chat(
+    request: ChatRequest,
+) -> Dict[str, Any]:
+    """
+    General chat with web search capabilities for vinyl-related questions.
+    
+    Automatically performs web search and scraping to answer questions about vinyl records,
+    pricing, market information, and general music knowledge when no specific record is selected.
+    """
+    try:
+        logger.info(f"General chat query: {request.message[:100]}")
+        
+        # Check for explicit /web trigger - always search for general queries, but clean the message
+        has_web_trigger = "/web" in request.message.lower()
+        search_message = request.message.replace("/web", "").strip() if has_web_trigger else request.message
+        
+        # Always perform web search for general queries since we have no specific record context
+        search_results = chat_tools.search_and_scrape(
+            search_message,  # Use cleaned message
+            scrape_results=True
+        )
+        
+        # Prepare context for Claude
+        web_context = ""
+        if search_results.get("search_results"):
+            web_context += "Current Web Information:\n"
+            for result in search_results["search_results"][:3]:
+                web_context += f"• {result.get('title', '')}: {result.get('content', '')[:250]}...\n"
+        
+        if search_results.get("scraped_content"):
+            web_context += "\nDetailed Information:\n"
+            for content in search_results["scraped_content"]:
+                if content.get("success"):
+                    web_context += f"• {content.get('title', '')}: {content.get('content', '')[:400]}...\n"
+        
+        # Get enhanced response from Claude
+        system_prompt = """You are a knowledgeable vinyl record expert with access to current web information. 
+        Answer questions about vinyl records, music history, pricing, collecting, and related topics using the provided web search results.
+        
+        Provide accurate, helpful responses based on the search results. If pricing is mentioned, give context about market conditions.
+        Keep responses informative but conversational."""
+        
+        try:
+            response = anthropic_client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=1000,
+                system=system_prompt + "\n\n" + web_context,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": request.message,
+                    }
+                ],
+            )
+            agent_response = response.content[0].text
+        except Exception as e:
+            logger.error(f"Error calling Claude: {e}")
+            agent_response = f"I found some information about your query, but I'm having trouble processing it right now."
+        
+        return {
+            "message": agent_response,
+            "search_results": search_results.get("search_results", []),
+            "sources_used": len(search_results.get("search_results", [])),
+            "web_enhanced": True
+        }
+    
+    except Exception as e:
+        logger.error(f"Error in general chat: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),

@@ -43,8 +43,11 @@ class VinylMetadataModel(BaseModel):
     title: str
     year: Optional[int] = None
     label: str
+    spotify_url: Optional[str] = None
     catalog_number: Optional[str] = None
     genres: List[str] = Field(default_factory=list)
+    estimated_value_eur: Optional[float] = None
+    estimated_value_usd: Optional[float] = None
 
     class Config:
         """Pydantic config."""
@@ -54,6 +57,7 @@ class VinylMetadataModel(BaseModel):
                 "title": "Abbey Road",
                 "year": 1969,
                 "label": "Apple Records",
+                "spotify_url": "https://open.spotify.com/album/0ETFjACtuP2ADo6LFhL6HN",
                 "catalog_number": "PCS 7088",
                 "genres": ["Rock", "Pop"]
             }
@@ -136,6 +140,7 @@ class ReviewRequest(BaseModel):
     title: Optional[str] = None
     year: Optional[int] = None
     label: Optional[str] = None
+    spotify_url: Optional[str] = None
     catalog_number: Optional[str] = None
     genres: Optional[List[str]] = None
     notes: Optional[str] = None
@@ -156,7 +161,7 @@ class ReviewRequest(BaseModel):
 class HealthCheckResponse(BaseModel):
     """Health check response."""
     status: str = "healthy"
-    version: str = "0.3.0"
+    version: str = "1.0.0"
     timestamp: datetime
     dependencies: Dict[str, str]
 
@@ -165,7 +170,7 @@ class HealthCheckResponse(BaseModel):
         json_schema_extra = {
             "example": {
                 "status": "healthy",
-                "version": "0.3.0",
+                "version": "1.0.0",
                 "timestamp": "2026-01-24T10:30:00",
                 "dependencies": {
                     "database": "connected",

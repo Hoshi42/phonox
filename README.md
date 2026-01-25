@@ -2,7 +2,7 @@
 
 **AI-powered Vinyl Collection Agent** – Cataloguing, Valuation, and Documentation
 
-An agentic system for collecting, analyzing, and insuring vinyl records using LangGraph orchestration, image recognition, and metadata lookup from Discogs/MusicBrainz.
+An agentic system for collecting, analyzing, and insuring vinyl records using LangGraph orchestration, image recognition, and metadata lookup from Discogs/MusicBrainz. Now includes Spotify link support and enhanced websearch.
 
 ---
 
@@ -151,6 +151,14 @@ See [Collaboration Instructions](.github/agents/instructions.md) for detailed wo
 - 🔄 Performance optimization
 - 🔄 Monitoring & alerting
 
+### What's New in 1.0.0
+- Backend and DB support for `spotify_url` on `vinyl_records`
+- APIs return and persist `spotify_url` via identify, review, and register add/update
+- Frontend Vinyl Card: edit and display Spotify link; header 🎧 quick link
+- Register view: 🎧 icon per record to open Spotify without selecting
+- Websearch enhanced: combines Tavily with DuckDuckGo fallback (no API key) and dedupes results
+- Version bump: backend `1.0.0` with updated health/root metadata
+
 
 ---
 
@@ -240,6 +248,17 @@ docker compose down -v  # Remove volumes
 docker compose up -d    # Fresh start
 ```
 
+### Spotify URL Not Saving
+```bash
+# Verify register update
+curl -s -X PUT http://localhost:8000/register/update \
+    -H "Content-Type: application/json" \
+    -d '{"record_id":"<ID>","spotify_url":"https://open.spotify.com/album/xyz"}'
+
+# Check DB
+docker compose exec db psql -U phonox -d phonox -c "SELECT id, spotify_url FROM vinyl_records ORDER BY updated_at DESC LIMIT 5;"
+```
+
 ### Tests Failing
 ```bash
 docker compose exec backend pytest tests/ -v --tb=short
@@ -256,6 +275,7 @@ For more, see [Deployment Guide](.github/agents/deployment.md#troubleshooting).
 - **Database**: PostgreSQL 16
 - **Cache/Queue**: Redis 7
 - **API Sources**: Discogs, MusicBrainz
+    - Websearch: Tavily (if configured) + DuckDuckGo fallback
 - **ML Models**: ViT-base (image embeddings), Tesseract (OCR)
 - **DevOps**: Docker, Docker Compose, GitHub Actions
 
@@ -284,9 +304,9 @@ TBD
 
 ## Status
 
-**Last Updated**: 2026-01-24  
-**Current Phase**: 0 (Foundation) – 80% complete  
-**Next Phase**: Phase 1 (Core Agent) – Starting after 0.2 & 0.3  
-**Full Timeline**: 6-8 weeks
+**Last Updated**: 2026-01-25  
+**Current Version**: 1.0.0  
+**Current Phase**: Production baseline (Spotify + websearch)  
+**Full Timeline**: ongoing
 
 See [Implementation Plan](.github/agents/implementation-plan.md) for detailed progress.

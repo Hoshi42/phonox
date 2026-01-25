@@ -1,6 +1,7 @@
 """FastAPI application entry point."""
 
 import logging
+import os
 from datetime import datetime
 from contextlib import asynccontextmanager
 from typing import Dict, Any
@@ -12,20 +13,17 @@ from sqlalchemy.orm import sessionmaker, Session
 
 from backend.database import Base, VinylRecord, get_db
 from backend.api.models import HealthCheckResponse
+from backend.api.register import router as register_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Database configuration
-DATABASE_URL = "sqlite:///./phonox.db"  # Local SQLite for development
-# DATABASE_URL = "postgresql://phonox:phonox@postgres:5432/phonox"  # Production
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://phonox:phonox123@localhost:5432/phonox")
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {},
-)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)  # type: ignore[assignment]
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Update the global SessionLocal in database module
 import backend.database as db_module
@@ -59,7 +57,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Phonox API",
     description="AI-powered Vinyl Collection Agent API",
-    version="0.3.0",
+    version="1.0.0",
     lifespan=lifespan,
 )
 
@@ -82,6 +80,14 @@ app.add_middleware(
 # Override get_db dependency
 app.dependency_overrides[get_db] = override_get_db
 
+# Include routers
+app.include_router(register_router)
+
+# Import routes after app creation to avoid circular imports
+from backend.api import routes  # noqa: E402, F401
+# Include API routes
+app.include_router(routes.router)
+
 
 @app.get("/health", response_model=HealthCheckResponse)
 async def health_check(db: Session = Depends(override_get_db)) -> HealthCheckResponse:
@@ -102,7 +108,7 @@ async def health_check(db: Session = Depends(override_get_db)) -> HealthCheckRes
 
     return HealthCheckResponse(
         status="healthy",
-        version="0.3.0",
+        version="1.0.0",
         timestamp=datetime.utcnow(),
         dependencies=dependencies,
     )
@@ -113,7 +119,7 @@ async def root():
     """Root endpoint."""
     return {
         "message": "Phonox API",
-        "version": "0.3.0",
+        "version": "1.0.0",
         "docs": "/docs",
         "health": "/health",
     }
