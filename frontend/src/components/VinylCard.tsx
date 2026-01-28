@@ -104,8 +104,8 @@ export default function VinylCard({
       
       // Send to chat panel
       if (onAddChatMessage) {
-        const artist = record.artist || record.metadata?.artist || record.intermediate_results?.artist || '?'
-        const title = record.title || record.metadata?.title || record.intermediate_results?.title || '?'
+        const artist = record.artist || record.metadata?.artist || '?'
+        const title = record.title || record.metadata?.title || '?'
         const analysisMessage = `🔍 **Web Search Analysis: "${artist} - ${title}"**
 
 **Search Query:** ${record.intermediate_results.search_query}
