@@ -70,8 +70,8 @@ def cmd_install(args):
 
 
 def cmd_configure(args):
-    if not args.anthropic and not args.tavily:
-        print("No changes. Provide --anthropic and/or --tavily.", file=sys.stderr)
+    if not args.anthropic and not args.tavily and not args.vision_model and not args.chat_model:
+        print("No changes. Provide --anthropic, --tavily, --vision-model, and/or --chat-model.", file=sys.stderr)
         sys.exit(1)
 
     existing_lines = []
@@ -87,6 +87,10 @@ def cmd_configure(args):
         existing_map["ANTHROPIC_API_KEY"] = args.anthropic
     if args.tavily:
         existing_map["TAVILY_API_KEY"] = args.tavily
+    if args.vision_model:
+        existing_map["ANTHROPIC_VISION_MODEL"] = args.vision_model
+    if args.chat_model:
+        existing_map["ANTHROPIC_CHAT_MODEL"] = args.chat_model
 
     updated = []
     seen = set()
@@ -101,7 +105,7 @@ def cmd_configure(args):
         else:
             updated.append(line)
 
-    for key in ("ANTHROPIC_API_KEY", "TAVILY_API_KEY"):
+    for key in ("ANTHROPIC_API_KEY", "TAVILY_API_KEY", "ANTHROPIC_VISION_MODEL", "ANTHROPIC_CHAT_MODEL"):
         if key in existing_map and key not in seen:
             updated.append(f"{key}={existing_map[key]}")
 
@@ -228,11 +232,17 @@ def main():
             elif choice == "3":
                 anthropic = input("ANTHROPIC_API_KEY (leave blank to skip): ").strip()
                 tavily = input("TAVILY_API_KEY (leave blank to skip): ").strip()
+                vision_model = input("ANTHROPIC_VISION_MODEL (leave blank to skip) [claude-sonnet-4-5-20250929]: ").strip()
+                chat_model = input("ANTHROPIC_CHAT_MODEL (leave blank to skip) [claude-haiku-4-5-20251001]: ").strip()
                 args = ["configure"]
                 if anthropic:
                     args += ["--anthropic", anthropic]
                 if tavily:
                     args += ["--tavily", tavily]
+                if vision_model:
+                    args += ["--vision-model", vision_model]
+                if chat_model:
+                    args += ["--chat-model", chat_model]
                 if len(args) == 1:
                     print("No keys provided. Returning to menu.")
                     continue
@@ -265,9 +275,11 @@ def main():
         install.add_argument("--up", action="store_true", help="Start containers after build")
         install.set_defaults(func=cmd_install)
 
-        configure = subparsers.add_parser("configure", help="Write API keys to .env")
+        configure = subparsers.add_parser("configure", help="Write configuration to .env")
         configure.add_argument("--anthropic", help="Set ANTHROPIC_API_KEY")
         configure.add_argument("--tavily", help="Set TAVILY_API_KEY")
+        configure.add_argument("--vision-model", help="Set ANTHROPIC_VISION_MODEL (e.g., claude-sonnet-4-5-20250929)")
+        configure.add_argument("--chat-model", help="Set ANTHROPIC_CHAT_MODEL (e.g., claude-haiku-4-5-20251001)")
         configure.set_defaults(func=cmd_configure)
 
         backup = subparsers.add_parser("backup", help="Backup database and uploads")

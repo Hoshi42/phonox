@@ -1,83 +1,329 @@
-# Phonox
+```
+ ██████╗ ██╗  ██╗ ██████╗ ███╗   ██╗ ██████╗ ██╗  ██╗
+ ██╔══██╗██║  ██║██╔═══██╗████╗  ██║██╔═══██╗╚██╗██╔╝
+ ██████╔╝███████║██║   ██║██╔██╗ ██║██║   ██║ ╚███╔╝ 
+ ██╔═══╝ ██╔══██║██║   ██║██║╚██╗██║██║   ██║ ██╔██╗ 
+ ██║     ██║  ██║╚██████╔╝██║ ╚████║╚██████╔╝██╔╝ ██╗
+ ╚═╝     ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝ ╚═╝  ╚═╝
+```
 
 **AI-powered Vinyl Collection Agent** – Cataloguing, Valuation, and Documentation
 
-An agentic system for collecting, analyzing, and insuring vinyl records using LangGraph orchestration, image recognition, and metadata lookup from Discogs/MusicBrainz. Now includes Spotify link support and enhanced websearch.
+---
+
+## What is Phonox?
+
+Phonox is an intelligent assistant for vinyl record collectors. It helps you:
+- **📸 Identify records** by snapping photos or uploading images
+- **💰 Get valuations** using multiple data sources (Discogs, MusicBrainz)
+- **🎵 Find Spotify links** for listening to your collection
+- **📝 Organize your collection** with metadata, ratings, and notes
+- **💬 Chat about records** with an AI agent that remembers your collection
+
+Perfect for collectors managing large vinyl libraries or insuring valuable collections.
+
+---
+
+## Prerequisites
+
+Before you start, make sure you have:
+
+1. **Docker & Docker Compose** installed
+   - [Windows/Mac](https://www.docker.com/products/docker-desktop)
+   - [Linux](https://docs.docker.com/engine/install/)
+   - Verify: Run `docker --version` and `docker compose version`
+
+2. **Git** (to clone the repository)
+   - [Install Git](https://git-scm.com/downloads)
+
+3. **API Keys** (optional but recommended)
+   - [Anthropic API Key](https://console.anthropic.com) (for Claude AI)
+   - [Tavily API Key](https://tavily.com) (for web search, optional – DuckDuckGo fallback is free)
 
 ---
 
 ## Quick Start (Docker)
 
+### 1. Clone and Install
+
 ```bash
-# Clone and navigate
+# Clone the repository
+git clone https://github.com/yourusername/phonox.git
 cd phonox
 
-# Start all services (PostgreSQL, Redis, FastAPI Backend, React Frontend)
+# Install and start (builds Docker images + starts services)
+./phonox-cli install --up
+```
+
+If you don't have the CLI, use Docker directly:
+```bash
 docker compose up -d
+```
 
-# View logs
-docker compose logs -f
+### 2. Configure API Keys (Optional)
 
-# Access services
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
-- PostgreSQL: localhost:5432 (user: phonox)
-- Redis: localhost:6379
+```bash
+# Set your API keys
+./phonox-cli configure --anthropic YOUR_ANTHROPIC_KEY
 
-# Run tests
+# Optional: Add Tavily for enhanced search
+./phonox-cli configure --tavily YOUR_TAVILY_KEY
+
+# Optional: Configure Anthropic models (for advanced users)
+./phonox-cli configure --vision-model claude-sonnet-4-5-20250929 --chat-model claude-haiku-4-5-20251001
+```
+
+Or edit `.env` file directly:
+```env
+ANTHROPIC_API_KEY=your_key_here
+TAVILY_API_KEY=your_key_here
+
+# Anthropic Model Configuration (optional)
+ANTHROPIC_VISION_MODEL=claude-sonnet-4-5-20250929
+ANTHROPIC_CHAT_MODEL=claude-haiku-4-5-20251001
+```
+
+### 3. Access the Application
+
+Open your browser and visit:
+- **Frontend** (UI): http://localhost:5173
+- **API Docs**: http://localhost:8000/docs
+- **Backend Health**: http://localhost:8000/health
+
+You should see Phonox ready to use!
+
+---
+
+## How to Use Phonox
+
+### Identify a Vinyl Record
+
+1. Click **"Upload Image"** on the home page
+2. Take a photo or upload an image of:
+   - The album cover (front or back)
+   - The barcode (if visible)
+   - The vinyl itself (for condition assessment)
+3. Phonox AI will:
+   - Scan for the barcode
+   - Search Discogs and MusicBrainz
+   - Extract album metadata automatically
+4. Review the results and save to your collection
+
+### Manage Your Collection
+
+1. Visit **"Register"** to see all your vinyl records
+2. **Edit** any record to:
+   - Add notes or condition notes
+   - Add Spotify link
+   - Update valuation
+   - Rate the record
+3. **Delete** records from your collection
+4. **Export** your collection (future feature)
+
+### Chat with the Agent
+
+1. Open the **Chat** panel on the right
+2. Ask questions about your collection:
+   - "What's my rarest record?"
+   - "Show me all records from the 80s"
+   - "What's the total value of my collection?"
+3. The agent remembers context from your collection
+
+---
+
+## How to Stop, Start, and Manage Services
+
+### Start Services
+```bash
+./phonox-cli start
+# or
+docker compose up -d
+```
+
+### Stop Services
+```bash
+./phonox-cli stop
+# or
+docker compose down
+```
+
+### View Logs
+```bash
+docker compose logs -f backend
+docker compose logs -f frontend
+```
+
+### Check Service Status
+```bash
+./phonox-cli status
+# or
+curl http://localhost:8000/health
+```
+
+---
+
+## Phonox CLI Commands
+
+Full CLI Reference:
+
+```bash
+# Install (build Docker images)
+./phonox-cli install
+
+# Install + start services
+./phonox-cli install --up
+
+# Configure API keys and models
+./phonox-cli configure --anthropic YOUR_KEY --tavily YOUR_KEY
+
+# Configure Anthropic models (for advanced users)
+./phonox-cli configure --vision-model claude-sonnet-4-5-20250929
+./phonox-cli configure --chat-model claude-haiku-4-5-20251001
+
+# Start services
+./phonox-cli start
+
+# Stop services
+./phonox-cli stop
+
+# Backup your data
+./phonox-cli backup
+
+# Restore from backup (use timestamp from backup folder)
+./phonox-cli restore 20260128_143000
+```
+
+### Interactive Menu
+
+Run without arguments to launch interactive menu:
+```bash
+./phonox-cli
+# Shows menu with all options above
+```
+
+---
+
+## Troubleshooting & Maintenance
+
+### Common Issues
+
+#### ❌ "Port already in use" (8000 or 5173)
+```bash
+# Kill process using port 8000
+lsof -i :8000 | grep LISTEN | awk '{print $2}' | xargs kill -9
+
+# Or restart Docker
+docker compose down
+docker compose up -d
+```
+
+#### ❌ "Database connection refused"
+```bash
+# Reset database
+docker compose down -v
+docker compose up -d
+```
+
+#### ❌ Images not uploading
+```bash
+# Check upload folder permissions
+ls -la data/uploads/
+
+# Restart services
+docker compose restart backend frontend
+```
+
+#### ❌ API keys not working
+```bash
+# Verify .env file
+cat .env
+
+# Restart backend to reload keys
+docker compose restart backend
+```
+
+### Regular Maintenance
+
+#### Backup Your Data (Weekly)
+```bash
+./phonox-cli backup
+# Backups stored in: ./backups/
+```
+
+#### View Backup History
+```bash
+ls -lh backups/
+```
+
+#### Restore from a Backup
+```bash
+./phonox-cli restore 20260128_143000
+```
+
+#### Check Database Size
+```bash
+docker compose exec db psql -U phonox -d phonox -c "
+  SELECT 
+    schemaname,
+    sum(pg_total_relation_size(schemaname||'.'||tablename)) AS size
+  FROM pg_tables
+  GROUP BY schemaname
+  ORDER BY size DESC;"
+```
+
+#### View Vinyl Records in Database
+```bash
+docker compose exec db psql -U phonox -d phonox -c "
+  SELECT id, title, artist, release_date, confidence, created_at
+  FROM vinyl_records
+  ORDER BY created_at DESC
+  LIMIT 10;"
+```
+
+---
+
+## Testing
+
+### Run All Tests
+```bash
 docker compose exec backend pytest tests/ -v
 ```
 
----
-
-## Phonox CLI
-
-Use the bundled `phonox-cli` to install, configure API keys, and manage backups/restores.
-
+### Run Specific Test Categories
 ```bash
-# Install (build images) and optionally start containers
-./phonox-cli install --up
+# Unit tests
+docker compose exec backend pytest tests/unit -v
 
-# Configure API keys
-./phonox-cli configure --anthropic YOUR_KEY --tavily YOUR_KEY
+# Integration tests
+docker compose exec backend pytest tests/integration -v
 
-# Backup DB + uploads
-./phonox-cli backup
-
-# Restore from a timestamp
-./phonox-cli restore 20260125_021500
-
-# Start/stop containers
-./phonox-cli start
-./phonox-cli stop
-
-# Alternate launcher
-./start-cli.sh <command> [args]
+# With coverage report
+docker compose exec backend pytest tests/ --cov=backend --cov-report=html
 ```
 
----
+### View Test Results
+```bash
+# Open coverage report
+open htmlcov/index.html  # macOS
+xdg-open htmlcov/index.html  # Linux
+start htmlcov/index.html  # Windows
+```
 
-## Documentation
+### 📖 Getting Started
+- **[What is Phonox?](#what-is-phonox)** – Overview and features
+- **[How to Use](#how-to-use-phonox)** – Step-by-step user guide
+- **[Troubleshooting](#troubleshooting--maintenance)** – Common issues and fixes
 
-### For Implementation Teams
+### 👨‍💻 For Developers
+- **[Tech Stack Guide](docs/tech-stack.md)** – Architecture and technologies
+- **[Requirements Spec](docs/requirements_en.md)** – Complete feature list
+- **[Testing Guide](TESTING_GUIDE.md)** – How to write and run tests
 
-1. **[Implementation Plan](.github/agents/implementation-plan.md)** – Roadmap, phases, iterations, and tracking
-2. **[Agent Collaboration Instructions](.github/agents/instructions.md)** – Role responsibilities, workflow, communication
-3. **[Deployment & Infrastructure](.github/agents/deployment.md)** – Docker, CI/CD, troubleshooting
-4. **[Testing Strategy](.github/agents/testing.md)** – Unit, integration, E2E test patterns
-
-### For Architects & Agents
-
-5. **[Tech Stack Guide](docs/tech-stack.md)** – Stack decisions and principles
-6. **[Agent Architecture](.github/agents/agent.md)** – State models, confidence gates, node specs
-7. **[Requirements Spec](docs/requirements_en.md)** – Full feature specification
-
-### For Developers
-
-8. **[Tools Reference](.github/agents/tools.md)** – Discogs, MusicBrainz, Image extraction
-9. **[Agent Engineer Role](.github/agents/agent.md)** – LangGraph workflows
-10. **[Frontend Developer Role](.github/agents/frontend.md)** – PWA, React components
+### 🏗️ For Teams & Contributors
+1. **[Implementation Plan](.github/agents/implementation-plan.md)** – Project roadmap and progress
+2. **[Contributing Guide](CONTRIBUTING.md)** – How to contribute code
+3. **[Agent Collaboration Instructions](.github/agents/instructions.md)** – Team workflow
+4. **[Deployment Guide](.github/agents/deployment.md)** – Production setup
 
 ---
 
@@ -106,192 +352,75 @@ phonox/
 │
 ├── backend/
 │   ├── main.py (FastAPI entry point)
-│   ├── agent/
-│   │   ├── state.py (State models)
-│   │   └── graph.py (LangGraph workflow)
-│   ├── tools/
-│   │   ├── base.py (Tool abstraction)
-│   │   ├── discogs.py (Discogs API)
-│   │   ├── musicbrainz.py (MusicBrainz API)
-│   │   └── image.py (Image feature extraction)
-│   ├── models.py (SQLAlchemy ORM)
-│   └── tests/
-│       ├── unit/
-│       └── integration/
+   ├── database.py (SQLAlchemy ORM)
+   ├── agent/
+   │   ├── state.py (State models)
+   │   ├── graph.py (LangGraph workflow)
+   │   ├── vision.py (Vision extraction)
+   │   ├── websearch.py (Web search integration)
+   │   ├── metadata.py (Metadata lookup)
+   │   └── barcode_utils.py (Barcode extraction)
+   ├── api/
+   │   ├── routes.py (Identification endpoints)
+   │   ├── register.py (Register endpoints)
+   │   └── models.py (Pydantic models)
+   ├── tools/
+   │   └── web_tools.py (Web search tools)
+   └── tests/ (unit, integration, api tests)
 │
 └── frontend/
     ├── src/
     │   ├── components/
-    │   │   ├── ImageCapture.tsx
-    │   │   ├── ResultDisplay.tsx
-    │   │   └── ReviewForm.tsx
+    │   │   ├── ImageUpload.tsx
+    │   │   ├── ResultsView.tsx
+    │   │   ├── ReviewForm.tsx
+    │   │   ├── ChatPanel.tsx
+    │   │   ├── VinylCard.tsx
+    │   │   ├── VinylRegister.tsx
+    │   │   └── AnalysisModal.tsx
     │   └── App.tsx
     └── package.json
 ```
 
----
 
-## Agent Roles
 
-Four specialized AI agents collaborate on implementation:
-
-| Role | Responsibility | Key Files |
-|------|---|---|
-| **System Architect** | Architecture, design decisions, phase planning | `architect.md`, `implementation-plan.md` |
-| **Agent Engineer** | LangGraph workflows, state transitions | `agent.md`, `backend/agent/` |
-| **Tool Engineer** | API integrations (Discogs, MusicBrainz, image) | `tools.md`, `backend/tools/` |
-| **Frontend Developer** | PWA UI, mobile capture, user flows | `frontend.md`, `frontend/src/` |
-
-See [Collaboration Instructions](.github/agents/instructions.md) for detailed workflow.
-
----
-
-## Key Features
-
-### Phase 1: Core Agent ✅
-- ✅ Typed state models (VinylState, Evidence)
-- ✅ LangGraph workflow orchestration (6 nodes)
-- ✅ Confidence-based decision gates (≥0.85 auto-commit)
-- ✅ Fallback chains (Discogs → MusicBrainz → Vision → Websearch)
-- ✅ 134 unit + integration tests passing
-
-### Phase 2-3: FastAPI Backend & Database ✅
-- ✅ FastAPI with CORS, health checks, lifespan management
-- ✅ SQLAlchemy ORM with VinylRecord model (18 columns)
-- ✅ Database persistence for metadata, evidence chain, confidence
-- ✅ 3 RESTful endpoints: /identify, /identify/{id}, /identify/{id}/review
-- ✅ 18 API integration tests passing
-- ✅ mypy type-safe (0 errors)
-
-### Phase 4: Frontend PWA ✅
-- ✅ React 18 + TypeScript + Vite with HMR
-- ✅ Image upload component (drag-and-drop, 1-5 images)
-- ✅ Results display with confidence scoring
-- ✅ Manual review/correction form for low-confidence records
-- ✅ Service worker for offline caching and PWA installation
-- ✅ Mobile-responsive design (desktop, tablet, mobile)
-- ✅ Playwright E2E test suite (13 tests)
-- ✅ Real-time result polling
-
-### Phase 5: Production Ready (Next)
-- 🔄 Error handling & edge cases
-- 🔄 Performance optimization
-- 🔄 Monitoring & alerting
-
-### What's New in 1.0.0
-- Backend and DB support for `spotify_url` on `vinyl_records`
-- APIs return and persist `spotify_url` via identify, review, and register add/update
-- Frontend Vinyl Card: edit and display Spotify link; header 🎧 quick link
-- Register view: 🎧 icon per record to open Spotify without selecting
-- Websearch enhanced: combines Tavily with DuckDuckGo fallback (no API key) and dedupes results
-- Version bump: backend `1.0.0` with updated health/root metadata
 
 
 ---
 
-## Development Workflow
+## Architecture Overview (Technical Details)
 
-1. **Read** [Implementation Plan](.github/agents/implementation-plan.md) for current phase
-2. **Start** iteration (create branch `feat/iteration-X.Y`)
-3. **Code** with tests in Docker (`docker compose up -d`)
-4. **Test** locally (`docker compose exec backend pytest tests/ -v`)
-5. **Review** code against [Collaboration Instructions](.github/agents/instructions.md)
-6. **Merge** to main when acceptance criteria met
-7. **Update** implementation plan with completions
+### How It Works
 
----
-
-## Architecture Highlights
-
-### Agentic-First Design
-- Agent is primary decision-maker
-- Tools provide IO abstraction
-- Graph orchestrates workflows
-- Backend handles persistence
-
-### Confidence Gates
-- **≥0.90**: Auto-commit (optional audit)
-- **0.85–0.89**: Auto-commit (recommended review)
-- **0.70–0.84**: Manual review required
-- **<0.50**: Force manual data entry
-
-### Tool Fallback Chain
-1. Discogs barcode match (0.95 confidence)
-2. Discogs fuzzy (title + artist) (0.85 confidence)
-3. MusicBrainz release lookup (0.80 confidence)
-4. Image similarity matching (0.70 confidence)
-5. Manual entry (1.0 confidence)
-
----
-
-## Testing
-
-```bash
-# Unit tests
-docker compose exec backend pytest tests/unit -v
-
-# Integration tests
-docker compose exec backend pytest tests/integration -v
-
-# All tests with coverage
-docker compose exec backend pytest tests/ --cov=backend --cov-report=html
-
-# Watch mode
-docker compose exec backend pytest-watch tests/
+```
+┌─────────────────────────────────────────────────────────┐
+│ Frontend (React)                                        │
+│ - Upload images                                         │
+│ - View collection                                       │
+│ - Chat with AI agent                                    │
+└────────────────────┬────────────────────────────────────┘
+                     │ HTTP
+                     ▼
+┌─────────────────────────────────────────────────────────┐
+│ Backend (FastAPI)                                       │
+│ - AI Agent (LangGraph)                                  │
+│ - Image Recognition                                     │
+│ - Metadata Lookup                                       │
+└────────────────────┬────────────────────────────────────┘
+                     │
+        ┌────────────┼────────────┐
+        ▼            ▼            ▼
+    Database    Discogs API   MusicBrainz
+   (PostgreSQL)  (Metadata)    (Metadata)
 ```
 
-**Coverage Target**: 85% (unit + integration)
+### Key Components
 
----
-
-## Deployment
-
-### Local Development
-```bash
-docker compose up -d
-# All services running locally
-```
-
-### Production (TODO)
-```bash
-# Use docker-compose.prod.yml with secrets management
-docker compose -f docker-compose.prod.yml up -d
-```
-
-See [Deployment Guide](.github/agents/deployment.md) for details.
-
----
-
-## Troubleshooting
-
-### Port Already in Use
-```bash
-lsof -i :8000 | grep LISTEN | awk '{print $2}' | xargs kill -9
-```
-
-### Database Won't Start
-```bash
-docker compose down -v  # Remove volumes
-docker compose up -d    # Fresh start
-```
-
-### Spotify URL Not Saving
-```bash
-# Verify register update
-curl -s -X PUT http://localhost:8000/register/update \
-    -H "Content-Type: application/json" \
-    -d '{"record_id":"<ID>","spotify_url":"https://open.spotify.com/album/xyz"}'
-
-# Check DB
-docker compose exec db psql -U phonox -d phonox -c "SELECT id, spotify_url FROM vinyl_records ORDER BY updated_at DESC LIMIT 5;"
-```
-
-### Tests Failing
-```bash
-docker compose exec backend pytest tests/ -v --tb=short
-```
-
-For more, see [Deployment Guide](.github/agents/deployment.md#troubleshooting).
+- **Agent** – AI decision-maker using LangGraph orchestration
+- **Tools** – Plugins for Discogs, MusicBrainz, image extraction, web search
+- **Database** – PostgreSQL stores your vinyl collection
+- **API** – FastAPI provides endpoints for the frontend
+- **Frontend** – React PWA for mobile and desktop browsers
 
 ---
 
@@ -310,16 +439,69 @@ See [Tech Stack Guide](docs/tech-stack.md) for details.
 
 ---
 
-## Contributing
+---
 
-All contributions must follow [Collaboration Instructions](.github/agents/instructions.md):
+## Need Help?
 
-1. Check [Implementation Plan](.github/agents/implementation-plan.md) for next iteration
-2. Assign iteration to self (status: `IN PROGRESS`)
-3. Work on branch `feat/iteration-X.Y`
-4. Write tests (unit + integration)
-5. Pass `pytest` and code review
-6. Update implementation plan on completion
+### Common Questions
+
+**Q: I don't have an Anthropic API key. Can I still use Phonox?**  
+A: No, Claude API is required. Get a free tier key at [console.anthropic.com](https://console.anthropic.com).
+
+**Q: Can I use Phonox without Docker?**  
+A: Not recommended. Docker ensures all dependencies work correctly. If you must, install: Python 3.12, PostgreSQL 16, Redis 7, Node.js 18.
+
+**Q: How do I backup my vinyl collection?**  
+A: Run `./phonox-cli backup` weekly. Backups are stored in `./backups/`.
+
+**Q: Can I run Phonox on my phone?**  
+A: Yes! It's a Progressive Web App (PWA). Open http://localhost:5173 on your phone and tap "Install" or "Add to Home Screen".
+
+**Q: How do I import my existing vinyl spreadsheet?**  
+A: Currently manual. We're working on CSV import (see roadmap). For now, use the UI to add records.
+
+### Get Support
+
+- 📖 **Documentation**: See links above
+- 🐛 **Report Issues**: Open an issue on GitHub
+- 💬 **Discuss Features**: Start a discussion
+- 👥 **Join Community**: See CONTRIBUTING.md
+
+---
+
+## What's New (Latest Version: 1.2.1)
+
+✨ **Version 1.2.1** (January 28, 2026)
+- Cleaned up debug artifacts
+- Improved stability
+- Fixed white screen issues
+
+See [CHANGELOG.md](CHANGELOG.md) for complete history.
+
+---
+
+## Status & Roadmap
+
+**Last Updated**: 2026-01-28  
+**Current Version**: 1.2.1  
+**Status**: Production Ready ✅
+
+### Completed Features
+- ✅ Image-based vinyl identification
+- ✅ Metadata lookup (Discogs, MusicBrainz)
+- ✅ AI-powered valuation
+- ✅ Web-based UI (mobile + desktop)
+- ✅ Spotify integration
+- ✅ Enhanced web search
+
+### Planned Features
+- 🔄 CSV import/export
+- 🔄 Barcode printing
+- 🔄 Collection insurance reports
+- 🔄 Social sharing
+- 🔄 Mobile app (iOS/Android)
+
+See [Implementation Plan](.github/agents/implementation-plan.md) for details.
 
 ---
 
@@ -329,11 +511,6 @@ TBD
 
 ---
 
-## Status
+## Contributing
 
-**Last Updated**: 2026-01-25  
-**Current Version**: 1.0.0  
-**Current Phase**: Production baseline (Spotify + websearch)  
-**Full Timeline**: ongoing
-
-See [Implementation Plan](.github/agents/implementation-plan.md) for detailed progress.
+Contributions welcome! See [Contributing Guide](CONTRIBUTING.md) for how to get started.

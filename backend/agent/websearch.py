@@ -59,7 +59,7 @@ def search_vinyl_metadata(
         response: Dict[str, Any] = client.search(
             query=search_query,
             include_images=False,
-            max_results=5,
+            max_results=7,
         )
 
         # Parse Tavily response
@@ -140,7 +140,7 @@ def search_vinyl_by_barcode(
                 response: Dict[str, Any] = client.search(
                     query=query,
                     include_images=False,
-                    max_results=3,  # Fewer results per query since we're doing multiple queries
+                    max_results=7,  # Fewer results per query since we're doing multiple queries
                 )
                 
                 results = _parse_tavily_response(response)
@@ -171,34 +171,6 @@ def search_vinyl_by_barcode(
             return []
         else:
             raise WebsearchError(f"Barcode search failed: {e}") from e
-
-    client = TavilyClient()
-
-    # Construct search query
-    search_query = f"{artist} {title} vinyl record album"
-
-    try:
-        logger.info(f"Searching Tavily for: {search_query}")
-
-        response: Dict[str, Any] = client.search(
-            query=search_query,
-            include_images=False,
-            max_results=5,
-        )
-
-        # Parse Tavily response
-        results = _parse_tavily_response(response)
-        logger.info(f"Found {len(results)} search results")
-
-        return results
-
-    except Exception as e:
-        logger.error(f"Tavily search failed: {e}")
-        if fallback_on_error:
-            logger.warning("Returning empty results due to error")
-            return []
-        else:
-            raise WebsearchError(f"Websearch failed: {e}") from e
 
 
 def _parse_tavily_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -356,7 +328,7 @@ def search_spotify_album(
         response: Dict[str, Any] = client.search(
             query=search_query,
             include_images=False,
-            max_results=3,
+            max_results=7,
         )
 
         # Look for Spotify URL in results
@@ -378,7 +350,7 @@ def search_spotify_album(
         response = client.search(
             query=search_query,
             include_images=False,
-            max_results=5,
+            max_results=7,
         )
 
         if response.get("results"):

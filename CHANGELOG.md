@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.1 (Latest)
+
+- Clean up intermediate analysis, test files, and debug artifacts
+- Production ready release
+
+## 1.2.0
+
+- Fix white screen issue and integrate ChatPanel messaging
+- Enhanced frontend stability and chat integration
+
+## 1.1.0
+
+- Add Condition field UI
+- Integrate value estimation features
+- Optimize CLI performance
+
 ## 1.0.0 (2026-01-25)
 
 - Added Spotify URL support end-to-end:

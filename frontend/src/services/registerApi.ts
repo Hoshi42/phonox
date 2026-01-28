@@ -199,6 +199,20 @@ class RegisterApiClient {
     return response.json()
   }
 
+  async deleteImages(recordId: string, imageUrls: string[]): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/images/${recordId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ image_urls: imageUrls }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to delete images: ${response.statusText}`)
+    }
+  }
+
   getImageUrl(imageId: string): string {
     return `${this.baseUrl}/images/${imageId}`
   }

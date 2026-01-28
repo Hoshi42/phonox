@@ -129,9 +129,13 @@ Do NOT include any text outside the JSON. FOCUS MAXIMUM ATTENTION on finding bar
         logger.info("Starting Claude 3 Sonnet vision extraction...")
         logger.info(f"Image format: {image_format}, Image data length: {len(image_base64)}")
 
+        # Get vision model from environment, with fallback
+        vision_model = os.getenv("ANTHROPIC_VISION_MODEL", "claude-sonnet-4-5-20250929")
+        logger.info(f"Using vision model: {vision_model}")
+
         # Try with the model name - Claude Sonnet 4.5 (vision capable)
         message = client.messages.create(
-            model="claude-sonnet-4-5-20250929",
+            model=vision_model,
             max_tokens=500,
             messages=cast(
                 Any,
