@@ -1,0 +1,102 @@
+site_name: Phonox Documentation
+site_description: AI-Powered Vinyl Record Identification System
+site_author: Phonox Contributors
+site_url: https://phonox-docs.example.com
+
+theme:
+  name: material
+  logo: https://raw.githubusercontent.com/your-username/phonox/master/frontend/public/favicon.ico
+  favicon: https://raw.githubusercontent.com/your-username/phonox/master/frontend/public/favicon.ico
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Light mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Dark mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search
+  - offline
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Overview: getting-started/overview.md
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quick-start.md
+  - User Guide:
+    - Uploading Records: user-guide/uploading.md
+    - Viewing Results: user-guide/results.md
+    - Managing Collection: user-guide/collection.md
+    - Chat Features: user-guide/chat.md
+  - API Reference:
+    - Introduction: api/introduction.md
+    - Endpoints: api/endpoints.md
+    - Authentication: api/authentication.md
+    - Examples: api/examples.md
+  - Architecture:
+    - System Design: architecture/system-design.md
+    - Data Flow: architecture/data-flow.md
+    - Components: architecture/components.md
+    - Database: architecture/database.md
+  - Development:
+    - Setup: development/setup.md
+    - Backend: development/backend.md
+    - Frontend: development/frontend.md
+    - Testing: development/testing.md
+    - Docker: development/docker.md
+  - Deployment:
+    - Cloud Run: deployment/cloud-run.md
+    - Docker: deployment/docker.md
+  - Contributing: contributing.md
+  - Changelog: changelog.md
+  - License: license.md
+
+markdown_extensions:
+  - pymdownx.highlight:
+      use_pygments: true
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:pymdownx.emoji.twemoji
+      emoji_generator: !!python/name:pymdownx.emoji.to_svg
+  - admonition
+  - toc:
+      permalink: true
+  - tables
+  - attr_list
+  - md_in_html
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/your-username/phonox
+      name: GitHub
+    - icon: fontawesome/brands/python
+      link: https://www.python.org
+      name: Python
+    - icon: fontawesome/brands/react
+      link: https://react.dev
+      name: React
+
+copyright: Copyright &copy; 2026 Phonox Contributors - MIT License
