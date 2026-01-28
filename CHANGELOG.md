@@ -1,17 +1,20 @@
 # Changelog
 
-## 1.2.2 (Latest)
+## 1.2.3 (Latest)
+
+- Unified spinner behavior across all analyses (upload, re-analysis, value estimation)
+- Consistent glass-morphism overlays with semi-transparent backgrounds and blur effects
+- Updated VinylSpinner text colors to work with dark theme overlays
+- All loading states now use same visual design system with centered VinylSpinner
+- Customizable spinner messages for different analysis types
+
+## 1.2.2
 
 - Reduce Tavily search results from 12/6 to 7 for all search functions
 - Fix batch image processing in re-analysis: now processes all images (existing + newly uploaded) together
 - Fix image display after re-analysis: newly uploaded images now persist to database and appear in UI
 - Updated `to_dict()` to include `image_urls` from VinylImage relationships
 - Improved image persistence across re-analysis operations
-
-## 1.2.1
-
-- Clean up intermediate analysis, test files, and debug artifacts
-- Production ready release
 
 ## 1.2.0
 
