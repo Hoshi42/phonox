@@ -507,10 +507,31 @@ See [Implementation Plan](.github/agents/implementation-plan.md) for details.
 
 ## License
 
-TBD
+This project is licensed under the MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
 ## Contributing
 
-Contributions welcome! See [Contributing Guide](CONTRIBUTING.md) for how to get started.
+Contributions are welcome! Please see [Contributing Guide](CONTRIBUTING.md) for guidelines on how to get started, including:
+- Setting up your development environment
+- Git workflow and branching strategy
+- Code style and commit message conventions
+- Testing and validation procedures
+
+---
+
+## Support
+
+- **Issues & Feature Requests**: [GitHub Issues](https://github.com/yourusername/phonox/issues)
+- **Documentation**: See [docs/](docs/) folder for detailed technical documentation
+
+---
+
+## Acknowledgments
+
+- Built with [Claude AI](https://www.anthropic.com) for record identification and chat
+- Uses [Tavily](https://tavily.com) for web search (with DuckDuckGo fallback)
+- Data enrichment from [MusicBrainz](https://musicbrainz.org) and [Spotify API](https://developer.spotify.com)
+- Powered by [FastAPI](https://fastapi.tiangolo.com), [React](https://react.dev), and [LangGraph](https://langchain.com/langgraph)
+
