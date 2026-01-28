@@ -45,6 +45,14 @@
   background: rgba(255, 255, 255, 0.3);
 }
 
+.uploadFormSection {
+  padding: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(102, 126, 234, 0.05);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
 .messages {
   flex: 1;
   overflow-y: auto;

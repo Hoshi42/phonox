@@ -92,6 +92,9 @@ class VinylRecord(Base):  # type: ignore[misc,valid-type]
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
+        # Get image URLs from relationships
+        image_urls = [f"/api/register/images/{img.id}" for img in self.images]
+        
         return {
             "record_id": self.id,
             "created_at": self.created_at,
@@ -106,6 +109,10 @@ class VinylRecord(Base):  # type: ignore[misc,valid-type]
                 "catalog_number": self.catalog_number,
                 "barcode": self.barcode,
                 "genres": self.get_genres(),
+                "estimated_value_eur": self.estimated_value_eur,
+                "estimated_value_usd": getattr(self, 'estimated_value_usd', None),
+                "condition": self.condition,
+                "image_urls": image_urls,
             },
             "evidence_chain": self.get_evidence_chain(),
             "confidence": self.confidence,

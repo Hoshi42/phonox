@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import styles from './App.module.css'
-import LoadingSpinner from './components/LoadingSpinner'
+import VinylSpinner from './components/VinylSpinner'
 import ChatPanel, { ChatPanelHandle } from './components/ChatPanel'
 import VinylCard from './components/VinylCard'
 import VinylRegister from './components/VinylRegister'
@@ -327,9 +327,10 @@ function App() {
             if (statusResponse.status === 'analyzed' || statusResponse.status === 'complete') {
               const updatedRecord = statusResponse as unknown as VinylRecord
               setRecord(updatedRecord)
-              // Preserve the uploaded images that were used for re-analysis
-              setUploadedImages(images)
-              console.log('App: Re-analysis completed successfully')
+              // Clear uploaded images since they're now saved to database and included in metadata.image_urls
+              setUploadedImages([])
+              console.log('App: Re-analysis completed successfully, uploaded images cleared')
+              console.log('App: Updated record now has', updatedRecord.metadata?.image_urls?.length || 0, 'images in database')
               
               // Update localStorage
               localStorage.setItem('phonox_current_record', JSON.stringify(updatedRecord))
@@ -619,8 +620,7 @@ function App() {
       {loading && (
         <div className={styles.loadingOverlay}>
           <div className={styles.loadingContent}>
-            <LoadingSpinner />
-            <p>Analyzing your vinyl record images...</p>
+            <VinylSpinner />
           </div>
         </div>
       )}

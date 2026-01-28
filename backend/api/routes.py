@@ -1,6 +1,7 @@
 """API routes for vinyl identification."""
 
 import logging
+import os
 import uuid
 from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
@@ -10,7 +11,7 @@ from sqlalchemy.orm import Session
 from anthropic import Anthropic
 
 from backend.main import app
-from backend.database import VinylRecord, SessionLocal
+from backend.database import VinylRecord, SessionLocal, VinylImage
 from backend.api.models import (
     VinylIdentifyRequest,
     VinylIdentifyResponse,
@@ -61,6 +62,31 @@ def _serialize_evidence_chain(evidence_chain: List[dict]) -> List[dict]:
             evidence_copy["source"] = evidence_copy["source"].value
         serialized.append(evidence_copy)
     return serialized
+
+
+def _estimate_condition_from_confidence(confidence: float) -> str:
+    """Estimate vinyl condition based on analysis confidence score.
+    
+    Maps confidence levels to vinyl grading standards:
+    - 0.95+ = Mint (M) - Perfect condition
+    - 0.85-0.94 = Near Mint (NM) - Nearly perfect
+    - 0.75-0.84 = Very Good+ (VG+) - Shows minimal wear
+    - 0.65-0.74 = Very Good (VG) - Shows some wear
+    - 0.50-0.64 = Good+ (G+) - Noticeable wear but playable
+    - Below 0.50 = Good (G) - Heavy wear but functional
+    """
+    if confidence >= 0.95:
+        return "Mint (M)"
+    elif confidence >= 0.85:
+        return "Near Mint (NM)"
+    elif confidence >= 0.75:
+        return "Very Good+ (VG+)"
+    elif confidence >= 0.65:
+        return "Very Good (VG)"
+    elif confidence >= 0.50:
+        return "Good+ (G+)"
+    else:
+        return "Good (G)"
 
 
 @router.post(
@@ -187,7 +213,7 @@ async def identify_vinyl(
                         # Build market context from search results
                         market_context = "Market Research Results:\n"
                         if search_results.get("search_results"):
-                            for result in search_results["search_results"][:5]:
+                            for result in search_results["search_results"][:12]:
                                 market_context += f"- {result.get('title', '')}: {result.get('content', '')}\n"
                         
                         if search_results.get("scraped_content"):
@@ -231,8 +257,10 @@ FACTORS: [list key factors]
 EXPLANATION: [brief explanation]"""
                         
                         try:
+                            # Get chat model from environment, with fallback
+                            chat_model = os.getenv("ANTHROPIC_CHAT_MODEL", "claude-haiku-4-5-20251001")
                             response = anthropic_client.messages.create(
-                                model="claude-haiku-4-5-20251001",
+                                model=chat_model,
                                 max_tokens=500,
                                 messages=[
                                     {
@@ -255,15 +283,19 @@ EXPLANATION: [brief explanation]"""
                             explanation = ""
                             
                             for line in valuation_text.split('\n'):
-                                if line.startswith('ESTIMATED_VALUE:'):
+                                # Strip and check for key markers
+                                line_stripped = line.strip()
+                                if line_stripped.startswith('ESTIMATED_VALUE:') or 'ESTIMATED_VALUE:' in line_stripped:
                                     match = re.search(r'€?([\d.]+)', line)
                                     if match:
                                         estimated_value = float(match.group(1))
-                                elif line.startswith('PRICE_RANGE:'):
+                                elif line_stripped.startswith('PRICE_RANGE:') or 'PRICE_RANGE:' in line_stripped:
+                                    # Extract all numbers from the line
                                     matches = re.findall(r'€?([\d.]+)', line)
                                     if len(matches) >= 2:
                                         price_range_min = float(matches[0])
                                         price_range_max = float(matches[1])
+                                        logger.info(f"Extracted price range from: {line} => min: {price_range_min}, max: {price_range_max}")
                                 elif line.startswith('MARKET_CONDITION:'):
                                     condition = line.replace('MARKET_CONDITION:', '').strip().lower()
                                     if condition in ['strong', 'stable', 'weak']:
@@ -306,7 +338,7 @@ EXPLANATION: [brief explanation]"""
                                             "title": result.get("title", ""),
                                             "content": result.get("content", "")[:200]  # First 200 chars
                                         }
-                                        for result in search_results.get("search_results", [])[:5]
+                                        for result in search_results.get("search_results", [])[:12]
                                     ]
                                 }
                             else:
@@ -329,6 +361,10 @@ EXPLANATION: [brief explanation]"""
             vinyl_record.confidence = result_state.get("confidence", 0.0)
             vinyl_record.auto_commit = result_state.get("auto_commit", False)
             vinyl_record.needs_review = result_state.get("needs_review", True)
+            
+            # Estimate condition from confidence if not already set
+            if not vinyl_record.condition:
+                vinyl_record.condition = _estimate_condition_from_confidence(vinyl_record.confidence)
 
             # Handle errors
             if result_state.get("error"):
@@ -787,7 +823,7 @@ When users ask questions, search for current information. When they provide corr
             ],
             "web_enhanced": needs_web_search,
             "sources_used": len(all_search_results),
-            "search_results": all_search_results[:5],  # Limit to top 5 results
+            "search_results": all_search_results[:12],  # Limit to top 12 results
         }
 
     except HTTPException:
@@ -875,9 +911,84 @@ async def general_chat(
         )
 
 
+@router.patch(
+    "/identify/{record_id}/metadata",
+    response_model=VinylRecordResponse,
+)
+async def update_vinyl_metadata(
+    record_id: str,
+    metadata: Dict[str, Any] = None,
+    db: Session = Depends(get_db),
+) -> VinylRecordResponse:
+    """Update vinyl record metadata fields."""
+    try:
+        # Query record from database
+        vinyl_record = db.query(VinylRecord).filter(VinylRecord.id == record_id).first()
+
+        if not vinyl_record:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Vinyl record {record_id} not found",
+            )
+
+        # Update allowed metadata fields
+        if metadata:
+            if "condition" in metadata:
+                vinyl_record.condition = metadata["condition"]
+            if "estimated_value_eur" in metadata:
+                vinyl_record.estimated_value_eur = metadata["estimated_value_eur"]
+            if "artist" in metadata:
+                vinyl_record.artist = metadata["artist"]
+            if "title" in metadata:
+                vinyl_record.title = metadata["title"]
+            if "year" in metadata:
+                vinyl_record.year = metadata["year"]
+            if "label" in metadata:
+                vinyl_record.label = metadata["label"]
+            if "genres" in metadata:
+                if metadata["genres"]:
+                    vinyl_record.set_genres(metadata["genres"] if isinstance(metadata["genres"], list) else [])
+            if "catalog_number" in metadata:
+                vinyl_record.catalog_number = metadata["catalog_number"]
+            if "barcode" in metadata:
+                vinyl_record.barcode = metadata["barcode"]
+            if "spotify_url" in metadata:
+                vinyl_record.spotify_url = metadata["spotify_url"]
+
+        db.commit()
+        db.refresh(vinyl_record)
+
+        # Build response
+        record_dict = vinyl_record.to_dict()
+        metadata_dict = record_dict.get("metadata", {})
+        metadata_dict_clean = {k: v for k, v in metadata_dict.items() if v is not None}
+
+        return VinylRecordResponse(
+            record_id=record_id,
+            created_at=vinyl_record.created_at,
+            updated_at=vinyl_record.updated_at,
+            status=vinyl_record.status,
+            metadata=VinylMetadataModel(**metadata_dict_clean),
+            evidence_chain=record_dict.get("evidence_chain", []),
+            confidence=vinyl_record.confidence or 0.0,
+            auto_commit=vinyl_record.auto_commit or False,
+            needs_review=vinyl_record.needs_review or True,
+            error=vinyl_record.error,
+            user_notes=vinyl_record.user_notes,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating vinyl metadata: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
+
+
 @router.post(
     "/reanalyze/{record_id}",
-    response_model=VinylIdentifyResponse,
+    response_model=VinylRecordResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def reanalyze_vinyl(
@@ -919,6 +1030,7 @@ async def reanalyze_vinyl(
             
             # Convert new uploaded files to image dicts
             import base64
+            
             new_image_dicts = []
             for file in files:
                 content = await file.read()
@@ -929,11 +1041,37 @@ async def reanalyze_vinyl(
                     "content_type": file.content_type or "image/jpeg"
                 })
             
-            # For now, just use the new images (in the future, we could fetch existing images from URLs)
-            # This is a limitation we'll note in the response
-            all_images = new_image_dicts
+            # Fetch and include existing images from database
+            # Images are stored in VinylImage table with file_path pointing to the file system
+            existing_image_dicts = []
+            try:
+                existing_images = db.query(VinylImage).filter(VinylImage.record_id == record_id).all()
+                logger.info(f"Found {len(existing_images)} existing image records in database for re-analysis")
+                
+                for idx, vinyl_image in enumerate(existing_images):
+                    try:
+                        # Check if file exists and read it
+                        if os.path.exists(vinyl_image.file_path):
+                            with open(vinyl_image.file_path, "rb") as f:
+                                image_data = f.read()
+                                file_content = base64.b64encode(image_data).decode('utf-8')
+                                existing_image_dicts.append({
+                                    "path": vinyl_image.filename or f"existing_image_{idx}",
+                                    "content": file_content,
+                                    "content_type": vinyl_image.content_type or "image/jpeg"
+                                })
+                                logger.info(f"Loaded existing image {idx + 1}/{len(existing_images)}: {vinyl_image.filename}")
+                        else:
+                            logger.warning(f"Image file not found on disk: {vinyl_image.file_path}")
+                    except Exception as e:
+                        logger.warning(f"Could not read image file {vinyl_image.file_path}: {e}")
+            except Exception as e:
+                logger.warning(f"Error fetching existing images from database: {e}")
             
-            logger.info(f"Re-analysis will process {len(all_images)} images ({len(new_image_dicts)} new)")
+            # Combine all images: existing + new
+            all_images = existing_image_dicts + new_image_dicts
+            
+            logger.info(f"Re-analysis will process {len(all_images)} total images ({len(existing_image_dicts)} existing from disk + {len(new_image_dicts)} new uploads)")
             
             initial_state: VinylState = {  # type: ignore
                 "images": all_images,
@@ -985,6 +1123,40 @@ async def reanalyze_vinyl(
             if result_state.get("error"):
                 existing_record.status = "failed"
                 existing_record.error = result_state["error"]
+            
+            # Save newly uploaded images to the database
+            # This makes them persistent and part of the record
+            if len(files) > 0:
+                logger.info(f"Saving {len(files)} newly uploaded images to database for record {record_id}")
+                from backend.api.register import UPLOAD_DIR
+                for file in files:
+                    try:
+                        # Read file content
+                        file_content = await file.read()
+                        
+                        # Generate unique filename
+                        file_extension = os.path.splitext(file.filename or '')[1] or '.jpg'
+                        unique_filename = f"{uuid.uuid4()}{file_extension}"
+                        file_path = os.path.join(UPLOAD_DIR, unique_filename)
+                        
+                        # Save file to disk
+                        with open(file_path, "wb") as buffer:
+                            buffer.write(file_content)
+                        
+                        # Create database record for the image
+                        vinyl_image = VinylImage(
+                            record_id=record_id,
+                            filename=file.filename or unique_filename,
+                            content_type=file.content_type or "image/jpeg",
+                            file_size=len(file_content),
+                            file_path=file_path,
+                            is_primary=len(existing_record.images) == 0  # First image is primary
+                        )
+                        
+                        db.add(vinyl_image)
+                        logger.info(f"Saved image {file.filename} for record {record_id}")
+                    except Exception as e:
+                        logger.error(f"Error saving image {file.filename}: {e}")
             
             db.commit()
             db.refresh(existing_record)
@@ -1155,19 +1327,22 @@ EXPLANATION: [brief explanation]"""
             explanation = ""
             
             for line in valuation_text.split('\n'):
-                if line.startswith('ESTIMATED_VALUE:'):
+                # Strip and check for key markers
+                line_stripped = line.strip()
+                if line_stripped.startswith('ESTIMATED_VALUE:') or 'ESTIMATED_VALUE:' in line_stripped:
                     # Extract number from "€XX.XX"
                     import re
                     match = re.search(r'€?([\d.]+)', line)
                     if match:
                         estimated_value = float(match.group(1))
-                elif line.startswith('PRICE_RANGE:'):
+                elif line_stripped.startswith('PRICE_RANGE:') or 'PRICE_RANGE:' in line_stripped:
                     # Extract "€XX.XX - €XX.XX"
                     import re
                     matches = re.findall(r'€?([\d.]+)', line)
                     if len(matches) >= 2:
                         price_range_min = float(matches[0])
                         price_range_max = float(matches[1])
+                        logger.info(f"Extracted price range from: {line} => min: {price_range_min}, max: {price_range_max}")
                 elif line.startswith('MARKET_CONDITION:'):
                     condition = line.replace('MARKET_CONDITION:', '').strip().lower()
                     if condition in ['strong', 'stable', 'weak']:

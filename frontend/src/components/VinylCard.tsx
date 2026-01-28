@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { VinylRecord } from '../App'
 import styles from './VinylCard.module.css'
 import { registerApiClient } from '../services/registerApi'
+import VinylSpinner from './VinylSpinner'
 
 const API_BASE = import.meta.env.VITE_API_URL
   || (typeof window !== 'undefined' && window.location.hostname
@@ -50,6 +51,7 @@ export default function VinylCard({
     condition: 'Good',
     estimated_value_eur: '' // ADD estimated_value_eur
   })
+  const [deletedImageUrls, setDeletedImageUrls] = useState<Set<string>>(new Set())
   const [showRawData, setShowRawData] = useState(false)
   const [isCheckingValue, setIsCheckingValue] = useState(false)
   const [webValue, setWebValue] = useState<string | null>(null)
@@ -82,7 +84,9 @@ export default function VinylCard({
       
       // Send to chat panel
       if (onAddChatMessage) {
-        const analysisMessage = `🔍 **Web Search Analysis: "${record.artist || '?'} - ${record.title || '?'}"**
+        const artist = record.artist || record.metadata?.artist || record.intermediate_results?.artist || '?'
+        const title = record.title || record.metadata?.title || record.intermediate_results?.title || '?'
+        const analysisMessage = `🔍 **Web Search Analysis: "${artist} - ${title}"**
 
 **Search Query:** ${record.intermediate_results.search_query}
 
@@ -210,7 +214,7 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
         estimated_value_eur: editData.estimated_value_eur ? parseFloat(editData.estimated_value_eur) : null,  // Allow deletion
       }
       onMetadataUpdate(updatedMetadata)
-      console.log('VinylCard: Metadata saved locally:', updatedMetadata)
+      console.log('VinylCard: Metadata saved locally (will be persisted when adding/updating in register):', updatedMetadata)
     }
     setIsEditing(false)
     setAppliedWebValue(null)
@@ -246,7 +250,7 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
         console.log('VinylCard: Intermediate results:', data.intermediate_results)
         
         // Format message for chat display
-        const chatMessage = `🔍 **Web Search Analysis: "${record.artist} - ${record.title}"**
+        const chatMessage = `🔍 **Web Search Analysis: "${record.metadata?.artist || record.artist || '?'} - ${record.metadata?.title || record.title || '?'}"**
 
 **Search Query:** ${data.intermediate_results.search_query}
 
@@ -337,6 +341,17 @@ ${data.intermediate_results.claude_analysis}
     
     try {
       if (isInRegister) {
+        // Delete images first if any were marked for deletion
+        if (deletedImageUrls.size > 0) {
+          await registerApiClient.deleteImages(record.record_id, Array.from(deletedImageUrls))
+          console.log('VinylCard: Deleted images:', Array.from(deletedImageUrls))
+        }
+        
+        // Upload new images if available
+        if (uploadedImages.length > 0) {
+          await registerApiClient.uploadImages(record.record_id, uploadedImages)
+        }
+        
         // Update existing record in register with ALL metadata fields
         // Send actual values (including null/empty) to allow deletion
         await registerApiClient.updateRegisterRecord({
@@ -384,6 +399,9 @@ ${data.intermediate_results.claude_analysis}
       // Notify parent component of successful register operation
       onRegisterSuccess?.()
       
+      // Clear deleted images tracking after successful update
+      setDeletedImageUrls(new Set())
+      
       console.log('VinylCard: Record successfully updated in register with values:', {
         estimated_value_eur: estimatedValue,
         condition: condition,
@@ -417,110 +435,6 @@ ${data.intermediate_results.claude_analysis}
 
   return (
     <>
-      {/* Search Intermediate Results Display */}
-      {searchIntermediateResults && (
-        <div style={{
-          backgroundColor: '#f0f7ff',
-          border: '2px solid #0066cc',
-          borderRadius: '8px',
-          padding: '16px',
-          marginBottom: '16px',
-          fontSize: '13px',
-          maxHeight: '400px',
-          overflowY: 'auto'
-        }}>
-          <div style={{ fontWeight: 'bold', marginBottom: '12px', color: '#0066cc', fontSize: '14px' }}>
-            🔍 Web Search Analysis Complete
-          </div>
-          
-          <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid #cce0ff' }}>
-            <div style={{ fontWeight: 'bold', marginBottom: '4px', fontSize: '12px' }}>🔎 Search Query:</div>
-            <div style={{ fontFamily: 'monospace', color: '#333', backgroundColor: '#fff', padding: '8px', borderRadius: '4px' }}>
-              {searchIntermediateResults.search_query}
-            </div>
-          </div>
-          
-          <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid #cce0ff' }}>
-            <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '12px' }}>
-              📊 Sources Found: {searchIntermediateResults.search_results_count}
-            </div>
-            <div style={{ display: 'grid', gap: '8px' }}>
-              {searchIntermediateResults.search_sources?.map((source: any, idx: number) => (
-                <div key={idx} style={{ 
-                  backgroundColor: '#fff', 
-                  padding: '8px', 
-                  borderRadius: '4px',
-                  borderLeft: '3px solid #0066cc'
-                }}>
-                  <div style={{ fontWeight: '600', color: '#0066cc', fontSize: '12px', marginBottom: '3px' }}>
-                    #{idx + 1} {source.title}
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#555' }}>
-                    {source.content}...
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid #cce0ff' }}>
-            <div style={{ fontWeight: 'bold', marginBottom: '4px', fontSize: '12px' }}>🧠 Claude AI Analysis:</div>
-            <div style={{ 
-              fontFamily: 'monospace', 
-              fontSize: '11px',
-              color: '#333',
-              backgroundColor: '#fff',
-              padding: '8px',
-              borderRadius: '4px',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              maxHeight: '200px',
-              overflowY: 'auto'
-            }}>
-              {searchIntermediateResults.claude_analysis}
-            </div>
-          </div>
-          
-          <div style={{ textAlign: 'right', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-            <button 
-              onClick={() => {
-                // Copy to clipboard
-                const text = `Search: ${searchIntermediateResults.search_query}\nSources: ${searchIntermediateResults.search_results_count}\n\n${searchIntermediateResults.claude_analysis}`
-                navigator.clipboard.writeText(text)
-              }}
-              style={{
-                fontSize: '11px',
-                padding: '6px 12px',
-                backgroundColor: '#e6f0ff',
-                border: '1px solid #0066cc',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                color: '#0066cc',
-                fontWeight: '500'
-              }}
-              title="Copy results to clipboard"
-            >
-              📋 Copy
-            </button>
-            <button 
-              onClick={() => setSearchIntermediateResults(null)}
-              style={{
-                fontSize: '11px',
-                padding: '6px 12px',
-                backgroundColor: '#e6f0ff',
-                border: '1px solid #0066cc',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                color: '#0066cc',
-                fontWeight: '500'
-              }}
-            >
-              ✕ Close
-            </button>
-          </div>
-        </div>
-      )}
-      
       <div className={styles.card}>
       {/* Header */}
       <div className={styles.header}>
@@ -576,17 +490,31 @@ ${data.intermediate_results.claude_analysis}
       {/* Images */}
       {(uploadedImages.length > 0 || (record.metadata?.image_urls && record.metadata.image_urls.length > 0)) && (
         <div className={styles.images}>
-          <h4>Images ({uploadedImages.length + (record.metadata?.image_urls?.length || 0)})</h4>
+          <h4>Images ({uploadedImages.length + (record.metadata?.image_urls?.length || 0) - deletedImageUrls.size})</h4>
           <div className={styles.imageGrid}>
             {/* Display images from database (loaded from register) */}
             {record.metadata?.image_urls?.map((imageUrl: string, index: number) => (
-              <div key={`db-${index}`} className={styles.imageItem}>
-                <img 
-                  src={`${API_BASE}${imageUrl}`} 
-                  alt={`Record image ${index + 1}`}
-                  className={styles.image}
-                />
-              </div>
+              !deletedImageUrls.has(imageUrl) && (
+                <div key={`db-${index}`} className={styles.imageItem}>
+                  <img 
+                    src={`${API_BASE}${imageUrl}`} 
+                    alt={`Record image ${index + 1}`}
+                    className={styles.image}
+                  />
+                  <button 
+                    onClick={() => {
+                      const newDeleted = new Set(deletedImageUrls)
+                      newDeleted.add(imageUrl)
+                      setDeletedImageUrls(newDeleted)
+                      console.log('VinylCard: Marked for deletion:', imageUrl)
+                    }}
+                    className={styles.removeBtn}
+                    title="Remove image"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )
             ))}
             {/* Display uploaded images (preview before saving) */}
             {uploadedImages.map((file, index) => (
@@ -625,7 +553,12 @@ ${data.intermediate_results.claude_analysis}
           </label>
           {uploadedImages.length > 0 && onReanalyze && (
             <button 
-              onClick={() => onReanalyze(uploadedImages)}
+              onClick={() => {
+                // Combine existing database images with newly uploaded images for comprehensive re-analysis
+                const allImagesToAnalyze = uploadedImages
+                console.log('VinylCard: Re-analyzing with', uploadedImages.length, 'new images +', (record.metadata?.image_urls?.length || 0), 'existing images')
+                onReanalyze(allImagesToAnalyze)
+              }}
               className={styles.reanalyzeBtn}
               title="Re-analyze record with all available images"
             >
@@ -886,6 +819,15 @@ ${data.intermediate_results.claude_analysis}
           </div>
         )}
       </div>
+
+      {/* Web Search Loading Overlay */}
+      {isCheckingValue && (
+        <div className={styles.webSearchLoadingOverlay}>
+          <div className={styles.webSearchLoadingContent}>
+            <VinylSpinner />
+          </div>
+        </div>
+      )}
     </div>
 
     </>
