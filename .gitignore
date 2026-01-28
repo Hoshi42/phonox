@@ -88,6 +88,7 @@ docker-compose.override.yml
 local_data/
 uploads/
 tmp/
+backups/
 
 # Persistent volume data (keep data but ignore in git)
 data/postgres/*
