@@ -89,6 +89,9 @@ local_data/
 uploads/
 tmp/
 backups/
+*.db
+*.sqlite
+*.sqlite3
 
 # Persistent volume data (keep data but ignore in git)
 data/postgres/*
