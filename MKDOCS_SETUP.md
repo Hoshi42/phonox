@@ -16,10 +16,11 @@ pip install mkdocs mkdocs-material
 ### 2. Preview Documentation
 
 ```bash
-mkdocs serve
+# Use port 8009 (port 8000 is used by FastAPI backend)
+mkdocs serve -a localhost:8009
 ```
 
-Visit **http://localhost:8000** in your browser.
+Visit **http://localhost:8009** in your browser.
 
 The site will auto-reload as you edit markdown files.
 
@@ -229,8 +230,11 @@ pip install mkdocs-material
 
 **Port 8000 already in use?**
 ```bash
-mkdocs serve -a localhost:8001
+# Use a different port (8009, 8010, etc.)
+mkdocs serve -a localhost:8009
 ```
+
+Note: Port 8000 is used by FastAPI backend. Use 8009 for MkDocs.
 
 **Search not working?**
 ```bash
