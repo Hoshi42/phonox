@@ -1,6 +1,18 @@
 # Changelog
 
-## 1.2.3 (Latest)
+## 1.3.0 (Latest)
+
+### Mobile UI Improvements
+- Optimized ChatPanel layout on mobile: increased message width from 85% to 95%, reduced padding for better readability
+- Improved mobile header layout: kept all items on single row (Logo + Title + User Info + Register Button)
+- Fixed ChatPanel container height on mobile: increased from 50vh to 65vh for better conversation visibility
+- Changed quick action buttons to 2-column grid layout on mobile for better organization
+- Unified button styling across header: aligned UserManager and Register Button heights, border-radius, and font sizes
+- Adjusted padding consistency: ChatPanel, header, and main content all use 12px horizontal padding on mobile
+- Fixed button overflow: Register Button now fits properly on mobile screens with responsive sizing
+- Optimized spacing for touch targets while maintaining visual consistency
+
+## 1.2.3
 
 - Unified spinner behavior across all analyses (upload, re-analysis, value estimation)
 - Consistent glass-morphism overlays with semi-transparent backgrounds and blur effects

@@ -245,11 +245,16 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
                 border: '1px solid rgba(255, 255, 255, 0.2)',
                 color: 'rgba(255, 255, 255, 0.9)',
                 padding: '6px 10px',
-                borderRadius: '4px',
-                fontSize: '0.8rem',
+                borderRadius: '10px',
+                fontSize: '0.7rem',
                 cursor: 'pointer',
-                minWidth: '44px', // Mobile touch target
-                minHeight: '44px'
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '32px',
+                minWidth: 'auto',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.2s'
               }}
             >
               {user}
@@ -266,11 +271,16 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
           border: '1px solid rgba(76, 175, 80, 0.5)',
           color: 'rgba(76, 175, 80, 1)',
           padding: '6px 10px',
-          borderRadius: '4px',
-          fontSize: '0.8rem',
+          borderRadius: '10px',
+          fontSize: '0.7rem',
           cursor: 'pointer',
-          minWidth: '44px',
-          minHeight: '44px'
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '32px',
+          minWidth: 'auto',
+          whiteSpace: 'nowrap',
+          transition: 'all 0.2s'
         }}
       >
         ➕ Add
