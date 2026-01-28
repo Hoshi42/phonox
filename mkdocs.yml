@@ -5,8 +5,8 @@ site_url: https://phonox-docs.example.com
 
 theme:
   name: material
-  logo: https://raw.githubusercontent.com/your-username/phonox/master/frontend/public/favicon.ico
-  favicon: https://raw.githubusercontent.com/your-username/phonox/master/frontend/public/favicon.ico
+  logo: images/phonox.png
+  favicon: images/phonox.png
   palette:
     - scheme: default
       primary: indigo

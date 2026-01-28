@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.0
+
+### Documentation Site
+- Added professional MkDocs documentation site with Material theme
+- Comprehensive documentation structure: Getting Started, User Guide, API Reference, Architecture, Development, Deployment
+- Interactive navigation with dark mode toggle and built-in search
+- Complete API documentation with endpoints, authentication, and code examples
+- Contributing guidelines and project information
+- Phonox logo integration in documentation header
+- Ready for deployment to GitHub Pages, Cloud Run, or Netlify
+
 ## 1.3.2
 
 ### Documentation
