@@ -1,6 +1,20 @@
 # Changelog
 
-## 1.3.0 (Latest)
+## 1.3.2
+
+### Documentation
+- Added `.env.example` template with all environment variables documented
+- Includes placeholder values and helpful comments for configuration
+- Links to API key sources (Anthropic, Tavily)
+- Examples for different deployment environments (local, Docker, production)
+
+## 1.3.1
+
+### Cleanup
+- Removed 14 temporary development documentation files
+- Project structure cleaned up for open source release
+
+## 1.3.0
 
 ### Mobile UI Improvements
 - Optimized ChatPanel layout on mobile: increased message width from 85% to 95%, reduced padding for better readability
