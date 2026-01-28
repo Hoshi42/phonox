@@ -98,7 +98,7 @@ function App() {
       setError(null)
 
       const response = await apiClient.identify(files)
-      const newRecordId = response.record_id
+      const newRecordId = response.record_id as string
       console.log('App: Upload successful, record ID:', newRecordId)
       console.log('App: Initial response keys:', Object.keys(response))
       console.log('App: Initial response status:', response.status)
