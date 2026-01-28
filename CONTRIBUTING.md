@@ -1,6 +1,8 @@
 # Contributing to Phonox
 
-Welcome! This document explains how to contribute to Phonox using our Git-based workflow.
+Welcome! This document explains how to contribute to Phonox. 
+
+By contributing to this project, you agree that your contributions will be licensed under its [MIT License](LICENSE).
 
 ---
 
