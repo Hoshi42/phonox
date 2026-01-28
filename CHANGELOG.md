@@ -1,6 +1,14 @@
 # Changelog
 
-## 1.2.1 (Latest)
+## 1.2.2 (Latest)
+
+- Reduce Tavily search results from 12/6 to 7 for all search functions
+- Fix batch image processing in re-analysis: now processes all images (existing + newly uploaded) together
+- Fix image display after re-analysis: newly uploaded images now persist to database and appear in UI
+- Updated `to_dict()` to include `image_urls` from VinylImage relationships
+- Improved image persistence across re-analysis operations
+
+## 1.2.1
 
 - Clean up intermediate analysis, test files, and debug artifacts
 - Production ready release
