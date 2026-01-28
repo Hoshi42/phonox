@@ -1,3 +1,20 @@
+/**
+ * VinylCard Component
+ * 
+ * Displays identified vinyl record metadata with editing capabilities.
+ * Features:
+ * - View/edit record metadata (artist, title, year, label, etc.)
+ * - Image management (upload, view, delete)
+ * - Value estimation with market lookup
+ * - Add to personal register
+ * - Web search results from identification
+ * - Confidence score visualization
+ * 
+ * @component
+ * @param {VinylCardProps} props - Component props
+ * @returns {JSX.Element} Vinyl record card interface
+ */
+
 import { useState, useMemo, useEffect } from 'react'
 import { VinylRecord } from '../App'
 import styles from './VinylCard.module.css'
