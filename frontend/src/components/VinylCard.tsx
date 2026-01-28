@@ -22,6 +22,8 @@ interface VinylCardProps {
   onAddChatMessage?: (content: string, role?: 'user' | 'assistant' | 'system') => void
   isInRegister?: boolean
   currentUser?: string
+  isCheckingValue?: boolean
+  onSetIsCheckingValue?: (value: boolean) => void
 }
 
 export default function VinylCard({ 
@@ -36,7 +38,9 @@ export default function VinylCard({
   onReanalyze,
   onAddChatMessage,
   isInRegister = false,
-  currentUser
+  currentUser,
+  isCheckingValue = false,
+  onSetIsCheckingValue
 }: VinylCardProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editData, setEditData] = useState({
@@ -53,7 +57,6 @@ export default function VinylCard({
   })
   const [deletedImageUrls, setDeletedImageUrls] = useState<Set<string>>(new Set())
   const [showRawData, setShowRawData] = useState(false)
-  const [isCheckingValue, setIsCheckingValue] = useState(false)
   const [webValue, setWebValue] = useState<string | null>(null)
   const [appliedWebValue, setAppliedWebValue] = useState<number | null>(null)
   const [searchIntermediateResults, setSearchIntermediateResults] = useState<any>(null)
@@ -224,7 +227,7 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
   const recheckValue = async () => {
     if (!record?.record_id || !record?.artist || !record?.title) return
     
-    setIsCheckingValue(true)
+    onSetIsCheckingValue?.(true)
     setWebValue(null)
     
     try {
@@ -291,7 +294,7 @@ ${data.intermediate_results.claude_analysis}
       console.error('VinylCard: Error checking value:', error)
       setWebValue('Error checking market value')
     } finally {
-      setIsCheckingValue(false)
+      onSetIsCheckingValue?.(false)
     }
   }
   
@@ -821,18 +824,8 @@ ${data.intermediate_results.claude_analysis}
       </div>
 
       {/* Web Search Loading Overlay */}
-      {isCheckingValue && (
-        <div className={styles.webSearchLoadingOverlay}>
-          <div className={styles.webSearchLoadingContent}>
-            <VinylSpinner 
-              message="Estimating Market Value..."
-              subtext="Searching web for current prices"
-            />
-          </div>
-        </div>
-      )}
+      {/* Overlay is now handled at App level for full viewport coverage */}
     </div>
-
     </>
   )
 }

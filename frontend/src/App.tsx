@@ -67,6 +67,7 @@ function App() {
   const [showRegister, setShowRegister] = useState(false)
   const [registerLoading, setRegisterLoading] = useState(false)
   const [currentUser, setCurrentUser] = useState('')
+  const [isCheckingValue, setIsCheckingValue] = useState(false)
 
   const handleUpload = async (files: File[]) => {
     const previousRecord = record  // Preserve previous record for error recovery
@@ -554,14 +555,13 @@ function App() {
   return (
     <div className={styles.container}>
       <header className={styles.header}>
-        <div className={styles.headerContent}>
-          <h1 className={styles.title}>
-            🎵 Phonox
-          </h1>
-          <p className={styles.subtitle}>
-            AI-powered vinyl record identification with web search
-          </p>
+        {/* Left: Logo */}
+        <div className={styles.headerLeft}>
+          <img src="/phonox.png" alt="Phonox" className={styles.logo} />
+          <h1 className={styles.title}>Phonox</h1>
         </div>
+        
+        {/* Right: Register & User */}
         <div className={styles.headerRight}>
           <UserManager onUserChange={handleUserChange} />
           <button 
@@ -573,7 +573,7 @@ function App() {
             disabled={!currentUser}
             title={!currentUser ? 'Please select a user first' : `${currentUser}'s register with ${vinylRegister.length} records`}
           >
-            📚 My Register ({vinylRegister.length}) {!currentUser ? '(No User)' : `(${currentUser})`}
+            📚 My Register ({vinylRegister.length})
           </button>
         </div>
       </header>
@@ -604,6 +604,8 @@ function App() {
             onAddChatMessage={(content, role) => chatPanelRef.current?.addMessage(content, role)}
             isInRegister={isRecordInRegister}
             currentUser={currentUser}
+            isCheckingValue={isCheckingValue}
+            onSetIsCheckingValue={setIsCheckingValue}
           />
         </div>
       </main>
@@ -621,6 +623,17 @@ function App() {
         <div className={styles.loadingOverlay}>
           <div className={styles.loadingContent}>
             <VinylSpinner />
+          </div>
+        </div>
+      )}
+
+      {isCheckingValue && (
+        <div className={styles.loadingOverlay}>
+          <div className={styles.loadingContent}>
+            <VinylSpinner 
+              message="Estimating Market Value..."
+              subtext="Searching web for current prices"
+            />
           </div>
         </div>
       )}

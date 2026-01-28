@@ -25,6 +25,18 @@
   font-weight: 600;
 }
 
+@media (max-width: 768px) {
+  .header h2 {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .header h2 {
+    font-size: 0.9rem;
+  }
+}
+
 .headerActions {
   display: flex;
   gap: 8px;
@@ -39,6 +51,13 @@
   font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.2s;
+}
+
+@media (max-width: 768px) {
+  .uploadBtn {
+    padding: 5px 10px;
+    font-size: 0.75rem;
+  }
 }
 
 .uploadBtn:hover {
@@ -61,6 +80,20 @@
   flex-direction: column;
   gap: 16px;
   min-height: 0;
+}
+
+@media (max-width: 768px) {
+  .messages {
+    padding: 12px;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .messages {
+    padding: 10px;
+    gap: 10px;
+  }
 }
 
 .message {
@@ -101,6 +134,14 @@
   border-radius: 12px;
   word-wrap: break-word;
   line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+  .messageContent {
+    max-width: 95%;
+    padding: 8px 12px;
+    font-size: 0.95rem;
+  }
 }
 
 .message.user .messageContent {
@@ -233,6 +274,18 @@
   background: rgba(255, 255, 255, 0.02);
 }
 
+@media (max-width: 768px) {
+  .inputSection {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .inputSection {
+    padding: 10px;
+  }
+}
+
 .inputContainer {
   display: flex;
   gap: 8px;
@@ -252,6 +305,14 @@
   min-height: 40px;
   max-height: 120px;
   transition: all 0.2s;
+}
+
+@media (max-width: 480px) {
+  .input {
+    padding: 10px;
+    font-size: 0.85rem;
+    min-height: 36px;
+  }
 }
 
 .input:focus {
@@ -285,6 +346,14 @@
   flex-shrink: 0;
 }
 
+@media (max-width: 480px) {
+  .sendBtn {
+    width: 36px;
+    height: 36px;
+    font-size: 0.95rem;
+  }
+}
+
 .sendBtn:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
@@ -303,6 +372,14 @@
   gap: 8px;
 }
 
+@media (max-width: 768px) {
+  .quickActions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+}
+
 .quickActionBtn {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -313,6 +390,16 @@
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .quickActionBtn {
+    padding: 8px 10px;
+    font-size: 0.75rem;
+    white-space: normal;
+    text-align: center;
+    border-radius: 6px;
+  }
 }
 
 .quickActionBtn:hover {
