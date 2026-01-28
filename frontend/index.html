@@ -39,11 +39,13 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      // if ('serviceWorker' in navigator) {
-        // window.addEventListener('load', () => {
-          // navigator.serviceWorker.register('/sw.js')
-        // })
-      // }
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('SW: Registered (disabled mode - cache bypass enabled)'))
+            .catch(err => console.log('SW: Registration failed', err))
+        })
+      }
     </script>
   </body>
 </html>

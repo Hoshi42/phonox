@@ -131,6 +131,13 @@
   font-size: 1.1rem;
 }
 
+@media (max-width: 768px) {
+  .loadingContent {
+    padding: 24px 20px;
+    max-width: 90vw;
+  }
+}
+
 .errorOverlay {
   position: fixed;
   top: 0;
@@ -189,16 +196,18 @@
 @media (max-width: 1200px) {
   .main {
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr auto;
+    grid-template-rows: auto auto;
   }
   
   .cardContainer {
     height: auto;
-    max-height: 500px;
+    max-height: none;
+    min-height: 400px;
   }
   
   .chatContainer {
     height: 500px;
+    min-height: 400px;
   }
 }
 
@@ -215,27 +224,73 @@
     flex-direction: column;
     align-items: center;
   }
-}
-
-@media (max-width: 768px) {
+  
   .header {
     padding: 16px 0;
   }
   
   .title {
-    font-size: 2rem;
+    font-size: 1.8rem;
   }
   
   .subtitle {
-    font-size: 1rem;
+    font-size: 0.95rem;
   }
   
   .main {
-    padding: 16px;
-    gap: 16px;
+    padding: 12px;
+    gap: 12px;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    max-width: 100%;
   }
   
   .chatContainer {
-    height: 400px;
+    height: auto;
+    min-height: 300px;
+    max-height: 50vh;
+  }
+  
+  .cardContainer {
+    height: auto;
+    min-height: 300px;
+    max-height: none;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+}
+
+@media (max-width: 480px) {
+  .title {
+    font-size: 1.5rem;
+    margin: 0;
+  }
+  
+  .subtitle {
+    font-size: 0.85rem;
+    margin: 4px 0 0 0;
+  }
+  
+  .main {
+    padding: 8px;
+    gap: 8px;
+  }
+  
+  .chatContainer {
+    min-height: 250px;
+  }
+  
+  .cardContainer {
+    min-height: 250px;
+  }
+  
+  .loadingContent {
+    padding: 24px 16px;
+    max-width: 90vw;
+  }
+  
+  .errorContent {
+    padding: 24px 16px;
+    max-width: 85vw;
   }
 }

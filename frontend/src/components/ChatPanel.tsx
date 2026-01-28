@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
 import ReactMarkdown from 'react-markdown'
 import styles from './ChatPanel.module.css'
 
@@ -34,12 +34,16 @@ interface ChatResponse {
   }>
 }
 
-export default function ChatPanel({
+export interface ChatPanelHandle {
+  addMessage: (content: string, role?: 'user' | 'assistant' | 'system') => void
+}
+
+const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
   record,
   onImageUpload,
   onAnalysisComplete,
   onMetadataUpdate,
-}: ChatPanelProps) {
+}: ChatPanelProps, ref) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
@@ -53,6 +57,18 @@ export default function ChatPanel({
   const [loading, setLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Expose addMessage method to parent
+  useImperativeHandle(ref, () => ({
+    addMessage: (content: string, role: 'user' | 'assistant' | 'system' = 'assistant') => {
+      const newMessage: ChatMessage = {
+        role,
+        content,
+        timestamp: new Date().toISOString(),
+      }
+      setMessages(prev => [...prev, newMessage])
+    }
+  }))
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -143,12 +159,6 @@ export default function ChatPanel({
         webEnhanced: data.web_enhanced,
         sourcesUsed: data.sources_used || 0,
         searchResults: data.search_results || []
-      }
-
-      // If we got updated metadata from the chat, notify parent component
-      if (data.updated_metadata) {
-        console.log('Updated metadata received:', data.updated_metadata)
-        onMetadataUpdate?.(data.updated_metadata)
       }
 
       setMessages(prev => [...prev, assistantMessage])
@@ -460,4 +470,7 @@ The vinyl card has been updated with all the details. You can edit any informati
       />
     </div>
   )
-}
+})
+
+ChatPanel.displayName = 'ChatPanel'
+export default ChatPanel

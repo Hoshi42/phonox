@@ -2,6 +2,19 @@
  * Register API client for vinyl collection management
  */
 
+// Helper to add cache-busting for mobile browsers
+function getCacheHeaders(): HeadersInit {
+  const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+  if (isMobile) {
+    return {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    }
+  }
+  return {}
+}
+
 // More robust API base URL detection with fallback
 const API_BASE = (() => {
   // First try environment variable (highest priority)
@@ -46,10 +59,17 @@ export interface RegisterRecord {
 
 export interface RegisterRequest {
   record_id: string
-  estimated_value_eur?: number
-  condition?: string
-  user_notes?: string
-  spotify_url?: string
+  artist?: string | null
+  title?: string | null
+  year?: number | null
+  label?: string | null
+  catalog_number?: string | null
+  barcode?: string | null
+  genres?: string[]
+  estimated_value_eur?: number | null
+  condition?: string | null
+  user_notes?: string | null
+  spotify_url?: string | null
   user_tag?: string
 }
 
@@ -72,8 +92,6 @@ class RegisterApiClient {
     console.log('[RegisterAPI] getRegister() - Starting request...')
     console.log('[RegisterAPI] getRegister() - URL:', url)
     console.log('[RegisterAPI] getRegister() - userTag:', userTag)
-    console.log('[RegisterAPI] getRegister() - User Agent:', navigator.userAgent)
-    console.log('[RegisterAPI] getRegister() - Online:', navigator.onLine)
 
     try {
       console.log('[RegisterAPI] getRegister() - Sending fetch request...')
@@ -81,6 +99,7 @@ class RegisterApiClient {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          ...getCacheHeaders(),
           ...fetchOptions?.headers
         },
         ...fetchOptions
@@ -88,7 +107,6 @@ class RegisterApiClient {
 
       console.log('[RegisterAPI] getRegister() - Response received')
       console.log('[RegisterAPI] getRegister() - Status:', response.status, response.statusText)
-      console.log('[RegisterAPI] getRegister() - Headers:', Object.fromEntries(response.headers.entries()))
 
       if (!response.ok) {
         let errorText = ''
