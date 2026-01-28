@@ -824,7 +824,10 @@ ${data.intermediate_results.claude_analysis}
       {isCheckingValue && (
         <div className={styles.webSearchLoadingOverlay}>
           <div className={styles.webSearchLoadingContent}>
-            <VinylSpinner />
+            <VinylSpinner 
+              message="Estimating Market Value..."
+              subtext="Searching web for current prices"
+            />
           </div>
         </div>
       )}
