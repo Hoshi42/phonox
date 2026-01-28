@@ -4,7 +4,7 @@
   border-radius: 12px;
   backdrop-filter: blur(10px);
   padding: 20px;
-  height: fit-content;
+  height: auto;
   max-height: calc(100vh - 120px);
   overflow-y: auto;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
@@ -637,4 +637,105 @@
   color: #e0e7ff;
   white-space: pre-wrap;
   word-wrap: break-word;
+}
+
+/* Mobile responsive styles for VinylCard */
+@media (max-width: 768px) {
+  .card {
+    padding: 16px;
+    max-height: none;
+    height: auto;
+  }
+  
+  .header {
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  
+  .header h2 {
+    font-size: 1.2rem;
+  }
+  
+  .actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  
+  .metadata {
+    margin-bottom: 16px;
+  }
+  
+  .metadata h4 {
+    font-size: 1rem;
+    margin-bottom: 12px;
+  }
+  
+  .metadataView,
+  .metadataEdit {
+    gap: 12px;
+  }
+  
+  .field {
+    margin-bottom: 12px;
+  }
+  
+  .field label {
+    font-size: 0.85rem;
+  }
+  
+  .field input,
+  .field select {
+    font-size: 16px;
+    padding: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 12px;
+    border-radius: 8px;
+  }
+  
+  .header {
+    margin-bottom: 12px;
+  }
+  
+  .header h2 {
+    font-size: 1.1rem;
+  }
+  
+  .editBtn, .saveBtn, .cancelBtn, .spotifyHeaderBtn {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+  }
+  
+  .status {
+    margin-bottom: 16px;
+  }
+  
+  .statusBadge {
+    font-size: 0.75rem;
+    padding: 6px 10px;
+  }
+  
+  .confidence {
+    font-size: 0.85rem;
+  }
+  
+  .images h4,
+  .metadata h4,
+  .valueSection h4 {
+    font-size: 0.95rem;
+  }
+  
+  .imageGrid {
+    gap: 8px;
+  }
+  
+  .registerBtn {
+    padding: 12px 16px;
+    font-size: 0.95rem;
+    width: 100%;
+  }
 }

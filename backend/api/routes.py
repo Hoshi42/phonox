@@ -147,6 +147,7 @@ async def identify_vinyl(
             vinyl_record.validation_passed = result_state.get("validation_passed", False)
 
             # Extract metadata
+            image_analysis_intermediate_results = None  # Track for response
             if result_state.get("vision_extraction"):
                 vision_data = result_state["vision_extraction"]
                 vinyl_record.artist = vision_data.get("artist")
@@ -159,21 +160,165 @@ async def identify_vinyl(
                 if vision_data.get("genres"):
                     vinyl_record.set_genres(vision_data["genres"])
                 
-                # Estimate value based on extracted metadata
+                # Estimate value based on extracted metadata using web search
+                # For image analysis: perform real market research immediately
                 try:
-                    value_estimate = estimate_vinyl_value(
-                        artist=vinyl_record.artist or "",
-                        title=vinyl_record.title or "",
-                        year=vinyl_record.year,
-                        label=vinyl_record.label,
-                        genres=vinyl_record.get_genres()
-                    )
-                    # Store estimated values in metadata
-                    vision_data["estimated_value_eur"] = value_estimate.get("estimated_value_eur")
-                    vision_data["estimated_value_usd"] = value_estimate.get("estimated_value_usd")
-                    logger.info(f"Value estimate for {vinyl_record.artist} - {vinyl_record.title}: €{value_estimate.get('estimated_value_eur')}")
+                    if vinyl_record.artist and vinyl_record.title:
+                        logger.info(f"Performing web search for value estimation during image analysis: {vinyl_record.artist} - {vinyl_record.title}")
+                        
+                        # Build search query with catalog number if available
+                        search_query = f"{vinyl_record.artist} {vinyl_record.title} vinyl record price"
+                        if vinyl_record.catalog_number:
+                            search_query += f" {vinyl_record.catalog_number}"
+                        if vinyl_record.year:
+                            search_query += f" {vinyl_record.year}"
+                        
+                        logger.info(f"Web search query for image analysis: {search_query}")
+                        
+                        # Perform web search
+                        search_results = chat_tools.search_and_scrape(
+                            search_query,
+                            scrape_results=True
+                        )
+                        
+                        search_results_count = len(search_results.get("search_results", []))
+                        logger.info(f"Image analysis web search found {search_results_count} results")
+                        
+                        # Build market context from search results
+                        market_context = "Market Research Results:\n"
+                        if search_results.get("search_results"):
+                            for result in search_results["search_results"][:5]:
+                                market_context += f"- {result.get('title', '')}: {result.get('content', '')}\n"
+                        
+                        if search_results.get("scraped_content"):
+                            market_context += "\nDetailed Pricing Information:\n"
+                            for content in search_results["scraped_content"][:3]:
+                                if content.get("success"):
+                                    market_context += f"- {content.get('title', '')}: {content.get('content', '')}\n"
+                        
+                        # Build record context
+                        record_context = f"""
+Vinyl Record Details:
+- Artist: {vinyl_record.artist}
+- Title: {vinyl_record.title}
+- Year: {vinyl_record.year or 'Unknown'}
+- Label: {vinyl_record.label or 'Unknown'}
+- Catalog Number: {vinyl_record.catalog_number or 'Unknown'}
+- Genres: {', '.join(vinyl_record.get_genres()) if hasattr(vinyl_record, 'get_genres') else 'Unknown'}
+- Image Analysis Confidence: {vinyl_record.confidence * 100:.0f}%
+- Format: Vinyl LP
+"""
+                        
+                        # Use Claude Haiku to analyze market data
+                        valuation_prompt = f"""Based on the web search results and record details provided, estimate the fair market value of this vinyl record in EUR.
+
+{market_context}
+
+{record_context}
+
+Please provide:
+1. Estimated fair market value in EUR (single number)
+2. Price range (minimum and maximum in EUR)
+3. Key factors affecting the price
+4. Market condition assessment (strong/stable/weak)
+5. Brief explanation of your valuation
+
+Format your response as follows:
+ESTIMATED_VALUE: €XX.XX
+PRICE_RANGE: €XX.XX - €XX.XX
+MARKET_CONDITION: [strong/stable/weak]
+FACTORS: [list key factors]
+EXPLANATION: [brief explanation]"""
+                        
+                        try:
+                            response = anthropic_client.messages.create(
+                                model="claude-haiku-4-5-20251001",
+                                max_tokens=500,
+                                messages=[
+                                    {
+                                        "role": "user",
+                                        "content": valuation_prompt,
+                                    }
+                                ],
+                            )
+                            
+                            valuation_text = response.content[0].text
+                            logger.info(f"Claude valuation during image analysis: {valuation_text[:200]}")
+                            
+                            # Parse Claude's response
+                            import re
+                            estimated_value = None
+                            price_range_min = None
+                            price_range_max = None
+                            market_condition = "stable"
+                            factors = []
+                            explanation = ""
+                            
+                            for line in valuation_text.split('\n'):
+                                if line.startswith('ESTIMATED_VALUE:'):
+                                    match = re.search(r'€?([\d.]+)', line)
+                                    if match:
+                                        estimated_value = float(match.group(1))
+                                elif line.startswith('PRICE_RANGE:'):
+                                    matches = re.findall(r'€?([\d.]+)', line)
+                                    if len(matches) >= 2:
+                                        price_range_min = float(matches[0])
+                                        price_range_max = float(matches[1])
+                                elif line.startswith('MARKET_CONDITION:'):
+                                    condition = line.replace('MARKET_CONDITION:', '').strip().lower()
+                                    if condition in ['strong', 'stable', 'weak']:
+                                        market_condition = condition
+                                elif line.startswith('FACTORS:'):
+                                    factors_text = line.replace('FACTORS:', '').strip()
+                                    factors = [f.strip() for f in factors_text.split(',')]
+                                elif line.startswith('EXPLANATION:'):
+                                    explanation = line.replace('EXPLANATION:', '').strip()
+                            
+                            # Fallback if parsing fails
+                            if estimated_value is None:
+                                prices = re.findall(r'€([\d.]+)', valuation_text)
+                                if prices:
+                                    estimated_value = float(prices[0])
+                                else:
+                                    estimated_value = None
+                            
+                            # Store estimated values if found
+                            if estimated_value is not None:
+                                vision_data["estimated_value_eur"] = estimated_value
+                                vision_data["estimated_value_usd"] = estimated_value / 0.92
+                                vision_data["market_condition"] = market_condition
+                                vision_data["price_range_min"] = price_range_min
+                                vision_data["price_range_max"] = price_range_max
+                                vision_data["valuation_factors"] = factors
+                                vision_data["valuation_explanation"] = explanation
+                                
+                                # ALSO store in vinyl_record so it's in the metadata (not just evidence)
+                                vinyl_record.estimated_value_eur = estimated_value
+                                logger.info(f"Image analysis: Web-based value estimate for {vinyl_record.artist} - {vinyl_record.title}: €{estimated_value}")
+                                
+                                # Create intermediate results for response
+                                image_analysis_intermediate_results = {
+                                    "search_query": search_query,
+                                    "search_results_count": search_results_count,
+                                    "claude_analysis": valuation_text,
+                                    "search_sources": [
+                                        {
+                                            "title": result.get("title", ""),
+                                            "content": result.get("content", "")[:200]  # First 200 chars
+                                        }
+                                        for result in search_results.get("search_results", [])[:5]
+                                    ]
+                                }
+                            else:
+                                logger.warning(f"Could not parse estimated value from Claude response for image analysis")
+                        
+                        except Exception as e:
+                            logger.error(f"Error calling Claude for image analysis valuation: {e}")
+                            # Continue without valuation
+                    
                 except Exception as e:
-                    logger.warning(f"Failed to estimate value: {e}")
+                    logger.error(f"Error during web search valuation in image analysis: {e}")
+                    # Continue without valuation
 
             # Store evidence chain
             evidence_chain = result_state.get("evidence_chain", [])
@@ -209,11 +354,12 @@ async def identify_vinyl(
         # Status is "analyzed" (not yet saved to register) or "failed"
         if vinyl_record.status in ["analyzed", "failed"]:
             logger.info(f"Identification complete, returning record response for {record_id}")
+            logger.info(f"Image analysis intermediate_results: {image_analysis_intermediate_results}")
             record_dict = vinyl_record.to_dict()
             metadata_dict = record_dict.get("metadata", {})
             # Filter out None values from metadata for Pydantic validation
             metadata_dict_clean = {k: v for k, v in metadata_dict.items() if v is not None}
-            return VinylRecordResponse(
+            response = VinylRecordResponse(
                 record_id=record_id,
                 created_at=vinyl_record.created_at,
                 updated_at=vinyl_record.updated_at,
@@ -225,7 +371,10 @@ async def identify_vinyl(
                 needs_review=vinyl_record.needs_review or True,
                 error=vinyl_record.error,
                 user_notes=vinyl_record.user_notes,
+                intermediate_results=image_analysis_intermediate_results,
             )
+            logger.info(f"Returning response with intermediate_results: {response.intermediate_results is not None}")
+            return response
         
         # Otherwise return initial response
         return VinylIdentifyResponse(
@@ -802,7 +951,7 @@ async def reanalyze_vinyl(
             result_state = graph.invoke(initial_state, config=config)
             
             # Update record with new results
-            existing_record.status = "complete"
+            existing_record.status = "analyzed"
             existing_record.validation_passed = result_state.get("validation_passed", False)
             
             # Extract metadata
@@ -817,6 +966,10 @@ async def reanalyze_vinyl(
                 existing_record.barcode = vision_data.get("barcode")
                 if vision_data.get("genres"):
                     existing_record.set_genres(vision_data["genres"])
+                
+                # Also store estimated value if available
+                if vision_data.get("estimated_value_eur"):
+                    existing_record.estimated_value_eur = vision_data.get("estimated_value_eur")
             
             # Store evidence chain
             evidence_chain = result_state.get("evidence_chain", [])
@@ -836,25 +989,253 @@ async def reanalyze_vinyl(
             db.commit()
             db.refresh(existing_record)
             
-            logger.info(f"Completed re-analysis for {record_id}: confidence={existing_record.confidence:.2f}")
+            logger.info(f"Completed re-analysis for {record_id}: confidence={existing_record.confidence:.2f}, status={existing_record.status}")
             
+            # Return the actual updated record status
+            record_dict = existing_record.to_dict()
+            metadata_dict = record_dict.get("metadata", {})
+            metadata_dict_clean = {k: v for k, v in metadata_dict.items() if v is not None}
+            
+            return VinylRecordResponse(
+                record_id=record_id,
+                created_at=existing_record.created_at,
+                updated_at=existing_record.updated_at,
+                status=existing_record.status,
+                metadata=VinylMetadataModel(**metadata_dict_clean),
+                evidence_chain=record_dict.get("evidence_chain", []),
+                confidence=existing_record.confidence or 0.0,
+                auto_commit=existing_record.auto_commit or False,
+                needs_review=existing_record.needs_review or True,
+                error=existing_record.error,
+                user_notes=existing_record.user_notes,
+            )
+        
         except Exception as e:
             logger.error(f"Error during re-analysis: {e}")
             existing_record.status = "failed"
             existing_record.error = str(e)
             db.commit()
-        
-        return VinylIdentifyResponse(
-            record_id=record_id,
-            status="processing",
-            message=f"Vinyl re-analysis started with {len(files)} new images",
-            job_id=record_id,
-        )
+            
+            # Return error status
+            return VinylRecordResponse(
+                record_id=record_id,
+                created_at=existing_record.created_at,
+                updated_at=existing_record.updated_at,
+                status="failed",
+                error=str(e),
+            )
         
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Unexpected error in reanalyze_vinyl: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
+
+
+@router.post("/estimate-value/{record_id}", response_model=Dict[str, Any])
+async def estimate_value_with_websearch(
+    record_id: str,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Estimate vinyl record value using web search for market pricing.
+    
+    Uses web search to find current market prices from Discogs, eBay, Vinted,
+    and other sources, then uses Claude Haiku to provide intelligent valuation
+    based on condition, rarity, and current market data.
+    
+    Returns estimated value in EUR with market context.
+    """
+    try:
+        # Fetch the vinyl record
+        vinyl_record = db.query(VinylRecord).filter(VinylRecord.id == record_id).first()
+        if not vinyl_record:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Record {record_id} not found",
+            )
+        
+        if not vinyl_record.artist or not vinyl_record.title:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Record must have artist and title for value estimation",
+            )
+        
+        logger.info(f"Estimating value with web search for {vinyl_record.artist} - {vinyl_record.title}")
+        
+        # Perform web search for pricing information
+        # Include catalog_number for more specific results (exact pressing identification)
+        search_query = f"{vinyl_record.artist} {vinyl_record.title} vinyl record price"
+        if vinyl_record.catalog_number:
+            search_query += f" {vinyl_record.catalog_number}"
+        if vinyl_record.year:
+            search_query += f" {vinyl_record.year}"
+        
+        logger.info(f"Web search query: {search_query}")
+        
+        search_results = chat_tools.search_and_scrape(
+            search_query,
+            scrape_results=True
+        )
+        
+        # Store search results for intermediate display
+        search_results_count = len(search_results.get("search_results", []))
+        logger.info(f"Web search found {search_results_count} results")
+        
+        # Build market context from search results
+        market_context = "Market Research Results:\n"
+        if search_results.get("search_results"):
+            for result in search_results["search_results"][:5]:
+                market_context += f"- {result.get('title', '')}: {result.get('content', '')}\n"
+        
+        if search_results.get("scraped_content"):
+            market_context += "\nDetailed Pricing Information:\n"
+            for content in search_results["scraped_content"][:3]:
+                if content.get("success"):
+                    market_context += f"- {content.get('title', '')}: {content.get('content', '')}\n"
+        
+        # Build record context
+        record_context = f"""
+Vinyl Record Details:
+- Artist: {vinyl_record.artist}
+- Title: {vinyl_record.title}
+- Year: {vinyl_record.year or 'Unknown'}
+- Label: {vinyl_record.label or 'Unknown'}
+- Catalog Number: {vinyl_record.catalog_number or 'Unknown'}
+- Genres: {', '.join(vinyl_record.get_genres()) if hasattr(vinyl_record, 'get_genres') else 'Unknown'}
+- Current Condition Assessment: Based on image analysis (confidence: {vinyl_record.confidence * 100:.0f}%)
+- Format: Vinyl LP
+"""
+        
+        # Use Claude to analyze market data and provide valuation
+        valuation_prompt = f"""Based on the web search results and record details provided, estimate the fair market value of this vinyl record in EUR.
+
+{market_context}
+
+{record_context}
+
+Please provide:
+1. Estimated fair market value in EUR (single number)
+2. Price range (minimum and maximum in EUR)
+3. Key factors affecting the price
+4. Market condition assessment (strong/stable/weak)
+5. Brief explanation of your valuation
+
+Format your response as follows:
+ESTIMATED_VALUE: €XX.XX
+PRICE_RANGE: €XX.XX - €XX.XX
+MARKET_CONDITION: [strong/stable/weak]
+FACTORS: [list key factors]
+EXPLANATION: [brief explanation]"""
+        
+        try:
+            response = anthropic_client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=500,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": valuation_prompt,
+                    }
+                ],
+            )
+            
+            valuation_text = response.content[0].text
+            logger.info(f"Claude valuation response: {valuation_text[:200]}")
+            
+            # Parse Claude's response
+            estimated_value = None
+            price_range_min = None
+            price_range_max = None
+            market_condition = "stable"
+            factors = []
+            explanation = ""
+            
+            for line in valuation_text.split('\n'):
+                if line.startswith('ESTIMATED_VALUE:'):
+                    # Extract number from "€XX.XX"
+                    import re
+                    match = re.search(r'€?([\d.]+)', line)
+                    if match:
+                        estimated_value = float(match.group(1))
+                elif line.startswith('PRICE_RANGE:'):
+                    # Extract "€XX.XX - €XX.XX"
+                    import re
+                    matches = re.findall(r'€?([\d.]+)', line)
+                    if len(matches) >= 2:
+                        price_range_min = float(matches[0])
+                        price_range_max = float(matches[1])
+                elif line.startswith('MARKET_CONDITION:'):
+                    condition = line.replace('MARKET_CONDITION:', '').strip().lower()
+                    if condition in ['strong', 'stable', 'weak']:
+                        market_condition = condition
+                elif line.startswith('FACTORS:'):
+                    factors_text = line.replace('FACTORS:', '').strip()
+                    factors = [f.strip() for f in factors_text.split(',')]
+                elif line.startswith('EXPLANATION:'):
+                    explanation = line.replace('EXPLANATION:', '').strip()
+            
+            # Fallback if parsing fails
+            if estimated_value is None:
+                # Try to extract any price mentioned
+                import re
+                prices = re.findall(r'€([\d.]+)', valuation_text)
+                if prices:
+                    estimated_value = float(prices[0])
+                else:
+                    estimated_value = 25.0  # Safe default
+            
+            # Note: We do NOT update the database here
+            # The value is only stored when the user clicks "Update in Register"
+            # This allows the user to review and decide whether to apply it
+            
+            logger.info(f"Value estimation completed: €{estimated_value} for {vinyl_record.artist} - {vinyl_record.title}")
+            logger.info(f"Estimated value is NOT yet saved to database - user must click 'Update in Register'")
+            
+            # Prepare intermediate results for display
+            intermediate_results = {
+                "search_query": search_query,
+                "search_results_count": search_results_count,
+                "claude_analysis": valuation_text,
+                "search_sources": [
+                    {
+                        "title": result.get("title", ""),
+                        "content": result.get("content", "")[:200]  # First 200 chars
+                    }
+                    for result in search_results.get("search_results", [])[:5]
+                ]
+            }
+            
+            return {
+                "record_id": record_id,
+                "estimated_value_eur": estimated_value,
+                "price_range_min": price_range_min,
+                "price_range_max": price_range_max,
+                "market_condition": market_condition,
+                "factors": factors,
+                "explanation": explanation,
+                "web_enhanced": True,
+                "sources_used": search_results_count,
+                "intermediate_results": intermediate_results,
+            }
+            
+        except Exception as e:
+            logger.error(f"Error calling Claude for valuation: {e}")
+            # Return current value with note that web search wasn't fully processed
+            return {
+                "record_id": record_id,
+                "estimated_value_eur": vinyl_record.estimated_value_eur or 25.0,
+                "error": "Web-based valuation unavailable, using cached estimate",
+                "web_enhanced": False,
+            }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error estimating value for {record_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { VinylRecord } from '../App'
 import styles from './VinylCard.module.css'
 import { registerApiClient } from '../services/registerApi'
@@ -18,6 +18,7 @@ interface VinylCardProps {
   onUpdateRegister?: (record: VinylRecord) => void
   onRegisterSuccess?: () => void
   onReanalyze?: (images: File[]) => void
+  onAddChatMessage?: (content: string, role?: 'user' | 'assistant' | 'system') => void
   isInRegister?: boolean
   currentUser?: string
 }
@@ -32,6 +33,7 @@ export default function VinylCard({
   onUpdateRegister,
   onRegisterSuccess,
   onReanalyze,
+  onAddChatMessage,
   isInRegister = false,
   currentUser
 }: VinylCardProps) {
@@ -46,10 +48,62 @@ export default function VinylCard({
     barcode: '',
     genres: '',
     condition: 'Good',
+    estimated_value_eur: '' // ADD estimated_value_eur
   })
   const [showRawData, setShowRawData] = useState(false)
   const [isCheckingValue, setIsCheckingValue] = useState(false)
   const [webValue, setWebValue] = useState<string | null>(null)
+  const [appliedWebValue, setAppliedWebValue] = useState<number | null>(null)
+  const [searchIntermediateResults, setSearchIntermediateResults] = useState<any>(null)
+  const [lastRecordIdWithResults, setLastRecordIdWithResults] = useState<string | null>(null)
+
+  // Auto-display intermediate results from image analysis
+  useEffect(() => {
+    if (!record) {
+      console.log('VinylCard: No record')
+      return
+    }
+    
+    console.log('VinylCard: useEffect triggered - record_id:', record.record_id)
+    console.log('VinylCard: Has intermediate_results?', !!record.intermediate_results)
+    console.log('VinylCard: Last record with results:', lastRecordIdWithResults)
+    
+    // If this is a new record (different record_id), clear old results
+    if (record.record_id !== lastRecordIdWithResults) {
+      console.log('VinylCard: New record detected, clearing old intermediate results')
+      setSearchIntermediateResults(null)
+    }
+    
+    // If we have intermediate results and haven't shown them yet for this record
+    if (record.intermediate_results && record.record_id !== lastRecordIdWithResults) {
+      console.log('VinylCard: Setting intermediate results from image analysis:', record.intermediate_results)
+      setSearchIntermediateResults(record.intermediate_results)
+      setLastRecordIdWithResults(record.record_id)
+      
+      // Send to chat panel
+      if (onAddChatMessage) {
+        const analysisMessage = `🔍 **Web Search Analysis: "${record.artist || '?'} - ${record.title || '?'}"**
+
+**Search Query:** ${record.intermediate_results.search_query}
+
+**Sources Found:** ${record.intermediate_results.search_results_count}
+
+**Top Sources:**
+${record.intermediate_results.search_sources?.map((s: any, i: number) => `${i+1}. **${s.title}**\n   ${s.content}...`).join('\n\n') || 'No sources'}
+
+---
+
+**Market Analysis:**
+${record.intermediate_results.claude_analysis || 'No analysis available'}`
+        
+        onAddChatMessage(analysisMessage, 'assistant')
+      }
+    } else if (record.intermediate_results && record.record_id === lastRecordIdWithResults) {
+      console.log('VinylCard: Already showed results for this record')
+    } else {
+      console.log('VinylCard: No intermediate_results in record')
+    }
+  }, [record?.record_id, record?.intermediate_results, lastRecordIdWithResults])
 
   // Determine condition from image analysis (simulated)
   const getCondition = () => {
@@ -109,7 +163,7 @@ export default function VinylCard({
   const getEstimatedValue = () => estimatedValue || 5
 
   const getConditionColor = () => {
-    const condition = getCondition()
+    const condition = record?.metadata?.condition || getCondition()
     if (!condition) return '#9ca3af'
     
     if (condition.includes('Mint')) return '#10b981'
@@ -130,6 +184,7 @@ export default function VinylCard({
         spotify_url: record.metadata?.spotify_url || '',
         catalog_number: record.metadata?.catalog_number || record.catalog_number || '',
         barcode: record.metadata?.barcode || record.barcode || '',
+        estimated_value_eur: record.metadata?.estimated_value_eur ? String(record.metadata.estimated_value_eur) : '',
         genres: Array.isArray(record.metadata?.genres || record.genres) 
           ? (record.metadata?.genres || record.genres)?.join(', ') || ''
           : '',
@@ -141,52 +196,96 @@ export default function VinylCard({
 
   const handleSave = () => {
     if (onMetadataUpdate) {
-      onMetadataUpdate({
+      const updatedMetadata = {
+        // Allow empty strings for fields that can be deleted
         artist: editData.artist || undefined,
         title: editData.title || undefined,
-        year: editData.year ? parseInt(editData.year) : undefined,
-        label: editData.label || undefined,
-        spotify_url: editData.spotify_url || undefined,
-        catalog_number: editData.catalog_number || undefined,
-        barcode: editData.barcode || undefined,
+        year: editData.year ? parseInt(editData.year) : null,  // null instead of undefined to allow deletion
+        label: editData.label || null,  // Allow deletion
+        spotify_url: editData.spotify_url || null,  // Allow deletion
+        catalog_number: editData.catalog_number || null,  // Allow deletion (the issue!)
+        barcode: editData.barcode || null,  // Allow deletion
         genres: editData.genres ? editData.genres.split(',').map(g => g.trim()).filter(Boolean) : undefined,
         condition: editData.condition || undefined,
-      })
+        estimated_value_eur: editData.estimated_value_eur ? parseFloat(editData.estimated_value_eur) : null,  // Allow deletion
+      }
+      onMetadataUpdate(updatedMetadata)
+      console.log('VinylCard: Metadata saved locally:', updatedMetadata)
     }
     setIsEditing(false)
+    setAppliedWebValue(null)
+    setWebValue(null)
   }
 
   const recheckValue = async () => {
-    if (!record?.artist || !record?.title) return
+    if (!record?.record_id || !record?.artist || !record?.title) return
     
     setIsCheckingValue(true)
     setWebValue(null)
     
     try {
-      // Try simple fallback: just show our estimated value is from ML algorithm
-      // In production, could integrate with real price APIs like Discogs, MusicBrainz, or Vinted
+      console.log('VinylCard: Requesting web-based value estimation for', record.artist, '-', record.title)
       
-      // For now, acknowledge that our estimate is already pretty good
-      const estimatedVal = getEstimatedValue()
+      const response = await fetch(`${API_BASE}/api/v1/estimate-value/${record.record_id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
       
-      if (estimatedVal) {
-        // Simulate a slight variance based on condition to show "market check"
-        const condition = getCondition()
-        let adjustmentFactor = 1.0
+      if (!response.ok) {
+        throw new Error(`Value estimation failed: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      console.log('VinylCard: Value estimation response:', data)
+      
+      // Store intermediate results for display
+      if (data.intermediate_results) {
+        setSearchIntermediateResults(data.intermediate_results)
+        console.log('VinylCard: Intermediate results:', data.intermediate_results)
         
-        if (condition?.includes('Mint')) adjustmentFactor = 1.2
-        else if (condition?.includes('Near Mint')) adjustmentFactor = 1.1
-        else if (condition?.includes('Very Good')) adjustmentFactor = 1.0
-        else if (condition?.includes('Good')) adjustmentFactor = 0.95
-        else if (condition?.includes('Fair')) adjustmentFactor = 0.8
+        // Format message for chat display
+        const chatMessage = `🔍 **Web Search Analysis: "${record.artist} - ${record.title}"**
+
+**Search Query:** ${data.intermediate_results.search_query}
+
+**Sources Found:** ${data.intermediate_results.search_results_count}
+
+**Top Sources:**
+${data.intermediate_results.search_sources?.map((s: any, i: number) => `${i+1}. **${s.title}**\n   ${s.content}...`).join('\n\n')}
+
+---
+
+**Market Analysis:**
+${data.intermediate_results.claude_analysis}
+
+---
+**Estimated Value:** €${data.estimated_value_eur}
+**Price Range:** €${data.price_range_min} - €${data.price_range_max}
+**Market Condition:** ${data.market_condition}`
         
-        const adjustedValue = Math.round(estimatedVal * adjustmentFactor * 100) / 100
+        // Send to chat panel
+        if (onAddChatMessage) {
+          onAddChatMessage(chatMessage, 'assistant')
+        }
+      }
+      
+      if (data.estimated_value_eur) {
+        const value = data.estimated_value_eur
+        const range = data.price_range_min && data.price_range_max 
+          ? ` (€${data.price_range_min}-€${data.price_range_max})`
+          : ''
+        const condition = data.market_condition ? ` [${data.market_condition} market]` : ''
         
-        setWebValue(`€${adjustedValue} (condition-adjusted)`)
+        setWebValue(`€${value}${range}${condition}`)
+        console.log('VinylCard: Web value set to:', value)
+      } else {
+        setWebValue('No price found')
       }
     } catch (error) {
-      console.error('Error checking value:', error)
-      setWebValue('Not available')
+      console.error('VinylCard: Error checking value:', error)
+      setWebValue('Error checking market value')
     } finally {
       setIsCheckingValue(false)
     }
@@ -202,17 +301,23 @@ export default function VinylCard({
       
       const newValue = parseFloat(priceMatch[0])
       
-      // Update metadata with new value
-      const updatedRecord = {
-        ...record,
-        metadata: {
-          ...record.metadata,
-          estimated_value_eur: newValue,
-        },
+      // Update editData with new value
+      setEditData(prev => ({
+        ...prev,
+        estimated_value_eur: String(newValue)
+      }))
+      
+      // Also update record.metadata immediately so Update in Register will use the new value
+      if (onMetadataUpdate) {
+        onMetadataUpdate({
+          estimated_value_eur: newValue
+        })
       }
       
-      onMetadataUpdate?.(updatedRecord.metadata)
-      setWebValue(null)
+      // Show the applied value in the display immediately
+      setAppliedWebValue(newValue)
+      
+      console.log('VinylCard: Web value applied and saved to metadata:', newValue)
     } catch (error) {
       console.error('Error applying web value:', error)
     }
@@ -221,17 +326,28 @@ export default function VinylCard({
   const handleRegisterAction = async () => {
     if (!record) return
     
-    const estimatedValue = getEstimatedValue()
-    const condition = getCondition()
+    // Use values from record.metadata (which were saved via handleSave)
+    // This ensures we use the latest user-edited values
+    const estimatedValue = record.metadata?.estimated_value_eur || getEstimatedValue()
+    const condition = record.metadata?.condition || getCondition()
+    const year = record.metadata?.year || record.year
     
-    // Use edited spotify_url if available, otherwise use record metadata
-    const spotifyUrlToSave = editData.spotify_url || record.metadata?.spotify_url || undefined
+    // Use edited spotify_url from metadata if available
+    const spotifyUrlToSave = record.metadata?.spotify_url || undefined
     
     try {
       if (isInRegister) {
-        // Update existing record in register
+        // Update existing record in register with ALL metadata fields
+        // Send actual values (including null/empty) to allow deletion
         await registerApiClient.updateRegisterRecord({
           record_id: record.record_id,
+          artist: record.metadata?.artist !== undefined ? record.metadata.artist : record.artist || undefined,
+          title: record.metadata?.title !== undefined ? record.metadata.title : record.title || undefined,
+          year: record.metadata?.year !== undefined ? record.metadata.year : record.year || undefined,
+          label: record.metadata?.label !== undefined ? record.metadata.label : record.label || undefined,
+          catalog_number: record.metadata?.catalog_number !== undefined ? record.metadata.catalog_number : record.catalog_number || undefined,
+          barcode: record.metadata?.barcode !== undefined ? record.metadata.barcode : record.barcode || undefined,
+          genres: record.metadata?.genres !== undefined ? record.metadata.genres : record.genres || undefined,
           estimated_value_eur: estimatedValue,
           condition: condition,
           user_notes: `Condition: ${condition} - Updated ${new Date().toLocaleDateString()}`,
@@ -245,9 +361,17 @@ export default function VinylCard({
           await registerApiClient.uploadImages(record.record_id, uploadedImages)
         }
         
-        // Add to register
+        // Add to register with ALL metadata fields
+        // Send actual values (including null/empty) to allow deletion
         await registerApiClient.addToRegister({
           record_id: record.record_id,
+          artist: record.metadata?.artist !== undefined ? record.metadata.artist : record.artist || undefined,
+          title: record.metadata?.title !== undefined ? record.metadata.title : record.title || undefined,
+          year: record.metadata?.year !== undefined ? record.metadata.year : record.year || undefined,
+          label: record.metadata?.label !== undefined ? record.metadata.label : record.label || undefined,
+          catalog_number: record.metadata?.catalog_number !== undefined ? record.metadata.catalog_number : record.catalog_number || undefined,
+          barcode: record.metadata?.barcode !== undefined ? record.metadata.barcode : record.barcode || undefined,
+          genres: record.metadata?.genres !== undefined ? record.metadata.genres : record.genres || undefined,
           estimated_value_eur: estimatedValue,
           condition: condition,
           user_notes: `Condition: ${condition} - Added ${new Date().toLocaleDateString()}`,
@@ -260,6 +384,12 @@ export default function VinylCard({
       // Notify parent component of successful register operation
       onRegisterSuccess?.()
       
+      console.log('VinylCard: Record successfully updated in register with values:', {
+        estimated_value_eur: estimatedValue,
+        condition: condition,
+        year: year
+      })
+      
     } catch (error) {
       console.error('Register operation failed:', error)
       alert('Failed to update register. Please try again.')
@@ -268,7 +398,9 @@ export default function VinylCard({
 
   const handleCancel = () => {
     setIsEditing(false)
-    setEditData({ artist: '', title: '', year: '', label: '', spotify_url: '', catalog_number: '', barcode: '', genres: '', condition: 'Good' })
+    setEditData({ artist: '', title: '', year: '', label: '', spotify_url: '', catalog_number: '', barcode: '', genres: '', condition: 'Good', estimated_value_eur: '' })
+    setAppliedWebValue(null)
+    setWebValue(null)
   }
 
   if (!record) {
@@ -284,7 +416,112 @@ export default function VinylCard({
   }
 
   return (
-    <div className={styles.card}>
+    <>
+      {/* Search Intermediate Results Display */}
+      {searchIntermediateResults && (
+        <div style={{
+          backgroundColor: '#f0f7ff',
+          border: '2px solid #0066cc',
+          borderRadius: '8px',
+          padding: '16px',
+          marginBottom: '16px',
+          fontSize: '13px',
+          maxHeight: '400px',
+          overflowY: 'auto'
+        }}>
+          <div style={{ fontWeight: 'bold', marginBottom: '12px', color: '#0066cc', fontSize: '14px' }}>
+            🔍 Web Search Analysis Complete
+          </div>
+          
+          <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid #cce0ff' }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '4px', fontSize: '12px' }}>🔎 Search Query:</div>
+            <div style={{ fontFamily: 'monospace', color: '#333', backgroundColor: '#fff', padding: '8px', borderRadius: '4px' }}>
+              {searchIntermediateResults.search_query}
+            </div>
+          </div>
+          
+          <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid #cce0ff' }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '12px' }}>
+              📊 Sources Found: {searchIntermediateResults.search_results_count}
+            </div>
+            <div style={{ display: 'grid', gap: '8px' }}>
+              {searchIntermediateResults.search_sources?.map((source: any, idx: number) => (
+                <div key={idx} style={{ 
+                  backgroundColor: '#fff', 
+                  padding: '8px', 
+                  borderRadius: '4px',
+                  borderLeft: '3px solid #0066cc'
+                }}>
+                  <div style={{ fontWeight: '600', color: '#0066cc', fontSize: '12px', marginBottom: '3px' }}>
+                    #{idx + 1} {source.title}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#555' }}>
+                    {source.content}...
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid #cce0ff' }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '4px', fontSize: '12px' }}>🧠 Claude AI Analysis:</div>
+            <div style={{ 
+              fontFamily: 'monospace', 
+              fontSize: '11px',
+              color: '#333',
+              backgroundColor: '#fff',
+              padding: '8px',
+              borderRadius: '4px',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              maxHeight: '200px',
+              overflowY: 'auto'
+            }}>
+              {searchIntermediateResults.claude_analysis}
+            </div>
+          </div>
+          
+          <div style={{ textAlign: 'right', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+            <button 
+              onClick={() => {
+                // Copy to clipboard
+                const text = `Search: ${searchIntermediateResults.search_query}\nSources: ${searchIntermediateResults.search_results_count}\n\n${searchIntermediateResults.claude_analysis}`
+                navigator.clipboard.writeText(text)
+              }}
+              style={{
+                fontSize: '11px',
+                padding: '6px 12px',
+                backgroundColor: '#e6f0ff',
+                border: '1px solid #0066cc',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                color: '#0066cc',
+                fontWeight: '500'
+              }}
+              title="Copy results to clipboard"
+            >
+              📋 Copy
+            </button>
+            <button 
+              onClick={() => setSearchIntermediateResults(null)}
+              style={{
+                fontSize: '11px',
+                padding: '6px 12px',
+                backgroundColor: '#e6f0ff',
+                border: '1px solid #0066cc',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                color: '#0066cc',
+                fontWeight: '500'
+              }}
+            >
+              ✕ Close
+            </button>
+          </div>
+        </div>
+      )}
+      
+      <div className={styles.card}>
       {/* Header */}
       <div className={styles.header}>
         <h2>Vinyl Record</h2>
@@ -460,8 +697,13 @@ export default function VinylCard({
                 type="text" 
                 value={editData.artist}
                 onChange={(e) => setEditData(prev => ({...prev, artist: e.target.value}))}
-              />
-            </div>
+              />              <label>Estimated Value (EUR):</label>
+              <input
+                type="number"
+                step="0.01"
+                value={editData.estimated_value_eur}
+                onChange={(e) => setEditData(prev => ({...prev, estimated_value_eur: e.target.value}))}
+              />            </div>
             <div className={styles.field}>
               <label>Title</label>
               <input 
@@ -557,7 +799,7 @@ export default function VinylCard({
           </h4>
           <div className={styles.valueContent}>
             <div className={styles.valueAmount}>
-              €{getEstimatedValue()}
+              €{appliedWebValue !== null ? appliedWebValue : getEstimatedValue()}
               {webValue && !webValue.includes('Error') && webValue !== 'No price found' && (
                 <div className={styles.webValue}>
                   <small>Web: {webValue}</small>
@@ -598,15 +840,15 @@ export default function VinylCard({
                 <span style={{ left: '100%' }}>€100+</span>
               </div>
             </div>
-            {getCondition() && (
+            {(record?.metadata?.condition || getCondition()) && (
               <div className={styles.conditionBadge}>
                 <span 
                   className={styles.conditionLabel}
                   style={{ color: getConditionColor() }}
                 >
-                  ● {getCondition()}
+                  ● {record?.metadata?.condition || getCondition()}
                 </span>
-                <small>Based on image analysis</small>
+                <small>{record?.metadata?.condition ? 'User-defined' : 'Based on image analysis'}</small>
               </div>
             )}
             <div className={styles.valueDisclaimer}>
@@ -645,5 +887,7 @@ export default function VinylCard({
         )}
       </div>
     </div>
+
+    </>
   )
 }

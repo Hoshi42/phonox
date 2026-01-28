@@ -6,6 +6,31 @@ export interface ApiError {
   detail: string
 }
 
+// Helper to add cache-busting headers for mobile browsers
+function getCacheHeaders(): HeadersInit {
+  const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+  if (isMobile) {
+    return {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+      // Add timestamp to force fresh response
+      'X-Cache-Bust': Date.now().toString()
+    }
+  }
+  return {}
+}
+
+// Helper to add cache-busting query parameter for GET requests
+function addCacheBustingParam(url: string): string {
+  const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+  if (isMobile) {
+    const separator = url.includes('?') ? '&' : '?'
+    return `${url}${separator}t=${Date.now()}`
+  }
+  return url
+}
+
 export class ApiClient {
   private baseUrl: string
 
@@ -51,6 +76,7 @@ export class ApiClient {
       const response = await fetch(url, {
         method: 'POST',
         body: formData,
+        headers: getCacheHeaders()
       })
 
       console.log('[API] identify() - Received response')
@@ -89,11 +115,13 @@ export class ApiClient {
   }
 
   async getResult(recordId: string): Promise<Record<string, unknown>> {
-    const url = `${this.baseUrl}/api/v1/identify/${recordId}`
+    const url = addCacheBustingParam(`${this.baseUrl}/api/v1/identify/${recordId}`)
     console.log('[API] getResult() - Fetching from:', url)
 
     try {
-      const response = await fetch(url)
+      const response = await fetch(url, {
+        headers: getCacheHeaders()
+      })
 
       if (!response.ok) {
         console.error('[API] getResult() - Response not OK:', response.status, response.statusText)
@@ -170,7 +198,10 @@ export class ApiClient {
   }
 
   async getHealth(): Promise<Record<string, unknown>> {
-    const response = await fetch(`${this.baseUrl}/health`)
+    const url = addCacheBustingParam(`${this.baseUrl}/health`)
+    const response = await fetch(url, {
+      headers: getCacheHeaders()
+    })
     return response.json()
   }
 

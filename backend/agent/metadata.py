@@ -322,6 +322,8 @@ def estimate_vinyl_value(
     year: Optional[int] = None,
     label: Optional[str] = None,
     genres: Optional[List[str]] = None,
+    catalog_number: Optional[str] = None,
+    condition_score: Optional[float] = None,
 ) -> Dict[str, float]:
     """
     Estimate vinyl record market value based on metadata.
@@ -330,7 +332,8 @@ def estimate_vinyl_value(
     - Release year (older = more valuable)
     - Label prestige (Blue Note, Stax, etc. command premium)
     - Genre (Jazz, Prog Rock tend to be more valuable)
-    - Rarity indicators
+    - Catalog number (more specific editions suggest rarity)
+    - Condition score (0.0-1.0, higher = better condition)
 
     Args:
         artist: Artist name
@@ -338,6 +341,8 @@ def estimate_vinyl_value(
         year: Release year
         label: Record label
         genres: List of genres
+        catalog_number: Catalog number (alphanumeric code)
+        condition_score: Condition score (0.0-1.0), optional
 
     Returns:
         Dict with estimated_value_eur and estimated_value_usd
@@ -388,8 +393,27 @@ def estimate_vinyl_value(
         elif any(genre in ' '.join(genres_lower) for genre in ['rock', 'pop']):
             genre_multiplier = 1.0
 
+    # Catalog number rarity multiplier
+    # Longer, more specific catalog numbers suggest rarer/special editions
+    catalog_multiplier = 1.0
+    if catalog_number:
+        # Check if catalog number is substantial (more than just a few chars)
+        if len(catalog_number.strip()) > 4:
+            catalog_multiplier = 1.2  # Specific editions tend to be worth slightly more
+        elif len(catalog_number.strip()) > 2:
+            catalog_multiplier = 1.1
+
+    # Condition multiplier (if provided)
+    # Condition score: 0.0 (poor) to 1.0 (mint)
+    # Formula: 0.4 (poor) to 1.5 (mint)
+    condition_multiplier = 1.0
+    if condition_score is not None:
+        # Map condition_score (0.0-1.0) to multiplier (0.4-1.5)
+        condition_multiplier = 0.4 + (condition_score * 1.1)
+
     # Calculate final values
-    estimated_eur = base_value_eur * year_multiplier * label_multiplier * genre_multiplier
+    estimated_eur = (base_value_eur * year_multiplier * label_multiplier * 
+                     genre_multiplier * catalog_multiplier * condition_multiplier)
 
     # Cap values between €5 and €500 (realistic for common vinyl)
     estimated_eur = max(5.0, min(500.0, estimated_eur))
@@ -398,7 +422,8 @@ def estimate_vinyl_value(
     logger.debug(
         f"Value estimate for {artist} - {title}: "
         f"€{estimated_eur:.2f} (multipliers: year={year_multiplier:.2f}, "
-        f"label={label_multiplier:.2f}, genre={genre_multiplier:.2f})"
+        f"label={label_multiplier:.2f}, genre={genre_multiplier:.2f}, "
+        f"catalog={catalog_multiplier:.2f}, condition={condition_multiplier:.2f})"
     )
 
     return {

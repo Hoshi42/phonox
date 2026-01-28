@@ -50,6 +50,13 @@ async def options_users():
 
 class RegisterRecordRequest(BaseModel):
     record_id: str
+    artist: Optional[str] = None
+    title: Optional[str] = None
+    year: Optional[int] = None
+    label: Optional[str] = None
+    catalog_number: Optional[str] = None
+    barcode: Optional[str] = None
+    genres: Optional[List[str]] = None
     estimated_value_eur: Optional[float] = None
     condition: Optional[str] = None
     user_notes: Optional[str] = None
@@ -206,20 +213,22 @@ async def update_register_record(
     if not record:
         raise HTTPException(status_code=404, detail="Record not found in register")
     
-    # Update fields
-    if request.estimated_value_eur is not None:
-        record.estimated_value_eur = request.estimated_value_eur
-    if request.condition is not None:
-        record.condition = request.condition
-    if request.user_notes is not None:
-        record.user_notes = request.user_notes
-    if request.spotify_url is not None:
-        record.spotify_url = request.spotify_url
-    if request.user_tag is not None:
-        record.user_tag = request.user_tag
+    # Update fields from request - use model_dump to get only provided fields
+    # This allows sending None/null to explicitly clear a field
+    update_data = request.model_dump(exclude_unset=True, exclude={'record_id'})
+    
+    for field, value in update_data.items():
+        if field == 'genres':
+            # Special handling for genres (uses set_genres method)
+            if value:
+                record.set_genres(value)
+            else:
+                record.set_genres([])
+        else:
+            # Set the field on the record (including None to clear)
+            setattr(record, field, value)
     
     record.updated_at = datetime.utcnow()
-    
     db.commit()
     db.refresh(record)
     

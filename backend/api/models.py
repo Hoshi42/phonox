@@ -112,6 +112,7 @@ class VinylRecordResponse(BaseModel):
     needs_review: bool = True
     error: Optional[str] = None
     user_notes: Optional[str] = None
+    intermediate_results: Optional[Dict[str, Any]] = None
 
     class Config:
         """Pydantic config."""

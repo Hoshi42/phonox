@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import styles from './App.module.css'
 import LoadingSpinner from './components/LoadingSpinner'
-import ChatPanel from './components/ChatPanel'
+import ChatPanel, { ChatPanelHandle } from './components/ChatPanel'
 import VinylCard from './components/VinylCard'
 import VinylRegister from './components/VinylRegister'
 import UserManager from './components/UserManager'
@@ -37,15 +37,28 @@ export interface VinylRecord {
     barcode?: string  // UPC/EAN barcode
     genres?: string[]
     estimated_value_eur?: number
+    estimated_value_usd?: number
+    condition?: string
+    image_urls?: string[]
   }
   created_at?: string
   updated_at?: string
   user_notes?: string | null
+  intermediate_results?: {
+    search_query?: string
+    search_results_count?: number
+    claude_analysis?: string
+    search_sources?: Array<{
+      title: string
+      content: string
+    }>
+  }
 }
 
 function App() {
   const [recordId, setRecordId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const chatPanelRef = useRef<ChatPanelHandle>(null)
   const [record, setRecord] = useState<VinylRecord | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pollInterval, setPollInterval] = useState<any>(null)
@@ -72,13 +85,17 @@ function App() {
       const response = await apiClient.identify(files)
       const newRecordId = response.record_id
       console.log('App: Upload successful, record ID:', newRecordId)
+      console.log('App: Initial response keys:', Object.keys(response))
       console.log('App: Initial response status:', response.status)
+      console.log('App: Full initial response:', response)
       setRecordId(newRecordId)
       setUploadedImages(files)
 
       // If already analyzed/complete from initial response, use it
       if (response.status === 'analyzed' || response.status === 'complete') {
         console.log('App: Analysis already complete from initial response, status:', response.status)
+        console.log('App: Response has intermediate_results?', !!response.intermediate_results)
+        console.log('App: Intermediate results data:', response.intermediate_results)
         const newRecord = response as unknown as VinylRecord
         setRecord(newRecord)
         setLoading(false)
@@ -89,30 +106,36 @@ function App() {
         return
       }
 
+      console.log('App: Status is', response.status, '- starting polling...')
+      
       // Start polling for results
       let pollCount = 0
       const maxPolls = 600 // 10 minutes with 1-second intervals
       const interval = setInterval(async () => {
         pollCount++
+        console.log(`App: Poll attempt ${pollCount}/${maxPolls}`)
         try {
           const statusResponse = await apiClient.getResult(newRecordId)
           console.log(`App: Poll ${pollCount} - Status: ${statusResponse.status}`)
+          console.log(`App: Poll ${pollCount} - Full response:`, statusResponse)
           
-          if (statusResponse.status === 'analyzed' || statusResponse.status === 'complete' || statusResponse.status === 'failed' || statusResponse.status === 'error') {
+          // Handle different status values - be more flexible
+          const status = statusResponse.status || statusResponse.state || 'processing'
+          console.log(`App: Poll ${pollCount} - Resolved status to: ${status}`)
+          
+          if (status === 'analyzed' || status === 'complete' || status === 'failed' || status === 'error') {
+            console.log(`App: Poll ${pollCount} - Terminal status detected: ${status}`)
             clearInterval(interval)
             setLoading(false)
             setPollInterval(null)
-            console.log('App: Polling finished with status:', statusResponse.status)
+            console.log('App: Polling finished with status:', status)
             
-            if (statusResponse.status === 'analyzed' || statusResponse.status === 'complete') {
+            if (status === 'analyzed' || status === 'complete') {
               const newRecord = statusResponse as unknown as VinylRecord
               setRecord(newRecord)
-              console.log('App: Analysis complete, record set')
-              // Save to localStorage
-              const timestamp = Date.now()
-              localStorage.setItem('phonox_current_record', JSON.stringify(newRecord))
-              localStorage.setItem('phonox_current_record_id', newRecordId)
-              localStorage.setItem('phonox_cache_timestamp', timestamp.toString())
+              console.log('App: Analysis complete, record set:', newRecord)
+              console.log('App: Polling result has intermediate_results?', !!newRecord.intermediate_results)
+              console.log('App: Polling result intermediate_results:', newRecord.intermediate_results)
             } else {
               // Restore previous record if available
               if (previousRecord && previousRecordId) {
@@ -124,18 +147,19 @@ function App() {
               setError(`Analysis failed: ${errorMsg}`)
             }
           } else if (pollCount > maxPolls) {
-            console.error('App: Polling timeout')
+            console.error('App: Polling timeout after', pollCount, 'polls')
             clearInterval(interval)
             setLoading(false)
             setPollInterval(null)
             setError('Analysis timeout - please try again')
           }
         } catch (err) {
-          console.error('App: Polling error:', err)
+          console.error('App: Polling error on attempt', pollCount, ':', err)
           console.error('App: Polling error details:', {
             message: err instanceof Error ? err.message : String(err),
             pollCount,
-            maxPolls
+            maxPolls,
+            stack: err instanceof Error ? err.stack : 'No stack'
           })
           // Don't clear interval on individual errors, keep polling
           if (pollCount > maxPolls) {
@@ -147,7 +171,7 @@ function App() {
               setRecordId(previousRecordId)
             }
             const errorMsg = err instanceof Error ? err.message : 'Failed to get analysis status'
-            console.error('App: Max polling attempts reached, error:', errorMsg)
+            console.error('App: Max polling attempts reached after', pollCount, 'attempts, error:', errorMsg)
             setError(errorMsg)
           }
         }
@@ -164,6 +188,11 @@ function App() {
         online: navigator.onLine
       })
       setLoading(false)
+      // Clear any polling that might be running
+      if (pollInterval) {
+        clearInterval(pollInterval)
+        setPollInterval(null)
+      }
       // Restore previous record if available
       if (previousRecord && previousRecordId) {
         setRecord(previousRecord)
@@ -227,10 +256,6 @@ function App() {
 
   const handleImageAdd = (newFiles: FileList) => {
     console.log('App: handleImageAdd called with files:', newFiles.length)
-    console.log('App: Current uploadedImages count:', uploadedImages.length)
-    console.log('App: Current record status:', record ? `${record.artist} - ${record.title}` : 'no record')
-    console.log('App: Record has database images:', record?.metadata?.image_urls?.length || 0)
-    console.log('App: Browser:', navigator.userAgent)
     
     const filesArray = Array.from(newFiles)
     const totalImages = uploadedImages.length + filesArray.length
@@ -240,28 +265,10 @@ function App() {
       return
     }
     
-    // Update uploaded images state - ALWAYS preserve existing uploaded images
-    setUploadedImages(prev => {
-      const newImages = [...prev, ...filesArray]
-      console.log('App: Updated uploaded images:', prev.length, '→', newImages.length)
-      return newImages
-    })
+    // Update uploaded images state
+    setUploadedImages(prev => [...prev, ...filesArray])
     
-    // CRITICAL: Always preserve existing record when adding images
-    // Whether it's a new record or a record loaded from register
-    if (record) {
-      console.log('App: Preserving existing record context during image add')
-      console.log('App: Record type:', record.status)
-      console.log('App: Record source:', record.created_at ? 'database' : 'new')
-      
-      // Force a small UI update to ensure React re-renders with new image count
-      // This prevents browser caching issues
-      setRecord(prev => prev ? {
-        ...prev,
-        updated_at: new Date().toISOString() // Force update timestamp
-      } : prev)
-      
-    } else {
+    if (!record) {
       // If no record yet, start initial analysis
       console.log('App: No existing record, starting initial analysis with:', filesArray.length, 'files')
       handleUpload(filesArray)
@@ -304,17 +311,20 @@ function App() {
       const response = await apiClient.reanalyze(recordId, images)
       console.log('App: Re-analysis started:', response.record_id)
       
-      // Start polling for results
+      // Start polling for results with timeout
+      let pollCount = 0
+      const maxPolls = 300 // 5 minutes with 1-second intervals
       const interval = setInterval(async () => {
+        pollCount++
         try {
           const statusResponse = await apiClient.getResult(recordId)
           
-          if (statusResponse.status === 'complete' || statusResponse.status === 'error') {
+          if (statusResponse.status === 'analyzed' || statusResponse.status === 'complete' || statusResponse.status === 'error') {
             clearInterval(interval)
             setLoading(false)
             setPollInterval(null)
             
-            if (statusResponse.status === 'complete') {
+            if (statusResponse.status === 'analyzed' || statusResponse.status === 'complete') {
               const updatedRecord = statusResponse as unknown as VinylRecord
               setRecord(updatedRecord)
               // Preserve the uploaded images that were used for re-analysis
@@ -332,6 +342,16 @@ function App() {
               setUploadedImages(originalUploadedImages)
               setError((statusResponse as any).error || 'Re-analysis failed')
             }
+          } else if (pollCount > maxPolls) {
+            // Timeout after 5 minutes
+            clearInterval(interval)
+            setLoading(false)
+            setPollInterval(null)
+            console.error('App: Re-analysis timeout after', pollCount, 'polls')
+            setRecord(originalRecord)
+            setRecordId(originalRecordId)
+            setUploadedImages(originalUploadedImages)
+            setError('Re-analysis timeout - took too long. Please try again.')
           }
         } catch (err) {
           clearInterval(interval)
@@ -344,7 +364,7 @@ function App() {
           setUploadedImages(originalUploadedImages)
           setError('Failed to get re-analysis status')
         }
-      }, POLL_INTERVAL)
+      }, 1000) // Poll every second
       
       setPollInterval(interval)
       
@@ -428,31 +448,6 @@ function App() {
     console.log('App: Clearing uploaded images for register record (database images will be used)')
     setUploadedImages([])
     
-    // Clear localStorage to prevent conflicts
-    localStorage.removeItem('phonox_current_record')
-    localStorage.removeItem('phonox_current_record_id')
-    localStorage.setItem('phonox_register_record_loaded', 'true')
-    
-    // Browser-specific refresh handling
-    const isOpera = navigator.userAgent.indexOf('Opera') !== -1 || navigator.userAgent.indexOf('OPR') !== -1
-    const isChrome = navigator.userAgent.indexOf('Chrome') !== -1
-    const isSafari = navigator.userAgent.indexOf('Safari') !== -1 && !isChrome
-    
-    console.log('App: Browser detection - Opera:', isOpera, 'Chrome:', isChrome, 'Safari:', isSafari)
-    
-    // Opera and Safari need extra state refresh
-    if (isOpera || isSafari) {
-      console.log('App: Applying browser-specific state refresh for', isOpera ? 'Opera' : 'Safari')
-      setTimeout(() => {
-        setRecord(prev => prev ? { 
-          ...prev, 
-          updated_at: new Date().toISOString(),
-          // Force UI refresh marker
-          _ui_refresh: Math.random()
-        } : null)
-      }, 100)
-    }
-    
     // Close the register view
     setShowRegister(false)
     
@@ -467,45 +462,7 @@ function App() {
     if (currentUser) {
       loadRegister(currentUser)
     }
-    
-    // Try to restore record state from localStorage if available
-    const savedRecord = localStorage.getItem('phonox_current_record')
-    const savedRecordId = localStorage.getItem('phonox_current_record_id')
-    if (savedRecord && savedRecordId && !record) {
-      try {
-        const parsedRecord = JSON.parse(savedRecord)
-        console.log('App: Restored record from localStorage:', parsedRecord.artist, '-', parsedRecord.title)
-        setRecord(parsedRecord)
-        setRecordId(savedRecordId)
-      } catch (error) {
-        console.error('App: Failed to restore record from localStorage:', error)
-        localStorage.removeItem('phonox_current_record')
-        localStorage.removeItem('phonox_current_record_id')
-      }
-    }
   }, [currentUser])
-
-  // CRITICAL: Persist record state to localStorage when it changes
-  // This ensures Opera and other browsers maintain state during image operations
-  useEffect(() => {
-    if (record && recordId) {
-      console.log('App: Persisting record state to localStorage:', record.artist, '-', record.title)
-      console.log('App: Browser:', navigator.userAgent.split(' ')[0])
-      localStorage.setItem('phonox_current_record', JSON.stringify(record))
-      localStorage.setItem('phonox_current_record_id', recordId)
-      
-      // Opera-specific: Force a DOM refresh marker
-      const isOpera = navigator.userAgent.indexOf('Opera') !== -1 || navigator.userAgent.indexOf('OPR') !== -1
-      if (isOpera) {
-        localStorage.setItem('phonox_opera_state_marker', new Date().toISOString())
-      }
-    } else if (!record) {
-      // Clear localStorage when no record
-      localStorage.removeItem('phonox_current_record')
-      localStorage.removeItem('phonox_current_record_id')
-      localStorage.removeItem('phonox_opera_state_marker')
-    }
-  }, [record, recordId, uploadedImages.length]) // Include uploadedImages.length to trigger on image changes
 
   const handleUserChange = (username: string) => {
     console.log('[DEBUG] App: User changed from', currentUser, 'to', username)
@@ -536,11 +493,12 @@ function App() {
       return
     }
     setRegisterLoading(true)
+    
+    // Enhanced mobile cache control with timestamp-based cache busting
+    const isMobile = /Mobi|Android/i.test(navigator.userAgent)
+    
     try {
       console.log('[DEBUG] App: Making API call to get register for:', user)
-      
-      // Enhanced mobile cache control with timestamp-based cache busting
-      const isMobile = /Mobi|Android/i.test(navigator.userAgent)
       const cacheHeaders = {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
@@ -622,6 +580,7 @@ function App() {
       <main className={styles.main}>
         <div className={styles.chatContainer}>
           <ChatPanel
+            ref={chatPanelRef}
             record={record}
             onImageUpload={handleUpload}
             onAnalysisComplete={() => {}}
@@ -631,7 +590,7 @@ function App() {
         
         <div className={styles.cardContainer}>
           <VinylCard
-            key={record ? `${record.record_id || record.id}-${uploadedImages.length}-${record.updated_at || ''}` : 'empty'}
+            key={record?.record_id || 'empty'}
             record={record}
             uploadedImages={uploadedImages}
             onMetadataUpdate={handleMetadataUpdate}
@@ -641,6 +600,7 @@ function App() {
             onUpdateRegister={handleUpdateRegister}
             onRegisterSuccess={() => loadRegister(currentUser)}
             onReanalyze={handleReanalyze}
+            onAddChatMessage={(content, role) => chatPanelRef.current?.addMessage(content, role)}
             isInRegister={isRecordInRegister}
             currentUser={currentUser}
           />
