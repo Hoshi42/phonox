@@ -1,4 +1,18 @@
-"""Register API endpoints for vinyl record collection management."""
+"""
+Register API endpoints for vinyl record collection management.
+
+Endpoints:
+- POST /api/register/add: Add record to user's register
+- GET /api/register: Get all records for a user
+- DELETE /api/register/{record_id}: Remove record from register
+- PUT /api/register/{record_id}: Update record in register
+- GET /api/register/users: List all registered users
+
+User Collections:
+- Stored per user tag in database
+- Persisted across sessions
+- Includes metadata, images, notes, condition, estimated value
+"""
 
 import os
 import uuid

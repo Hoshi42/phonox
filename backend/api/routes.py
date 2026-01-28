@@ -1,4 +1,17 @@
-"""API routes for vinyl identification."""
+"""
+FastAPI routes for vinyl record identification and management.
+
+Endpoints:
+- POST /api/v1/identify: Upload images and identify vinyl records
+- GET /api/v1/identify/{record_id}: Get identification results
+- POST /api/v1/identify/{record_id}/review: Review and confirm results
+- POST /api/v1/identify/{record_id}/chat: Chat with AI about specific record
+- POST /api/v1/chat: General vinyl chat without specific record context
+- GET /api/v1/health: Health check endpoint
+
+Authentication: Not required (open API)
+Rate limiting: None (add before production)
+"""
 
 import logging
 import os

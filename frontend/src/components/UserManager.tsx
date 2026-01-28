@@ -1,3 +1,20 @@
+/**
+ * UserManager Component
+ * 
+ * Manages user selection and authentication.
+ * Features:
+ * - User login/registration
+ * - Switch between existing users
+ * - Create new user profiles
+ * - Persist user selection in localStorage
+ * - Trigger register reload on user change
+ * 
+ * @component
+ * @param {Object} props - Component props
+ * @param {Function} props.onUserChange - Callback when user is changed or selected
+ * @returns {JSX.Element} User management interface
+ */
+
 import { useState, useEffect } from 'react'
 
 interface UserManagerProps {

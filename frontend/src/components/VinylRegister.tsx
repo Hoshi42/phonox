@@ -1,3 +1,25 @@
+/**
+ * VinylRegister Component
+ * 
+ * Personal vinyl collection register/library view.
+ * Features:
+ * - View all records in user's collection
+ * - Toggle between list and grid display modes
+ * - Sort by artist, title, year, or estimated value
+ * - Filter by genre
+ * - Select record to view/edit details
+ * - Delete records from collection
+ * - Collection statistics and analytics
+ * 
+ * @component
+ * @param {Object} props - Component props
+ * @param {RegisterRecord[]} props.records - User's vinyl collection
+ * @param {Function} props.onClose - Callback to close register view
+ * @param {Function} props.onDeleteRecord - Callback to delete a record
+ * @param {Function} props.onRecordSelect - Callback when record is selected
+ * @returns {JSX.Element} Register modal interface
+ */
+
 import { useState } from 'react'
 import { RegisterRecord } from '../services/registerApi'
 import styles from './VinylRegister.module.css'

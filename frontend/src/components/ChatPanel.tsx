@@ -1,3 +1,24 @@
+/**
+ * ChatPanel Component
+ * 
+ * AI-powered chat assistant for vinyl record queries and collection management.
+ * Features:
+ * - Real-time chat with Claude AI
+ * - Image upload for record identification
+ * - Web search integration (Tavily + DuckDuckGo fallback)
+ * - Context-aware responses based on personal record
+ * - Quick action buttons for common queries
+ * - Web sources attribution and citations
+ * 
+ * @component
+ * @param {ChatPanelProps} props - Component props
+ * @param {any} [props.record] - Current vinyl record context
+ * @param {Function} [props.onImageUpload] - Callback for image uploads
+ * @param {Function} [props.onAnalysisComplete] - Callback when analysis completes
+ * @param {Function} [props.onMetadataUpdate] - Callback for metadata updates
+ * @returns {JSX.Element} Chat interface
+ */
+
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
 import ReactMarkdown from 'react-markdown'
 import styles from './ChatPanel.module.css'

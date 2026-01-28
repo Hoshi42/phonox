@@ -1,3 +1,17 @@
+/**
+ * Phonox - AI-Powered Vinyl Collection Agent
+ * 
+ * Main application component that orchestrates:
+ * - Image upload and vinyl record identification
+ * - Chat panel for AI assistant interactions
+ * - Vinyl card display and metadata editing
+ * - Personal vinyl register management
+ * - User management and collection organization
+ * 
+ * @component
+ * @returns {JSX.Element} The main application interface
+ */
+
 import { useEffect, useState, useRef } from 'react'
 import styles from './App.module.css'
 import VinylSpinner from './components/VinylSpinner'
