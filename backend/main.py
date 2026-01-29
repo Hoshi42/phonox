@@ -46,38 +46,6 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Phonox API server")
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables created/verified")
-    
-    # Cleanup old temporary analysis records (older than 24 hours)
-    try:
-        from datetime import timedelta
-        db = SessionLocal()
-        cutoff_time = datetime.utcnow() - timedelta(hours=24)
-        old_temp_records = db.query(VinylRecord).filter(
-            VinylRecord.status == "analyzed",
-            VinylRecord.in_register == False,
-            VinylRecord.created_at < cutoff_time
-        ).all()
-        
-        deleted_count = 0
-        for record in old_temp_records:
-            # Delete associated images first
-            for image in record.images:
-                try:
-                    image_path = image.file_path
-                    if os.path.exists(image_path):
-                        os.remove(image_path)
-                        logger.info(f"Deleted image file: {image_path}")
-                except Exception as e:
-                    logger.warning(f"Failed to delete image file: {e}")
-            db.delete(record)
-            deleted_count += 1
-        
-        if deleted_count > 0:
-            db.commit()
-            logger.info(f"Cleaned up {deleted_count} old temporary analysis records")
-        db.close()
-    except Exception as e:
-        logger.warning(f"Cleanup of temporary records failed: {e}")
 
     yield
 

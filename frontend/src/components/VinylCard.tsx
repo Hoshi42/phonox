@@ -15,7 +15,7 @@
  * @returns {JSX.Element} Vinyl record card interface
  */
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { VinylRecord } from '../App'
 import styles from './VinylCard.module.css'
 import { registerApiClient } from '../services/registerApi'
@@ -78,6 +78,9 @@ export default function VinylCard({
   const [appliedWebValue, setAppliedWebValue] = useState<number | null>(null)
   const [searchIntermediateResults, setSearchIntermediateResults] = useState<any>(null)
   const [lastRecordIdWithResults, setLastRecordIdWithResults] = useState<string | null>(null)
+  
+  // Use ref to track if we've already sent this message (prevents double-send in StrictMode)
+  const sentIntermediateResultsRef = useRef<string | null>(null)
 
   // Auto-display intermediate results from image analysis
   useEffect(() => {
@@ -102,8 +105,10 @@ export default function VinylCard({
       setSearchIntermediateResults(record.intermediate_results)
       setLastRecordIdWithResults(record.record_id)
       
-      // Send to chat panel
-      if (onAddChatMessage) {
+      // Send to chat panel (use ref to prevent StrictMode double-send)
+      if (onAddChatMessage && sentIntermediateResultsRef.current !== record.record_id) {
+        sentIntermediateResultsRef.current = record.record_id
+        
         const artist = record.artist || record.metadata?.artist || '?'
         const title = record.title || record.metadata?.title || '?'
         const analysisMessage = `🔍 **Web Search Analysis: "${artist} - ${title}"**
@@ -147,7 +152,7 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
   }
 
   const getConditionMultiplier = () => {
-    const condition = getCondition()
+    const condition = record?.metadata?.condition
     if (!condition) return 1
     
     if (condition.includes('Mint')) return 1.5
@@ -187,7 +192,7 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
   const getEstimatedValue = () => estimatedValue || 5
 
   const getConditionColor = () => {
-    const condition = record?.metadata?.condition || getCondition()
+    const condition = record?.metadata?.condition
     if (!condition) return '#9ca3af'
     
     if (condition.includes('Mint')) return '#10b981'
@@ -212,7 +217,7 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
         genres: Array.isArray(record.metadata?.genres || record.genres) 
           ? (record.metadata?.genres || record.genres)?.join(', ') || ''
           : '',
-        condition: record.metadata?.condition || 'Good',
+        condition: record.metadata?.condition || record.condition || 'Good',
       })
       setIsEditing(true)
     }
@@ -268,31 +273,7 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
       if (data.intermediate_results) {
         setSearchIntermediateResults(data.intermediate_results)
         console.log('VinylCard: Intermediate results:', data.intermediate_results)
-        
-        // Format message for chat display
-        const chatMessage = `🔍 **Web Search Analysis: "${record.metadata?.artist || record.artist || '?'} - ${record.metadata?.title || record.title || '?'}"**
-
-**Search Query:** ${data.intermediate_results.search_query}
-
-**Sources Found:** ${data.intermediate_results.search_results_count}
-
-**Top Sources:**
-${data.intermediate_results.search_sources?.map((s: any, i: number) => `${i+1}. **${s.title}**\n   ${s.content}...`).join('\n\n')}
-
----
-
-**Market Analysis:**
-${data.intermediate_results.claude_analysis}
-
----
-**Estimated Value:** €${data.estimated_value_eur}
-**Price Range:** €${data.price_range_min} - €${data.price_range_max}
-**Market Condition:** ${data.market_condition}`
-        
-        // Send to chat panel
-        if (onAddChatMessage) {
-          onAddChatMessage(chatMessage, 'assistant')
-        }
+        // Don't re-send web analysis message to chat - it was already sent during initial analysis
       }
       
       if (data.estimated_value_eur) {
@@ -574,15 +555,15 @@ ${data.intermediate_results.claude_analysis}
           {uploadedImages.length > 0 && onReanalyze && (
             <button 
               onClick={() => {
-                // Combine existing database images with newly uploaded images for comprehensive re-analysis
+                // Analyze only newly uploaded images and intelligently merge metadata
                 const allImagesToAnalyze = uploadedImages
-                console.log('VinylCard: Re-analyzing with', uploadedImages.length, 'new images +', (record.metadata?.image_urls?.length || 0), 'existing images')
+                console.log('VinylCard: Analyzing', uploadedImages.length, 'new images (will intelligently merge with existing metadata)')
                 onReanalyze(allImagesToAnalyze)
               }}
               className={styles.reanalyzeBtn}
-              title="Re-analyze record with all available images"
+              title="Analyze new images and intelligently update metadata"
             >
-              🔄 Re-analyze with {uploadedImages.length + (record.metadata?.image_urls?.length || 0)} total images
+              📸 Analyze {uploadedImages.length} new image{uploadedImages.length > 1 ? 's' : ''}
             </button>
           )}
         </div>
@@ -638,7 +619,7 @@ ${data.intermediate_results.claude_analysis}
             <div className={styles.field}>
               <label>Condition</label>
               <span style={{ color: getConditionColor() }}>
-                {getCondition() || 'Unknown'}
+                {record?.metadata?.condition || 'Not analyzed'}
               </span>
             </div>
           </div>
@@ -793,15 +774,15 @@ ${data.intermediate_results.claude_analysis}
                 <span style={{ left: '100%' }}>€100+</span>
               </div>
             </div>
-            {(record?.metadata?.condition || getCondition()) && (
+            {record?.metadata?.condition && (
               <div className={styles.conditionBadge}>
                 <span 
                   className={styles.conditionLabel}
                   style={{ color: getConditionColor() }}
                 >
-                  ● {record?.metadata?.condition || getCondition()}
+                  ● {isEditing ? editData.condition : record?.metadata?.condition}
                 </span>
-                <small>{record?.metadata?.condition ? 'User-defined' : 'Based on image analysis'}</small>
+                <small>{isEditing ? 'Editing' : 'From image analysis'}</small>
               </div>
             )}
             <div className={styles.valueDisclaimer}>

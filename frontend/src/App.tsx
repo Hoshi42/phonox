@@ -41,6 +41,7 @@ export interface VinylRecord {
   needs_review: boolean
   evidence_chain: unknown[]
   error?: string
+  condition?: string
   metadata?: {
     artist?: string
     title?: string
@@ -297,6 +298,7 @@ function App() {
   const handleReanalyze = async (images: File[]) => {
     console.log('App: Re-analyzing with', images.length, 'uploaded images')
     console.log('App: Current record ID:', recordId)
+    console.log('App: Is in register:', isRecordInRegister)
     console.log('App: Current record has database images:', record?.metadata?.image_urls?.length || 0)
     console.log('App: Browser:', navigator.userAgent)
     
@@ -305,8 +307,9 @@ function App() {
     const originalRecordId = recordId
     const originalUploadedImages = [...uploadedImages]
     
-    if (!recordId || !record) {
-      console.log('App: No existing record, using standard upload flow')
+    // If record is NOT in the register (not yet saved to DB), use standard upload flow
+    if (!isRecordInRegister || !recordId || !record) {
+      console.log('App: Record not in register yet, using standard upload flow')
       try {
         await handleUpload(images)
       } catch (error) {
@@ -323,7 +326,8 @@ function App() {
       setLoading(true)
       
       // Use the new reanalyze endpoint that can handle existing records
-      const response = await apiClient.reanalyze(recordId, images)
+      // Pass current record data so backend doesn't need to query database
+      const response = await apiClient.reanalyze(recordId, images, record)
       console.log('App: Re-analysis started:', response.record_id)
       
       // Start polling for results with timeout

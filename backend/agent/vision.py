@@ -82,7 +82,7 @@ def extract_vinyl_metadata(
     """
     client = Anthropic()
 
-    # Construct the prompt for vinyl metadata extraction with enhanced barcode detection
+    # Construct the prompt for vinyl metadata extraction with CONDITION ASSESSMENT
     extraction_prompt = """Analyze this vinyl record image (could be album cover, back cover, spine, or label) and extract the following metadata:
 
 1. Artist/Group Name
@@ -92,7 +92,28 @@ def extract_vinyl_metadata(
 5. Catalog Number (alphanumeric code like "ABC-123", "DEF 456", etc.)
 6. Barcode/UPC (long numeric code, typically 12-13 digits)
 7. Genres (comma-separated list)
-8. Confidence Score (0.0-1.0) indicating how confident you are in the accuracy
+8. PHYSICAL CONDITION (assess visual signs of wear/damage)
+9. Confidence Score (0.0-1.0) indicating metadata accuracy (NOT condition accuracy)
+
+PHYSICAL CONDITION ASSESSMENT:
+Analyze visible damage, wear, and quality:
+- Mint (M): Perfect condition, no visible damage or wear
+- Near Mint (NM): Nearly perfect, minimal visible signs of handling
+- Very Good+ (VG+): Shows minimal wear, few light scratches or marks
+- Very Good (VG): Visible wear, light scratches, some handling marks
+- Good+ (G+): Noticeable scratches, dust marks, but still playable
+- Good (G): Heavy scratches, significant wear, plays through
+- Fair (F): Major scratches, visible damage, plays with noise
+- Poor (P): Severe damage, major scratches, heavy wear
+
+Look for:
+- Visible scratches (radial or circular)
+- Dust, dirt, or stains
+- Warping or visible deformation
+- Seam splits (on sleeves)
+- General wear patterns
+
+IMPORTANT: Rate condition based on VISIBLE DAMAGE, not metadata confidence!
 
 CRITICAL BARCODE IDENTIFICATION INSTRUCTIONS:
 - UPC/EAN barcodes appear as BLACK AND WHITE VERTICAL LINES (like |||||| ||| | |||) with numbers below
@@ -120,10 +141,12 @@ IMPORTANT: Return ONLY a valid JSON object with this exact structure:
     "catalog_number": "extracted catalog number or null",
     "barcode": "extracted barcode/UPC or null",
     "genres": ["genre1", "genre2"],
+    "condition": "Mint (M)" or "Good (G)" etc. - based on VISIBLE WEAR,
+    "condition_notes": "Brief description of visible condition (scratches, dust, wear, etc.)",
     "confidence": 0.85
 }
 
-Do NOT include any text outside the JSON. FOCUS MAXIMUM ATTENTION on finding barcode numbers!"""
+Do NOT include any text outside the JSON. FOCUS MAXIMUM ATTENTION on finding barcode numbers and assessing physical condition!"""
 
     try:
         logger.info("Starting Claude 3 Sonnet vision extraction...")

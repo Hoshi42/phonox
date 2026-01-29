@@ -216,6 +216,7 @@ ${record.year || record.metadata?.year ? `📅 Released: ${record.year || record
 ${record.label || record.metadata?.label ? `🏷️ Label: ${record.label || record.metadata?.label}` : ''}
 ${record.catalog_number || record.metadata?.catalog_number ? `📋 Catalog #: ${record.catalog_number || record.metadata?.catalog_number}` : ''}
 ${record.genres?.length || record.metadata?.genres?.length ? `🎵 Genres: ${(record.genres || record.metadata?.genres)?.join(', ')}` : ''}
+${record.metadata?.condition ? `💿 Condition: **${record.metadata.condition}**` : ''}
 
 **Confidence: ${Math.round(record.confidence * 100)}%**
 
