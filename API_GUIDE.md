@@ -198,17 +198,25 @@ Content-Type: application/json
 
 ---
 
-### POST /api/v1/identify/{record_id}/reanalyze
+### POST /api/v1/reanalyze/{record_id}
 
-Re-analyze existing record with new images.
+Re-analyze record with additional images. Works entirely in-memory (v1.4.1+).
+
+**How it works:**
+- Frontend sends current record data + new images
+- Backend analyzes only new images (not re-analyzing old ones)
+- Intelligently merges metadata using Claude
+- Returns enhanced record with merged metadata
+- No database dependencies - perfect for unsaved records
 
 **Request**
 
 ```http
-POST /api/v1/identify/f47ac10b-58cc-4372-a567-0e02b2c3d479/reanalyze HTTP/1.1
+POST /api/v1/reanalyze/f47ac10b-58cc-4372-a567-0e02b2c3d479 HTTP/1.1
 Content-Type: multipart/form-data
 
-images: [File, ...]  (New images to analyze)
+files: [File, ...]              (New images to analyze)
+current_record: JSON (Optional) (Current record data from frontend)
 ```
 
 **Response** (202 Accepted)
@@ -216,10 +224,22 @@ images: [File, ...]  (New images to analyze)
 ```json
 {
   "record_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-  "status": "pending",
-  "message": "Re-analysis started with 1 new image + 1 existing image"
+  "status": "analyzed",
+  "metadata": {
+    "artist": "Updated Artist",
+    "title": "Updated Title",
+    "condition": "Very Good+ (VG+)",
+    ...
+  },
+  "confidence": 0.95
 }
 ```
+
+**Notes:**
+- Works for both unsaved records and registered records
+- All processing is in-memory (no temporary database entries)
+- Condition comes exclusively from agent image analysis
+- Database only updated when user saves to register
 
 ---
 
