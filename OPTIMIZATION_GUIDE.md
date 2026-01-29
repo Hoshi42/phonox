@@ -23,7 +23,9 @@
 - ✅ **Intelligente Metadaten-Ergänzung**: Die neuen Metadaten werden mit bestehenden Daten gemergt
 - ✅ **Claude übernimmt Konfliktauflösung**: Bei Unterschieden entscheidet Claude intelligent
 
-**Backend-Endpoint**: `POST /api/v1/reanalyze/{record_id}` ([routes.py](backend/api/routes.py#L1000-L1240))
+**Backend-Endpoint**: `POST /api/v1/reanalyze/{record_id}` ([routes.py](backend/api/routes.py#L965-L1115))
+
+**v1.4.1 Update**: Endpoint now works entirely in-memory! Frontend sends current record data with new images. No database lookup needed during analysis. Much faster and eliminates errors on unsaved records.
 
 ---
 

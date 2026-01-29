@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.4.1
+
+### Architecture & Backend Optimization
+- **In-Memory Analysis**: Refactored `/reanalyze` endpoint to work entirely in-memory without database dependencies
+  - Frontend sends current record data with new images
+  - Backend processes in-memory and returns merged metadata
+  - Database only involved when user explicitly saves to register
+  - Eliminates 500 errors on re-analysis of unsaved records
+  - Significantly faster analysis without DB queries
+
+### Condition Field Improvements
+- **Agent-Only Condition**: Removed all `getCondition()` fallbacks - condition now exclusively from agent's image analysis
+  - No longer calculated from confidence score
+  - Shows "Not analyzed" if agent didn't provide condition
+  - Only persists to database when user saves to register
+- **Analysis Message Enhancement**: Added condition suggestion to "Analysis Complete" message in chat
+- **Edit Display Fix**: Condition field now correctly shows saved value when editing (not just "Good" default)
+
+### Bug Fixes
+- Fixed missing `Form` import in FastAPI routes that broke register access
+- Fixed undefined `isRecordInRegister` variable reference in reanalyze logic
+- Restored full register functionality after import error
+
+### Technical Details
+- [routes.py](backend/api/routes.py#L965-L1115): Complete `/reanalyze` endpoint refactor for in-memory processing
+- [client.ts](frontend/src/api/client.ts#L208-L230): Updated API client to send current record data
+- [App.tsx](frontend/src/App.tsx#L298-L330): Smart routing between `/identify` and `/reanalyze` based on register status
+- [ChatPanel.tsx](frontend/src/components/ChatPanel.tsx#L209-L230): Added condition field to analysis completion message
+- [VinylCard.tsx](frontend/src/components/VinylCard.tsx#L190-L225): Removed condition calculation, display only from metadata
+
 ## 1.4.0
 
 ### Documentation Site
