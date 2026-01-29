@@ -25,6 +25,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
+    image: phonox:backend-latest
     container_name: phonox_backend
     ports:
       - "0.0.0.0:8000:8000"
@@ -49,6 +50,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+    image: phonox:frontend-latest
     container_name: phonox_frontend
     ports:
       - "0.0.0.0:5173:5173"

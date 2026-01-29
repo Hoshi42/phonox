@@ -19,12 +19,12 @@ import uuid
 from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
 
-from fastapi import APIRouter, File, UploadFile, HTTPException, Depends, status
+from fastapi import APIRouter, File, UploadFile, HTTPException, Depends, status, Form
 from sqlalchemy.orm import Session
 from anthropic import Anthropic
 
 from backend.main import app
-from backend.database import VinylRecord, SessionLocal, VinylImage
+from backend.database import VinylRecord, SessionLocal, VinylImage, VinylImage
 from backend.api.models import (
     VinylIdentifyRequest,
     VinylIdentifyResponse,
@@ -77,29 +77,7 @@ def _serialize_evidence_chain(evidence_chain: List[dict]) -> List[dict]:
     return serialized
 
 
-def _estimate_condition_from_confidence(confidence: float) -> str:
-    """Estimate vinyl condition based on analysis confidence score.
-    
-    Maps confidence levels to vinyl grading standards:
-    - 0.95+ = Mint (M) - Perfect condition
-    - 0.85-0.94 = Near Mint (NM) - Nearly perfect
-    - 0.75-0.84 = Very Good+ (VG+) - Shows minimal wear
-    - 0.65-0.74 = Very Good (VG) - Shows some wear
-    - 0.50-0.64 = Good+ (G+) - Noticeable wear but playable
-    - Below 0.50 = Good (G) - Heavy wear but functional
-    """
-    if confidence >= 0.95:
-        return "Mint (M)"
-    elif confidence >= 0.85:
-        return "Near Mint (NM)"
-    elif confidence >= 0.75:
-        return "Very Good+ (VG+)"
-    elif confidence >= 0.65:
-        return "Very Good (VG)"
-    elif confidence >= 0.50:
-        return "Good+ (G+)"
-    else:
-        return "Good (G)"
+
 
 
 @router.post(
@@ -375,9 +353,10 @@ EXPLANATION: [brief explanation]"""
             vinyl_record.auto_commit = result_state.get("auto_commit", False)
             vinyl_record.needs_review = result_state.get("needs_review", True)
             
-            # Estimate condition from confidence if not already set
-            if not vinyl_record.condition:
-                vinyl_record.condition = _estimate_condition_from_confidence(vinyl_record.confidence)
+            # Use condition estimated by vision agent if available
+            # (The agent analyzes physical condition from the images)
+            if not vinyl_record.condition and vision_data:
+                vinyl_record.condition = vision_data.get("condition")
 
             # Handle errors
             if result_state.get("error"):
@@ -652,15 +631,16 @@ async def chat_with_agent(
         }
 
         # Build system prompt for Claude to understand vinyl record correction context
-        system_prompt = """You are a helpful vinyl record identification assistant with access to web search and scraping tools. Users are providing feedback, corrections, and questions about vinyl record metadata.
+        system_prompt = """You are a helpful vinyl record identification assistant. Users are providing feedback, corrections, and questions about vinyl record metadata.
 
 Your tasks:
 1. Acknowledge the user's input conversationally
-2. Use web search to find additional information when needed
-3. Validate their corrections against current metadata and web sources
-4. Provide enriched information from web searches
-5. Extract structured metadata from natural language corrections
-6. Keep responses informative but concise
+2. Validate their corrections against current metadata and web sources (when provided)
+3. Answer questions about the record
+4. Extract structured metadata from natural language corrections
+5. Keep responses informative but concise
+
+IMPORTANT: Do NOT include detailed web search results or source lists in your response - these are provided separately to the user interface.
 
 Current vinyl record context:
 - Artist: {artist}
@@ -670,7 +650,7 @@ Current vinyl record context:
 - Catalog Number: {catalog_number}
 - Genres: {genres}
 
-When users ask questions, search for current information. When they provide corrections, acknowledge and confirm updates.""".format(
+When web search information is provided below, use it to enhance your answer but keep your response focused on answering the user's question directly.""".format(
             artist=current_metadata.get("artist", "Unknown"),
             title=current_metadata.get("title", "Unknown"),
             year=current_metadata.get("year", "Unknown"),
@@ -704,30 +684,12 @@ When users ask questions, search for current information. When they provide corr
                 if web_info.get("pricing_info"):
                     all_search_results.extend(web_info["pricing_info"])
                 
-                # Format web information for Claude
-                web_context = "\n\nWeb Search Results:\n"
-                
-                # Add general info
-                if web_info.get("general_info"):
-                    web_context += "General Information:\n"
-                    for result in web_info["general_info"][:2]:
-                        web_context += f"- {result.get('title', '')}: {result.get('content', '')[:200]}...\n"
-                
-                # Add pricing info
-                if web_info.get("pricing_info"):
-                    web_context += "\nPricing Information:\n"
-                    for result in web_info["pricing_info"][:2]:
-                        web_context += f"- {result.get('title', '')}: {result.get('content', '')[:200]}...\n"
-                
-                # Add detailed scraped content
-                if web_info.get("detailed_content"):
-                    web_context += "\nDetailed Information:\n"
-                    for content in web_info["detailed_content"][:1]:  # Only first detailed result
-                        if content.get("success"):
-                            web_context += f"- {content.get('title', '')}: {content.get('content', '')[:300]}...\n"
+                # Format MINIMAL web information for Claude (summary only, not full formatted results)
+                web_context = "\n\nNote: Web search results are available with 5+ sources on pricing, condition, and market information for this record."
                 
             except Exception as e:
                 logger.error(f"Error performing web search: {e}")
+
                 web_context = "\nNote: Web search temporarily unavailable."
 
         # Call Claude Haiku 4.5 (fastest, cheapest model) for intelligent response
@@ -1007,87 +969,111 @@ async def update_vinyl_metadata(
 async def reanalyze_vinyl(
     record_id: str,
     files: List[UploadFile] = File(...),
+    current_record: Optional[str] = Form(None),
     db: Session = Depends(get_db),
-) -> VinylIdentifyResponse:
+) -> VinylRecordResponse:
     """
-    Re-analyze a vinyl record with additional images.
+    Smart re-analysis: Analyze only NEW images and intelligently enhance metadata.
     
-    This endpoint combines existing database images with new uploaded images
-    for a more comprehensive analysis.
+    Works in two modes:
+    1. ANALYSIS (not yet saved): current_record provided, no DB lookup needed
+    2. REGISTERED (already saved): current_record provided, used instead of DB lookup
+    
+    OPTIMIZED WORKFLOW:
+    1. Use provided current_record data (no database lookup)
+    2. Analyze ONLY the newly uploaded images (not re-analyzing old images)
+    3. Extract metadata from new images
+    4. Compare with existing metadata using Claude
+    5. Intelligently merge/enhance metadata (only update if confident)
+    6. Return merged record (save to DB only if user clicks "Add to Register")
+    
+    This reduces:
+    - API costs (fewer images processed)
+    - Processing time
+    - Disk space usage
+    - Mobile upload issues
+    - Database dependencies
     """
     try:
-        # Get existing record
-        existing_record = db.query(VinylRecord).filter(VinylRecord.id == record_id).first()
-        if not existing_record:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Record not found"
-            )
-            
         # Validate new files
         if not files or len(files) == 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="At least one image file is required for re-analysis",
             )
-            
-        logger.info(f"Re-analyzing record {record_id} with {len(files)} new images")
         
-        # Update record status
-        existing_record.status = "processing"
-        db.commit()
+        # Parse current record data from frontend
+        existing_metadata = {}
+        if current_record:
+            try:
+                import json
+                record_data = json.loads(current_record)
+                # Extract metadata from the provided record
+                existing_metadata = {
+                    "artist": record_data.get("artist") or record_data.get("metadata", {}).get("artist"),
+                    "title": record_data.get("title") or record_data.get("metadata", {}).get("title"),
+                    "year": record_data.get("year") or record_data.get("metadata", {}).get("year"),
+                    "label": record_data.get("label") or record_data.get("metadata", {}).get("label"),
+                    "catalog_number": record_data.get("catalog_number") or record_data.get("metadata", {}).get("catalog_number"),
+                    "barcode": record_data.get("barcode") or record_data.get("metadata", {}).get("barcode"),
+                    "genres": record_data.get("genres") or record_data.get("metadata", {}).get("genres"),
+                    "condition": record_data.get("condition") or record_data.get("metadata", {}).get("condition"),
+                }
+                existing_confidence = record_data.get("confidence", 0.5)
+            except Exception as e:
+                logger.warning(f"Could not parse current_record: {e}")
+                existing_metadata = {}
+                existing_confidence = 0.5
+        else:
+            # Fallback: try to get from database (for backwards compatibility)
+            existing_record = db.query(VinylRecord).filter(VinylRecord.id == record_id).first()
+            if not existing_record:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Record not found and no current_record provided"
+                )
+            existing_metadata = {
+                "artist": existing_record.artist,
+                "title": existing_record.title,
+                "year": existing_record.year,
+                "label": existing_record.label,
+                "catalog_number": existing_record.catalog_number,
+                "barcode": existing_record.barcode,
+                "genres": existing_record.get_genres(),
+                "condition": existing_record.metadata.get("condition") if existing_record.metadata else None,
+            }
+            existing_confidence = existing_record.confidence or 0.5
+            
+
+        logger.info(f"Smart re-analyzing record {record_id} with {len(files)} NEW images (old images NOT re-analyzed)")
         
         try:
-            # Initialize agent graph
+            # STEP 1: Analyze ONLY new images (not all images)
             graph = build_agent_graph()
             
-            # Convert new uploaded files to image dicts
             import base64
-            
             new_image_dicts = []
             for file in files:
-                content = await file.read()
-                file_content = base64.b64encode(content).decode('utf-8')
-                new_image_dicts.append({
-                    "path": file.filename or f"new_image_{len(new_image_dicts)}",
-                    "content": file_content,
-                    "content_type": file.content_type or "image/jpeg"
-                })
+                try:
+                    content = await file.read()
+                    file_content = base64.b64encode(content).decode('utf-8')
+                    new_image_dicts.append({
+                        "path": file.filename or f"new_image_{len(new_image_dicts)}",
+                        "content": file_content,
+                        "content_type": file.content_type or "image/jpeg"
+                    })
+                except Exception as e:
+                    logger.error(f"Error processing file {file.filename}: {e}")
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Failed to process image {file.filename}: {str(e)}"
+                    )
             
-            # Fetch and include existing images from database
-            # Images are stored in VinylImage table with file_path pointing to the file system
-            existing_image_dicts = []
-            try:
-                existing_images = db.query(VinylImage).filter(VinylImage.record_id == record_id).all()
-                logger.info(f"Found {len(existing_images)} existing image records in database for re-analysis")
-                
-                for idx, vinyl_image in enumerate(existing_images):
-                    try:
-                        # Check if file exists and read it
-                        if os.path.exists(vinyl_image.file_path):
-                            with open(vinyl_image.file_path, "rb") as f:
-                                image_data = f.read()
-                                file_content = base64.b64encode(image_data).decode('utf-8')
-                                existing_image_dicts.append({
-                                    "path": vinyl_image.filename or f"existing_image_{idx}",
-                                    "content": file_content,
-                                    "content_type": vinyl_image.content_type or "image/jpeg"
-                                })
-                                logger.info(f"Loaded existing image {idx + 1}/{len(existing_images)}: {vinyl_image.filename}")
-                        else:
-                            logger.warning(f"Image file not found on disk: {vinyl_image.file_path}")
-                    except Exception as e:
-                        logger.warning(f"Could not read image file {vinyl_image.file_path}: {e}")
-            except Exception as e:
-                logger.warning(f"Error fetching existing images from database: {e}")
+            logger.info(f"Processing {len(new_image_dicts)} NEW images for metadata extraction")
             
-            # Combine all images: existing + new
-            all_images = existing_image_dicts + new_image_dicts
-            
-            logger.info(f"Re-analysis will process {len(all_images)} total images ({len(existing_image_dicts)} existing from disk + {len(new_image_dicts)} new uploads)")
-            
+            # Create state with ONLY new images for analysis
             initial_state: VinylState = {  # type: ignore
-                "images": all_images,
+                "images": new_image_dicts,
                 "validation_passed": False,
                 "image_features": {},
                 "vision_extraction": {},
@@ -1097,115 +1083,70 @@ async def reanalyze_vinyl(
                 "needs_review": True,
             }
             
-            # Invoke graph with config for checkpointer
-            config = {"configurable": {"thread_id": record_id + "_reanalysis"}}
+            # Invoke graph with new images only
+            config = {"configurable": {"thread_id": record_id + "_new_analysis"}}
             result_state = graph.invoke(initial_state, config=config)
             
-            # Update record with new results
-            existing_record.status = "analyzed"
-            existing_record.validation_passed = result_state.get("validation_passed", False)
+            # STEP 2: Extract metadata from new images
+            new_metadata = result_state.get("vision_extraction", {})
+            logger.info(f"Extracted metadata from new images: {new_metadata}")
             
-            # Extract metadata
-            if result_state.get("vision_extraction"):
-                vision_data = result_state["vision_extraction"]
-                existing_record.artist = vision_data.get("artist")
-                existing_record.title = vision_data.get("title")
-                existing_record.year = vision_data.get("year")
-                existing_record.label = vision_data.get("label")
-                existing_record.spotify_url = vision_data.get("spotify_url") or vision_data.get("spotify_link")
-                existing_record.catalog_number = vision_data.get("catalog_number")
-                existing_record.barcode = vision_data.get("barcode")
-                if vision_data.get("genres"):
-                    existing_record.set_genres(vision_data["genres"])
-                
-                # Also store estimated value if available
-                if vision_data.get("estimated_value_eur"):
-                    existing_record.estimated_value_eur = vision_data.get("estimated_value_eur")
+            # STEP 3: Intelligently enhance metadata using Claude
+            from backend.agent.metadata_enhancer import MetadataEnhancer
+            enhancer = MetadataEnhancer()
             
-            # Store evidence chain
-            evidence_chain = result_state.get("evidence_chain", [])
-            if evidence_chain:
-                existing_record.set_evidence_chain(_serialize_evidence_chain(evidence_chain))
-            
-            # Store confidence and routing flags
-            existing_record.confidence = result_state.get("confidence", 0.0)
-            existing_record.auto_commit = result_state.get("auto_commit", False)
-            existing_record.needs_review = result_state.get("needs_review", True)
-            
-            # Handle errors
-            if result_state.get("error"):
-                existing_record.status = "failed"
-                existing_record.error = result_state["error"]
-            
-            # Save newly uploaded images to the database
-            # This makes them persistent and part of the record
-            if len(files) > 0:
-                logger.info(f"Saving {len(files)} newly uploaded images to database for record {record_id}")
-                from backend.api.register import UPLOAD_DIR
-                for file in files:
-                    try:
-                        # Read file content
-                        file_content = await file.read()
-                        
-                        # Generate unique filename
-                        file_extension = os.path.splitext(file.filename or '')[1] or '.jpg'
-                        unique_filename = f"{uuid.uuid4()}{file_extension}"
-                        file_path = os.path.join(UPLOAD_DIR, unique_filename)
-                        
-                        # Save file to disk
-                        with open(file_path, "wb") as buffer:
-                            buffer.write(file_content)
-                        
-                        # Create database record for the image
-                        vinyl_image = VinylImage(
-                            record_id=record_id,
-                            filename=file.filename or unique_filename,
-                            content_type=file.content_type or "image/jpeg",
-                            file_size=len(file_content),
-                            file_path=file_path,
-                            is_primary=len(existing_record.images) == 0  # First image is primary
-                        )
-                        
-                        db.add(vinyl_image)
-                        logger.info(f"Saved image {file.filename} for record {record_id}")
-                    except Exception as e:
-                        logger.error(f"Error saving image {file.filename}: {e}")
-            
-            db.commit()
-            db.refresh(existing_record)
-            
-            logger.info(f"Completed re-analysis for {record_id}: confidence={existing_record.confidence:.2f}, status={existing_record.status}")
-            
-            # Return the actual updated record status
-            record_dict = existing_record.to_dict()
-            metadata_dict = record_dict.get("metadata", {})
-            metadata_dict_clean = {k: v for k, v in metadata_dict.items() if v is not None}
-            
-            return VinylRecordResponse(
-                record_id=record_id,
-                created_at=existing_record.created_at,
-                updated_at=existing_record.updated_at,
-                status=existing_record.status,
-                metadata=VinylMetadataModel(**metadata_dict_clean),
-                evidence_chain=record_dict.get("evidence_chain", []),
-                confidence=existing_record.confidence or 0.0,
-                auto_commit=existing_record.auto_commit or False,
-                needs_review=existing_record.needs_review or True,
-                error=existing_record.error,
-                user_notes=existing_record.user_notes,
+            enhanced_metadata, new_confidence, changes = enhancer.enhance_metadata(
+                existing_metadata,
+                new_metadata,
+                existing_confidence
             )
-        
-        except Exception as e:
-            logger.error(f"Error during re-analysis: {e}")
-            existing_record.status = "failed"
-            existing_record.error = str(e)
-            db.commit()
             
-            # Return error status
+            logger.info(f"Metadata enhancement complete. Changes: {changes}")
+            logger.info(f"New confidence: {new_confidence:.2f}")
+            
+            # STEP 4: Build response with enhanced metadata (NO database save)
+            # The frontend will decide whether to save this to the register
+            merged_metadata = existing_metadata.copy()
+            if enhanced_metadata:
+                merged_metadata.update({k: v for k, v in enhanced_metadata.items() if v is not None})
+            
+            # Create response with merged metadata (in-memory only)
+            response_data = VinylRecordResponse(
+                record_id=record_id,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+                status="analyzed",
+                metadata=VinylMetadataModel(
+                    artist=merged_metadata.get("artist"),
+                    title=merged_metadata.get("title"),
+                    year=merged_metadata.get("year"),
+                    label=merged_metadata.get("label"),
+                    catalog_number=merged_metadata.get("catalog_number"),
+                    barcode=merged_metadata.get("barcode"),
+                    genres=merged_metadata.get("genres"),
+                    condition=merged_metadata.get("condition"),
+                    confidence=new_confidence,
+                ),
+                evidence_chain=_serialize_evidence_chain(result_state.get("evidence_chain", [])),
+                confidence=new_confidence,
+                auto_commit=result_state.get("auto_commit", False),
+                needs_review=result_state.get("needs_review", True),
+                error=result_state.get("error"),
+                user_notes=f"Smart re-analysis: {enhancer.get_enhancement_summary(changes)}",
+            )
+            
+            logger.info(f"Completed smart re-analysis for {record_id}: confidence={new_confidence:.2f}, changes={len(changes)}")
+            return response_data
+        
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error during smart re-analysis: {e}")
+            # Return error response without database updates
             return VinylRecordResponse(
                 record_id=record_id,
-                created_at=existing_record.created_at,
-                updated_at=existing_record.updated_at,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
                 status="failed",
                 error=str(e),
             )

@@ -205,15 +205,21 @@ export class ApiClient {
     return response.json()
   }
 
-  async reanalyze(recordId: string, files: File[]): Promise<{ record_id: string; id?: string }> {
+  async reanalyze(recordId: string, files: File[], currentRecord?: any): Promise<{ record_id: string; id?: string }> {
     const formData = new FormData()
     files.forEach((file) => {
       formData.append('files', file)
     })
+    
+    // Send current record data so backend doesn't need to query database
+    if (currentRecord) {
+      formData.append('current_record', JSON.stringify(currentRecord))
+    }
 
     const url = `${this.baseUrl}/api/v1/reanalyze/${recordId}`
     console.log('[API] reanalyze() - Re-analyzing record:', recordId)
     console.log('[API] reanalyze() - Files count:', files.length, files.map(f => ({ name: f.name, size: f.size, type: f.type })))
+    console.log('[API] reanalyze() - Current record data provided:', !!currentRecord)
 
     try {
       const response = await fetch(url, {
