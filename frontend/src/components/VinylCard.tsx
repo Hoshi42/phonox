@@ -319,14 +319,24 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
     
     setIsUpdatingRegister(true)
     
-    // Use values from record.metadata (which were saved via handleSave)
-    // This ensures we use the latest user-edited values
-    const estimatedValue = record.metadata?.estimated_value_eur || getEstimatedValue()
-    const condition = record.metadata?.condition || 'Good'
-    const year = record.metadata?.year || record.year
+    // Use values from editData if form was being edited, otherwise use record.metadata
+    // This ensures we capture the latest user edits even if metadata update is debounced
+    const estimatedValue = isEditing ? 
+      (editData.estimated_value_eur ? parseFloat(editData.estimated_value_eur) : getEstimatedValue()) :
+      (record.metadata?.estimated_value_eur || getEstimatedValue())
     
-    // Use edited spotify_url from metadata if available
-    const spotifyUrlToSave = record.metadata?.spotify_url || undefined
+    const condition = isEditing ? 
+      (editData.condition || 'Good') : 
+      (record.metadata?.condition || 'Good')
+    
+    const year = isEditing ?
+      (editData.year ? parseInt(editData.year) : record.year) :
+      (record.metadata?.year || record.year)
+    
+    // Use edited spotify_url from metadata or editData if available
+    const spotifyUrlToSave = isEditing ? 
+      (editData.spotify_url || undefined) : 
+      (record.metadata?.spotify_url || undefined)
     
     try {
       if (isInRegister) {
@@ -344,16 +354,17 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
         console.log('VinylCard: Deleted images:', Array.from(deletedImageUrls))
         
         // Update existing record in register with ALL metadata fields
+        // Use editData values if form is being edited, otherwise use record.metadata
         // Send actual values (including null/empty) to allow deletion
         await registerApiClient.updateRegisterRecord({
           record_id: record.record_id,
-          artist: record.metadata?.artist !== undefined ? record.metadata.artist : record.artist || undefined,
-          title: record.metadata?.title !== undefined ? record.metadata.title : record.title || undefined,
-          year: record.metadata?.year !== undefined ? record.metadata.year : record.year || undefined,
-          label: record.metadata?.label !== undefined ? record.metadata.label : record.label || undefined,
-          catalog_number: record.metadata?.catalog_number !== undefined ? record.metadata.catalog_number : record.catalog_number || undefined,
-          barcode: record.metadata?.barcode !== undefined ? record.metadata.barcode : record.barcode || undefined,
-          genres: record.metadata?.genres !== undefined ? record.metadata.genres : record.genres || undefined,
+          artist: isEditing ? (editData.artist || undefined) : (record.metadata?.artist || record.artist || undefined),
+          title: isEditing ? (editData.title || undefined) : (record.metadata?.title || record.title || undefined),
+          year: year,
+          label: isEditing ? (editData.label || null) : (record.metadata?.label || record.label || null),
+          catalog_number: isEditing ? (editData.catalog_number || null) : (record.metadata?.catalog_number || record.catalog_number || null),
+          barcode: isEditing ? (editData.barcode || null) : (record.metadata?.barcode || record.barcode || null),
+          genres: isEditing ? (editData.genres ? editData.genres.split(',').map(g => g.trim()).filter(Boolean) : undefined) : (record.metadata?.genres || record.genres || undefined),
           estimated_value_eur: estimatedValue,
           condition: condition,
           user_notes: `Condition: ${condition} - Updated ${new Date().toLocaleDateString()}`,
@@ -377,16 +388,17 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
         }
         
         // Add to register with ALL metadata fields
+        // Use editData values if form is being edited, otherwise use record.metadata
         // Send actual values (including null/empty) to allow deletion
         await registerApiClient.addToRegister({
           record_id: record.record_id,
-          artist: record.metadata?.artist !== undefined ? record.metadata.artist : record.artist || undefined,
-          title: record.metadata?.title !== undefined ? record.metadata.title : record.title || undefined,
-          year: record.metadata?.year !== undefined ? record.metadata.year : record.year || undefined,
-          label: record.metadata?.label !== undefined ? record.metadata.label : record.label || undefined,
-          catalog_number: record.metadata?.catalog_number !== undefined ? record.metadata.catalog_number : record.catalog_number || undefined,
-          barcode: record.metadata?.barcode !== undefined ? record.metadata.barcode : record.barcode || undefined,
-          genres: record.metadata?.genres !== undefined ? record.metadata.genres : record.genres || undefined,
+          artist: isEditing ? (editData.artist || undefined) : (record.metadata?.artist || record.artist || undefined),
+          title: isEditing ? (editData.title || undefined) : (record.metadata?.title || record.title || undefined),
+          year: year,
+          label: isEditing ? (editData.label || null) : (record.metadata?.label || record.label || null),
+          catalog_number: isEditing ? (editData.catalog_number || null) : (record.metadata?.catalog_number || record.catalog_number || null),
+          barcode: isEditing ? (editData.barcode || null) : (record.metadata?.barcode || record.barcode || null),
+          genres: isEditing ? (editData.genres ? editData.genres.split(',').map(g => g.trim()).filter(Boolean) : undefined) : (record.metadata?.genres || record.genres || undefined),
           estimated_value_eur: estimatedValue,
           condition: condition,
           user_notes: `Condition: ${condition} - Added ${new Date().toLocaleDateString()}`,
