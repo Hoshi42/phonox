@@ -36,6 +36,12 @@ interface VinylRegisterProps {
   onRecordSelect: (record: RegisterRecord) => void
 }
 
+interface CollectionAnalysis {
+  summary: string
+  loading: boolean
+  error: string | null
+}
+
 export default function VinylRegister({
   records,
   onClose,
@@ -46,6 +52,11 @@ export default function VinylRegister({
   const [sortBy, setSortBy] = useState<'artist' | 'title' | 'year' | 'value'>('artist')
   const [filterGenre, setFilterGenre] = useState<string>('')
   const [searchText, setSearchText] = useState<string>('')
+  const [analysis, setAnalysis] = useState<CollectionAnalysis>({
+    summary: '',
+    loading: false,
+    error: null
+  })
 
   const getRecordValue = (record: RegisterRecord) => {
     // Use the stored estimated_value_eur if available, otherwise calculate
@@ -114,11 +125,126 @@ export default function VinylRegister({
     records.flatMap(record => record.genres || [])
   )].sort()
 
+  const handleEstimateCollection = async () => {
+    setAnalysis({ summary: '', loading: true, error: null })
+    
+    try {
+      // Compile collection summary data
+      const totalRecords = records.length
+      const totalValue = records.reduce((sum, record) => sum + getRecordValue(record), 0)
+      
+      // Genre analysis
+      const genreCount: Record<string, number> = {}
+      records.forEach(record => {
+        (record.genres || []).forEach(genre => {
+          genreCount[genre] = (genreCount[genre] || 0) + 1
+        })
+      })
+      
+      // Decade distribution
+      const decadeCount: Record<string, number> = {}
+      records.forEach(record => {
+        if (record.year) {
+          const decade = Math.floor(record.year / 10) * 10
+          const decadeLabel = `${decade}s`
+          decadeCount[decadeLabel] = (decadeCount[decadeLabel] || 0) + 1
+        }
+      })
+      
+      // Condition analysis
+      const conditionCount: Record<string, number> = {}
+      records.forEach(record => {
+        const condition = record.condition || 'Unknown'
+        conditionCount[condition] = (conditionCount[condition] || 0) + 1
+      })
+      
+      // Top artists
+      const artistCount: Record<string, number> = {}
+      records.forEach(record => {
+        const artist = record.artist || 'Unknown'
+        artistCount[artist] = (artistCount[artist] || 0) + 1
+      })
+      const topArtists = Object.entries(artistCount)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 10)
+        .map(([artist, count]) => `${artist} (${count})`)
+      
+      // Build collection summary prompt
+      const collectionSummary = `
+VINYL COLLECTION ANALYSIS REQUEST
+
+Collection Overview:
+- Total Records: ${totalRecords}
+- Total Estimated Value: €${totalValue}
+- Average Value per Record: €${(totalValue / totalRecords).toFixed(2)}
+
+Genre Distribution:
+${Object.entries(genreCount)
+  .sort(([,a], [,b]) => b - a)
+  .slice(0, 15)
+  .map(([genre, count]) => `- ${genre}: ${count} records`)
+  .join('\n')}
+
+Decade Distribution:
+${Object.entries(decadeCount)
+  .sort()
+  .reverse()
+  .map(([decade, count]) => `- ${decade}: ${count} records`)
+  .join('\n')}
+
+Condition Distribution:
+${Object.entries(conditionCount)
+  .map(([condition, count]) => `- ${condition}: ${count} records`)
+  .join('\n')}
+
+Top 10 Artists:
+${topArtists.map((artist, i) => `${i + 1}. ${artist}`).join('\n')}
+
+Please analyze this vinyl collection as a professional record appraiser and collector would. Provide insights on:
+1. Collection composition and strengths
+2. Rarity and value assessment
+3. Market potential and investment value
+4. Recommendations for growth and improvement
+5. Notable gaps or opportunities for completing sets
+6. Suggestions for preservation and care
+Keep your analysis professional but personable, suitable for a collector.
+`
+
+      // Send to Claude for analysis
+      const response = await fetch(`${API_BASE}/api/v1/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: collectionSummary
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to analyze collection')
+      }
+
+      const data = await response.json()
+      setAnalysis({
+        summary: data.message || '',
+        loading: false,
+        error: null
+      })
+    } catch (err) {
+      setAnalysis({
+        summary: '',
+        loading: false,
+        error: err instanceof Error ? err.message : 'Failed to analyze collection'
+      })
+    }
+  }
+
   const handleDownloadCsv = () => {
     const csvEscape = (value: unknown) => {
       if (value === null || value === undefined) return ''
       const str = String(value)
-      if (/[",\n]/.test(str)) {
+      if (/[;"\n]/.test(str)) {
         return `"${str.replace(/"/g, '""')}"`
       }
       return str
@@ -130,45 +256,44 @@ export default function VinylRegister({
       'Year',
       'Label',
       'Catalog Number',
+      'Barcode',
       'Genres',
       'Estimated Value (EUR)',
       'Condition',
-      'Notes',
+      'User Tag',
       'Confidence (%)',
-      'Spotify URL',
-      'Images',
-      'Created At',
-      'Updated At'
+      'Spotify URL'
     ]
 
-    const rows = filteredRecords.map((record) => {
+    const rows = records.map((record) => {
       const value = getRecordValue(record)
       const confidence = record.confidence != null ? Math.round(record.confidence * 100) : ''
-      const images = (record.image_urls || []).map((url) => `${API_BASE}${url}`).join('; ')
+      // Prepend apostrophe to barcode to force text format in spreadsheets
+      const barcodeValue = record.barcode ? `'${record.barcode}` : ''
+      // Convert decimal point to comma for European locale
+      const estimatedValue = value ? value.toFixed(2).replace('.', ',') : ''
       return [
-        record.artist || '',
-        record.title || '',
-        record.year ?? '',
-        record.label || '',
-        record.catalog_number || '',
-        (record.genres || []).join('; '),
-        value ? value.toFixed(2) : '',
-        record.condition || '',
-        record.user_notes || '',
-        confidence,
-        record.spotify_url || '',
-        images,
-        record.created_at || '',
-        record.updated_at || ''
+        `"${csvEscape(record.artist || '')}"`,
+        `"${csvEscape(record.title || '')}"`,
+        `"${record.year ?? ''}"`,
+        `"${csvEscape(record.label || '')}"`,
+        `"${csvEscape(record.catalog_number || '')}"`,
+        `"${barcodeValue}"`,
+        `"${csvEscape((record.genres || []).join(', '))}"`,
+        `"${estimatedValue}"`,
+        `"${csvEscape(record.condition || '')}"`,
+        `"${csvEscape(record.user_tag || '')}"`,
+        confidence ? `"${confidence}"` : `""`,
+        `"${csvEscape(record.spotify_url || '')}"`
       ]
     })
 
     const csvContent = [
-      headers.map(csvEscape).join(','),
-      ...rows.map((row) => row.map(csvEscape).join(','))
+      headers.map(csvEscape).join(';'),
+      ...rows.map((row) => row.join(';'))
     ].join('\n')
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
@@ -192,6 +317,14 @@ export default function VinylRegister({
             </div>
           </div>
           <div className={styles.headerRight}>
+            <button
+              onClick={handleEstimateCollection}
+              className={styles.analyzeBtn}
+              title="Analyze collection professionally"
+              disabled={analysis.loading}
+            >
+              {analysis.loading ? '⏳ Analyzing...' : '📊 Analyze Collection'}
+            </button>
             <button
               onClick={handleDownloadCsv}
               className={styles.csvBtn}
@@ -362,6 +495,36 @@ export default function VinylRegister({
             </div>
           )}
         </div>
+
+        {/* Collection Analysis Modal */}
+        {analysis.summary && (
+          <div className={styles.analysisOverlay} onClick={() => setAnalysis({ ...analysis, summary: '' })}>
+            <div className={styles.analysisModal} onClick={(e) => e.stopPropagation()}>
+              <div className={styles.analysisHeader}>
+                <h3>📊 Collection Analysis</h3>
+                <button 
+                  onClick={() => setAnalysis({ ...analysis, summary: '' })}
+                  className={styles.closeBtn}
+                >
+                  ✕
+                </button>
+              </div>
+              <div className={styles.analysisContent}>
+                {analysis.error ? (
+                  <p className={styles.error}>{analysis.error}</p>
+                ) : (
+                  <div className={styles.analysisText}>
+                    {analysis.summary.split('\n').map((paragraph, i) => (
+                      paragraph.trim() && (
+                        <p key={i}>{paragraph}</p>
+                      )
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
