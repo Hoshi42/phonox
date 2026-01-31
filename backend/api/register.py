@@ -258,9 +258,13 @@ async def update_register_record(
         
         db.flush()  # Ensure deletes are processed before updating record
     
-    # Update fields from request - use model_dump to get only provided fields
-    # This allows sending None/null to explicitly clear a field
-    update_data = request.model_dump(exclude_unset=True, exclude={'record_id', 'image_urls'})
+    # Update fields from request - get all provided fields from the Pydantic model
+    # Note: We don't use exclude_unset=True because it can miss fields that have None as value
+    update_data = request.model_dump(exclude={'record_id', 'image_urls'})
+    
+    print(f'[UPDATE REGISTER] Updating record {request.record_id}')
+    print(f'[UPDATE REGISTER] Update data keys: {list(update_data.keys())}')
+    print(f'[UPDATE REGISTER] Condition value in request: {update_data.get("condition")}')
     
     for field, value in update_data.items():
         if field == 'genres':
@@ -269,9 +273,13 @@ async def update_register_record(
                 record.set_genres(value)
             else:
                 record.set_genres([])
-        else:
-            # Set the field on the record (including None to clear)
+            print(f'[UPDATE REGISTER] Set genres: {value}')
+        elif value is not None or field in request.model_fields_set:
+            # Only update fields that are not None, or explicitly set (to allow clearing with None)
             setattr(record, field, value)
+            print(f'[UPDATE REGISTER] Set {field} = {value}')
+    
+    print(f'[UPDATE REGISTER] After update, record.condition = {record.condition}')
     
     record.updated_at = datetime.utcnow()
     db.commit()

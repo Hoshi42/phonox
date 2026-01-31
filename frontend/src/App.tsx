@@ -279,6 +279,14 @@ function App() {
     }
   }
 
+  const flushMetadataUpdates = () => {
+    // Force any pending debounced metadata updates to execute immediately
+    if (metadataUpdateTimeoutRef.current) {
+      clearTimeout(metadataUpdateTimeoutRef.current)
+      metadataUpdateTimeoutRef.current = null
+    }
+  }
+
   const handleImageAdd = (newFiles: FileList) => {
     console.log('App: handleImageAdd called with files:', newFiles.length)
     
