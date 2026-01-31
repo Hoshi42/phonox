@@ -594,20 +594,10 @@ ${analysis.summary}
               <div className={styles.analysisContent}>
                 {analysis.loading ? (
                   <div className={styles.loadingContainer}>
-                    <div className={styles.spinningVinyl}>
-                      <svg viewBox="0 0 100 100" className={styles.vinylRecord}>
-                        {/* Outer ring */}
-                        <circle cx="50" cy="50" r="48" fill="#1a1a2e" stroke="#667eea" strokeWidth="2"/>
-                        {/* Vinyl grooves effect */}
-                        <circle cx="50" cy="50" r="42" fill="none" stroke="#667eea" strokeWidth="0.5" opacity="0.3"/>
-                        <circle cx="50" cy="50" r="36" fill="none" stroke="#667eea" strokeWidth="0.5" opacity="0.3"/>
-                        <circle cx="50" cy="50" r="30" fill="none" stroke="#667eea" strokeWidth="0.5" opacity="0.3"/>
-                        <circle cx="50" cy="50" r="24" fill="none" stroke="#667eea" strokeWidth="0.5" opacity="0.3"/>
-                        {/* Center label */}
-                        <circle cx="50" cy="50" r="16" fill="#764ba2"/>
-                        <circle cx="50" cy="50" r="12" fill="#1a1a2e"/>
-                        <text x="50" y="54" textAnchor="middle" fill="#667eea" fontSize="8" fontWeight="bold">PHONOX</text>
-                      </svg>
+                    <div className={styles.loadingDots}>
+                      <span></span>
+                      <span></span>
+                      <span></span>
                     </div>
                     <p className={styles.loadingText}>Analyzing your collection...</p>
                   </div>
