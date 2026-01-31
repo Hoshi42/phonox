@@ -22,6 +22,7 @@
 
 import { useState } from 'react'
 import { RegisterRecord } from '../services/registerApi'
+import LoadingSpinner from './LoadingSpinner'
 import styles from './VinylRegister.module.css'
 
 const API_BASE = import.meta.env.VITE_API_URL
@@ -310,6 +311,132 @@ ${analysis.summary}
     return parts
   }
 
+  const parseAnalysisContent = (text: string) => {
+    const lines = text.split('\n')
+    const elements: JSX.Element[] = []
+    let i = 0
+
+    while (i < lines.length) {
+      const line = lines[i]
+
+      // Skip separator lines
+      if (line.trim().match(/^-{3,}$|^_{3,}$/)) {
+        i++
+        continue
+      }
+
+      // Headers
+      if (line.startsWith('##')) {
+        elements.push(
+          <h3 key={i} className={styles.analysisHeading}>
+            {line.replace(/^#+\s*/, '')}
+          </h3>
+        )
+        i++
+        continue
+      }
+
+      if (line.startsWith('###')) {
+        elements.push(
+          <h4 key={i} className={styles.analysisSubheading}>
+            {line.replace(/^#+\s*/, '')}
+          </h4>
+        )
+        i++
+        continue
+      }
+
+      // Table detection and rendering
+      if (line.includes('|')) {
+        const tableLines = []
+        let isHeader = false
+        while (i < lines.length && lines[i].includes('|')) {
+          tableLines.push(lines[i])
+          i++
+        }
+
+        if (tableLines.length > 0) {
+          elements.push(
+            <div key={`table-${i}`} className={styles.tableWrapper}>
+              <table className={styles.analysisTable}>
+                <tbody>
+                  {tableLines.map((tableLine, idx) => {
+                    // Skip separator rows
+                    if (tableLine.trim().match(/^\|[\s\-:]+\|/)) {
+                      isHeader = true
+                      return null
+                    }
+
+                    const cells = tableLine
+                      .split('|')
+                      .filter(cell => cell.trim())
+                      .map(cell => cell.trim())
+
+                    if (isHeader && idx === 0) {
+                      return (
+                        <thead key={`header-${idx}`}>
+                          <tr>
+                            {cells.map((cell, cidx) => (
+                              <th key={cidx}>{cell}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                      )
+                    }
+
+                    return (
+                      <tr key={`row-${idx}`}>
+                        {cells.map((cell, cidx) => (
+                          <td key={cidx}>{cell}</td>
+                        ))}
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+        continue
+      }
+
+      // Bullet points
+      if (line.trim().match(/^[-•]\s/)) {
+        elements.push(
+          <li key={i} className={styles.analysisListItem}>
+            {renderMarkdown(line.replace(/^[-•]\s*/, ''))}
+          </li>
+        )
+        i++
+        continue
+      }
+
+      // Numbered lists
+      if (line.trim().match(/^\d+\.\s/)) {
+        elements.push(
+          <li key={i} className={styles.analysisListItem}>
+            {renderMarkdown(line.replace(/^\d+\.\s*/, ''))}
+          </li>
+        )
+        i++
+        continue
+      }
+
+      // Regular paragraphs
+      if (line.trim()) {
+        elements.push(
+          <p key={i} className={styles.analysisParagraph}>
+            {renderMarkdown(line)}
+          </p>
+        )
+      }
+
+      i++
+    }
+
+    return elements
+  }
+
   const handleDownloadCsv = () => {
     const csvEscape = (value: unknown) => {
       if (value === null || value === undefined) return ''
@@ -593,56 +720,12 @@ ${analysis.summary}
               </div>
               <div className={styles.analysisContent}>
                 {analysis.loading ? (
-                  <div className={styles.loadingContainer}>
-                    <div className={styles.loadingDots}>
-                      <span></span>
-                      <span></span>
-                      <span></span>
-                    </div>
-                    <p className={styles.loadingText}>Analyzing your collection...</p>
-                  </div>
+                  <LoadingSpinner />
                 ) : analysis.error ? (
                   <p className={styles.error}>{analysis.error}</p>
                 ) : (
                   <div className={styles.analysisText}>
-                    {analysis.summary.split('\n').map((paragraph, i) => {
-                      // Handle different markdown elements
-                      if (paragraph.startsWith('##')) {
-                        return (
-                          <h3 key={i} className={styles.analysisHeading}>
-                            {paragraph.replace(/^#+\s*/, '')}
-                          </h3>
-                        )
-                      }
-                      if (paragraph.startsWith('###')) {
-                        return (
-                          <h4 key={i} className={styles.analysisSubheading}>
-                            {paragraph.replace(/^#+\s*/, '')}
-                          </h4>
-                        )
-                      }
-                      if (paragraph.startsWith('-') || paragraph.startsWith('•')) {
-                        return (
-                          <li key={i} className={styles.analysisListItem}>
-                            {renderMarkdown(paragraph.replace(/^[-•]\s*/, ''))}
-                          </li>
-                        )
-                      }
-                      if (paragraph.startsWith('1.') || /^\d+\./.test(paragraph)) {
-                        return (
-                          <li key={i} className={styles.analysisListItem}>
-                            {renderMarkdown(paragraph.replace(/^\d+\.\s*/, ''))}
-                          </li>
-                        )
-                      }
-                      return (
-                        paragraph.trim() && (
-                          <p key={i} className={styles.analysisParagraph}>
-                            {renderMarkdown(paragraph)}
-                          </p>
-                        )
-                      )
-                    })}
+                    {parseAnalysisContent(analysis.summary)}
                   </div>
                 )}
               </div>

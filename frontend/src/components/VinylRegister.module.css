@@ -781,33 +781,38 @@
   gap: 20px;
 }
 
-.loadingDots {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-  padding: 4px 0;
+.tableWrapper {
+  margin: 20px 0;
+  overflow-x: auto;
 }
 
-.loadingDots span {
-  width: 8px;
-  height: 8px;
-  background: rgba(102, 126, 234, 0.7);
-  border-radius: 50%;
-  animation: loadingPulse 1.5s ease-in-out infinite;
+.analysisTable {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-.loadingDots span:nth-child(2) {
-  animation-delay: 0.2s;
+.analysisTable thead {
+  background: rgba(102, 126, 234, 0.1);
 }
 
-.loadingDots span:nth-child(3) {
-  animation-delay: 0.4s;
-}
-
-.loadingText {
+.analysisTable th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
   color: #a5b4fc;
-  font-size: 1.1rem;
-  font-weight: 500;
-  text-align: center;
-  margin: 0;
+  border-bottom: 2px solid rgba(102, 126, 234, 0.3);
+}
+
+.analysisTable td {
+  padding: 10px 16px;
+  color: #e0e7ff;
+  border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+}
+
+.analysisTable tbody tr:hover {
+  background: rgba(102, 126, 234, 0.05);
 }
