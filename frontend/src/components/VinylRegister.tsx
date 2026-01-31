@@ -22,7 +22,7 @@
 
 import { useState } from 'react'
 import { RegisterRecord } from '../services/registerApi'
-import LoadingSpinner from './LoadingSpinner'
+import VinylSpinner from './VinylSpinner'
 import styles from './VinylRegister.module.css'
 
 const API_BASE = import.meta.env.VITE_API_URL
@@ -720,7 +720,10 @@ ${analysis.summary}
               </div>
               <div className={styles.analysisContent}>
                 {analysis.loading ? (
-                  <LoadingSpinner />
+                  <VinylSpinner 
+                    message="Analyzing your collection..."
+                    subtext="Professional valuation in progress"
+                  />
                 ) : analysis.error ? (
                   <p className={styles.error}>{analysis.error}</p>
                 ) : (
