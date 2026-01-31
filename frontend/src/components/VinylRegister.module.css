@@ -649,6 +649,31 @@
   font-weight: 600;
 }
 
+.analysisActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.downloadBtn {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #10b981;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.downloadBtn:hover {
+  background: rgba(16, 185, 129, 0.25);
+}
+
 .analysisContent {
   flex: 1;
   overflow-y: auto;
@@ -666,8 +691,39 @@
   text-align: justify;
 }
 
+.analysisParagraph {
+  margin: 0 0 16px 0;
+  text-align: justify;
+}
+
 .analysisText p:last-child {
   margin-bottom: 0;
+}
+
+.analysisHeading {
+  margin: 24px 0 12px 0;
+  font-size: 1.1rem;
+  color: #a5b4fc;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(102, 126, 234, 0.2);
+  padding-bottom: 8px;
+}
+
+.analysisSubheading {
+  margin: 16px 0 8px 0;
+  font-size: 0.95rem;
+  color: #c7d2fe;
+  font-weight: 600;
+}
+
+.analysisListItem {
+  margin: 0 0 8px 20px;
+  color: #e0e7ff;
+}
+
+.analysisListItem strong {
+  color: #a5b4fc;
+  font-weight: 600;
 }
 
 .error {
