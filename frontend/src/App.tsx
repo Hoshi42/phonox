@@ -469,6 +469,7 @@ function App() {
         barcode: registerRecord.barcode,
         genres: registerRecord.genres,
         estimated_value_eur: registerRecord.estimated_value_eur,
+        condition: registerRecord.condition,  // CRITICAL: Include condition in metadata!
         image_urls: registerRecord.image_urls || [],
       },
       created_at: registerRecord.created_at,
