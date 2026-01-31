@@ -259,7 +259,27 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
       if (data.intermediate_results) {
         setSearchIntermediateResults(data.intermediate_results)
         console.log('VinylCard: Intermediate results:', data.intermediate_results)
-        // Don't re-send web analysis message to chat - it was already sent during initial analysis
+        
+        // Send web search results to chat panel
+        if (onAddChatMessage) {
+          const artist = record.artist || record.metadata?.artist || '?'
+          const title = record.title || record.metadata?.title || '?'
+          const analysisMessage = `🔍 **Web Search Results: "${artist} - ${title}"**
+
+**Search Query:** ${data.intermediate_results.search_query}
+
+**Sources Found:** ${data.intermediate_results.search_results_count}
+
+**Top Sources:**
+${data.intermediate_results.search_sources?.map((s: any, i: number) => `${i+1}. **${s.title}**\n   ${s.content}...`).join('\n\n') || 'No sources'}
+
+---
+
+**Market Analysis:**
+${data.intermediate_results.claude_analysis || 'No analysis available'}`
+          
+          onAddChatMessage(analysisMessage, 'assistant')
+        }
       }
       
       if (data.estimated_value_eur) {
