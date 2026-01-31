@@ -567,29 +567,51 @@ ${analysis.summary}
         </div>
 
         {/* Collection Analysis Modal */}
-        {analysis.summary && (
-          <div className={styles.analysisOverlay} onClick={() => setAnalysis({ ...analysis, summary: '' })}>
+        {(analysis.summary || analysis.loading) && (
+          <div className={styles.analysisOverlay} onClick={() => !analysis.loading && setAnalysis({ ...analysis, summary: '' })}>
             <div className={styles.analysisModal} onClick={(e) => e.stopPropagation()}>
               <div className={styles.analysisHeader}>
                 <h3>📊 Collection Analysis</h3>
                 <div className={styles.analysisActions}>
+                  {analysis.summary && (
+                    <button 
+                      onClick={handleDownloadReport}
+                      className={styles.downloadBtn}
+                      title="Download as Markdown"
+                    >
+                      ⬇️ Report
+                    </button>
+                  )}
                   <button 
-                    onClick={handleDownloadReport}
-                    className={styles.downloadBtn}
-                    title="Download as Markdown"
-                  >
-                    ⬇️ Report
-                  </button>
-                  <button 
-                    onClick={() => setAnalysis({ ...analysis, summary: '' })}
+                    onClick={() => !analysis.loading && setAnalysis({ ...analysis, summary: '' })}
                     className={styles.closeBtn}
+                    disabled={analysis.loading}
                   >
                     ✕
                   </button>
                 </div>
               </div>
               <div className={styles.analysisContent}>
-                {analysis.error ? (
+                {analysis.loading ? (
+                  <div className={styles.loadingContainer}>
+                    <div className={styles.spinningVinyl}>
+                      <svg viewBox="0 0 100 100" className={styles.vinylRecord}>
+                        {/* Outer ring */}
+                        <circle cx="50" cy="50" r="48" fill="#1a1a2e" stroke="#667eea" strokeWidth="2"/>
+                        {/* Vinyl grooves effect */}
+                        <circle cx="50" cy="50" r="42" fill="none" stroke="#667eea" strokeWidth="0.5" opacity="0.3"/>
+                        <circle cx="50" cy="50" r="36" fill="none" stroke="#667eea" strokeWidth="0.5" opacity="0.3"/>
+                        <circle cx="50" cy="50" r="30" fill="none" stroke="#667eea" strokeWidth="0.5" opacity="0.3"/>
+                        <circle cx="50" cy="50" r="24" fill="none" stroke="#667eea" strokeWidth="0.5" opacity="0.3"/>
+                        {/* Center label */}
+                        <circle cx="50" cy="50" r="16" fill="#764ba2"/>
+                        <circle cx="50" cy="50" r="12" fill="#1a1a2e"/>
+                        <text x="50" y="54" textAnchor="middle" fill="#667eea" fontSize="8" fontWeight="bold">PHONOX</text>
+                      </svg>
+                    </div>
+                    <p className={styles.loadingText}>Analyzing your collection...</p>
+                  </div>
+                ) : analysis.error ? (
                   <p className={styles.error}>{analysis.error}</p>
                 ) : (
                   <div className={styles.analysisText}>
