@@ -128,9 +128,131 @@ def cmd_restore(args):
     run(["bash", str(RESTORE_SCRIPT), args.timestamp])
 
 
+def check_docker_network():
+    """Check if Docker network exists and containers can communicate."""
+    compose = get_compose_cmd()
+    
+    # Check if network exists
+    try:
+        result = subprocess.run(
+            ["docker", "network", "ls"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+        networks = result.stdout
+        if "phonox_phonox_network" not in networks and "phonox_network" not in networks:
+            print(
+                style("⚠ Warning: ", "yellow")
+                + "Docker network not found. Will be recreated on start."
+            )
+            return False
+    except Exception as e:
+        print(
+            style("⚠ Warning: ", "yellow")
+            + f"Could not check Docker network: {e}"
+        )
+        return False
+    
+    return True
+
+
+def check_database_health():
+    """Check if database is accessible."""
+    compose = get_compose_cmd()
+    
+    try:
+        result = subprocess.run(
+            compose + ["ps", "--filter", "name=phonox_db"],
+            cwd=ROOT_DIR,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+        
+        if "healthy" in result.stdout.lower():
+            print(style("✓ ", "green") + "Database is healthy")
+            return True
+        elif "up" in result.stdout.lower() and "starting" in result.stdout.lower():
+            print(style("⏳ ", "yellow") + "Database is starting...")
+            return None  # Still initializing
+        else:
+            print(
+                style("✗ ", "red")
+                + "Database is not responding. Running recovery..."
+            )
+            return False
+    except Exception as e:
+        print(
+            style("✗ ", "red")
+            + f"Could not check database health: {e}"
+        )
+        return False
+
+
 def cmd_start(_args):
     compose = get_compose_cmd()
+    
+    # Check network before starting
+    check_docker_network()
+    
+    print(style("\nStarting containers...", "cyan"))
     run(compose + ["up", "-d"])
+    
+    # Wait a moment for containers to start
+    import time
+    time.sleep(3)
+    
+    # Check database health
+    print(style("\nChecking database health...", "cyan"))
+    health_result = check_database_health()
+    
+    if health_result is False:
+        print(
+            style("\n⚠ ", "yellow")
+            + "Database may not be ready. Waiting for initialization..."
+        )
+        # Give DB more time to initialize
+        import time
+        for i in range(5, 0, -1):
+            print(style(f"  Waiting {i}s...", "dim"), end="\r")
+            time.sleep(1)
+        print("                    ", end="\r")  # Clear the line
+        
+        # Check again
+        health_result = check_database_health()
+        if health_result is False:
+            print(
+                style(
+                    "\n⚠ Database still not healthy. ",
+                    "red",
+                )
+                + "Try running: phonox-cli restart"
+            )
+    
+    print(style("\n✓ Containers started successfully", "green"))
+
+
+def cmd_restart(_args):
+    """Stop and start containers with network recovery."""
+    compose = get_compose_cmd()
+    
+    print(style("Stopping containers...", "cyan"))
+    run(compose + ["down"])
+    
+    print(style("Restarting containers...", "cyan"))
+    run(compose + ["up", "-d"])
+    
+    # Wait for startup
+    import time
+    time.sleep(3)
+    
+    print(style("\nChecking database health...", "cyan"))
+    check_database_health()
+    
+    print(style("\n✓ Containers restarted successfully", "green"))
 
 
 def cmd_stop(_args):
@@ -180,6 +302,27 @@ def print_status():
     else:
         print(style("Containers:", "bold"), style("Docker Compose not available", "red"))
 
+    # Check Docker Network
+    try:
+        result = subprocess.run(
+            ["docker", "network", "ls"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+        if "phonox_phonox_network" in result.stdout or "phonox_network" in result.stdout:
+            network_name = "phonox_phonox_network" if "phonox_phonox_network" in result.stdout else "phonox_network"
+            print(
+                style("Network:", "bold")
+                + " "
+                + style(network_name, "green")
+            )
+        else:
+            print(style("Network:", "bold"), style("not found", "yellow"))
+    except Exception:
+        print(style("Network:", "bold"), style("status unavailable", "yellow"))
+
     if BACKUPS_DIR.exists():
         db_backups = sorted(BACKUPS_DIR.glob("phonox_db_*.sql"))
         upload_backups = sorted(BACKUPS_DIR.glob("phonox_uploads_*.tar.gz"))
@@ -219,8 +362,9 @@ def main():
             print("3) Configure API keys")
             print("4) Start containers")
             print("5) Stop containers")
-            print("6) Backup")
-            print("7) Restore")
+            print("6) Restart containers (with recovery)")
+            print("7) Backup")
+            print("8) Restore")
             print("0) Exit")
 
             choice = input(style("Select an option: ", "bold")).strip()
@@ -252,8 +396,10 @@ def main():
             elif choice == "5":
                 sys.argv += ["stop"]
             elif choice == "6":
-                sys.argv += ["backup"]
+                sys.argv += ["restart"]
             elif choice == "7":
+                sys.argv += ["backup"]
+            elif choice == "8":
                 timestamp = input("Backup timestamp to restore: ").strip()
                 if not timestamp:
                     print("No timestamp provided. Returning to menu.")
@@ -291,6 +437,9 @@ def main():
 
         start = subparsers.add_parser("start", help="Start Docker containers")
         start.set_defaults(func=cmd_start)
+
+        restart = subparsers.add_parser("restart", help="Restart Docker containers with network recovery")
+        restart.set_defaults(func=cmd_restart)
 
         stop = subparsers.add_parser("stop", help="Stop Docker containers")
         stop.set_defaults(func=cmd_stop)

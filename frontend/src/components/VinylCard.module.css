@@ -595,6 +595,40 @@
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
+.registerBtn.loading {
+  opacity: 0.9;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.registerBtn.loading:hover {
+  transform: none;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+}
+
+.registerBtn.loading:disabled {
+  cursor: not-allowed;
+  opacity: 0.9;
+}
+
+.spinner {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
 .rawDataSection {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   padding-top: 16px;
