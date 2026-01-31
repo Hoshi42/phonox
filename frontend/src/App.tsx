@@ -492,6 +492,16 @@ function App() {
     console.log('App: Register record loaded successfully')
   }
 
+  const handleAnalysisReport = (reportContent: string) => {
+    // Add the analysis to chat as a system context message
+    if (chatPanelRef.current) {
+      chatPanelRef.current.addMessage(reportContent, 'system')
+    }
+    
+    // Close the register modal
+    setShowRegister(false)
+  }
+
   const isRecordInRegister = record ? 
     vinylRegister.some(r => r.id === record.record_id) : false
 
@@ -664,6 +674,7 @@ function App() {
           onClose={() => setShowRegister(false)}
           onDeleteRecord={handleDeleteFromRegister}
           onRecordSelect={handleRecordSelectFromRegister}
+          onAnalysisReport={handleAnalysisReport}
         />
       )}
 

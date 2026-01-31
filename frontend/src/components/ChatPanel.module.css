@@ -159,13 +159,15 @@
 }
 
 .message.system .messageContent {
-  background: rgba(245, 158, 11, 0.1);
-  color: #fbbf24;
-  border: 1px solid rgba(245, 158, 11, 0.2);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+  color: #a5b4fc;
+  border: 1px solid rgba(102, 126, 234, 0.3);
+  border-left: 4px solid #667eea;
   border-radius: 8px;
-  text-align: center;
-  font-style: italic;
+  padding: 16px;
   max-width: 100%;
+  font-size: 0.95rem;
+  line-height: 1.6;
 }
 
 .messageImages {

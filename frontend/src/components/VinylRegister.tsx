@@ -35,6 +35,7 @@ interface VinylRegisterProps {
   onClose: () => void
   onDeleteRecord: (recordId: string) => void
   onRecordSelect: (record: RegisterRecord) => void
+  onAnalysisReport?: (reportContent: string) => void
 }
 
 interface CollectionAnalysis {
@@ -47,7 +48,8 @@ export default function VinylRegister({
   records,
   onClose,
   onDeleteRecord,
-  onRecordSelect
+  onRecordSelect,
+  onAnalysisReport
 }: VinylRegisterProps) {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid')
   const [sortBy, setSortBy] = useState<'artist' | 'title' | 'year' | 'value'>('artist')
@@ -701,13 +703,26 @@ ${analysis.summary}
                 <h3>📊 Collection Analysis</h3>
                 <div className={styles.analysisActions}>
                   {analysis.summary && (
-                    <button 
-                      onClick={handleDownloadReport}
-                      className={styles.downloadBtn}
-                      title="Download as Markdown"
-                    >
-                      ⬇️ Report
-                    </button>
+                    <>
+                      <button 
+                        onClick={() => {
+                          if (onAnalysisReport) {
+                            onAnalysisReport(analysis.summary)
+                          }
+                        }}
+                        className={styles.chatBtn}
+                        title="Discuss in Chat"
+                      >
+                        💬 Chat
+                      </button>
+                      <button 
+                        onClick={handleDownloadReport}
+                        className={styles.downloadBtn}
+                        title="Download as Markdown"
+                      >
+                        ⬇️ Report
+                      </button>
+                    </>
                   )}
                   <button 
                     onClick={() => !analysis.loading && setAnalysis({ ...analysis, summary: '' })}

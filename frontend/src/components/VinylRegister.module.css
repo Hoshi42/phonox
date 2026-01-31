@@ -674,6 +674,25 @@
   background: rgba(16, 185, 129, 0.25);
 }
 
+.chatBtn {
+  background: rgba(102, 126, 234, 0.15);
+  border: 1px solid rgba(102, 126, 234, 0.35);
+  color: #667eea;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.chatBtn:hover {
+  background: rgba(102, 126, 234, 0.25);
+}
+
 .analysisContent {
   flex: 1;
   overflow-y: auto;
