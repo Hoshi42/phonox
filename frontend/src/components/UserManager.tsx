@@ -127,7 +127,11 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
     loadExistingUsers() // Refresh user list
   }
 
+  // Detect if user is on mobile device
+  const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)
+
   if (showModal) {
+    
     return (
       <div style={{
         position: 'fixed',
@@ -135,32 +139,52 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
         left: 0,
         width: '100%',
         height: '100%',
-        background: 'rgba(0,0,0,0.8)',
+        background: 'rgba(0, 0, 0, 0.8)',
+        backdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 9999
       }}>
         <div style={{
-          background: 'white',
-          padding: '2rem',
-          borderRadius: '8px',
-          minWidth: '300px',
-          maxWidth: '90vw',
-          textAlign: 'center'
+          background: 'linear-gradient(135deg, #1a1a2e 0%, #0f0f1e 50%, #16213e 100%)',
+          border: '1px solid rgba(102, 126, 234, 0.3)',
+          padding: isMobile ? '1.5rem 1rem' : '2rem',
+          borderRadius: '16px',
+          minWidth: isMobile ? '90vw' : '400px',
+          maxWidth: isMobile ? '90vw' : '500px',
+          maxHeight: isMobile ? '90vh' : 'auto',
+          overflow: 'auto',
+          textAlign: 'center',
+          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5)'
         }}>
-          <h2 style={{ margin: '0 0 1rem 0' }}>Welcome to Phonox</h2>
+          <h2 style={{ 
+            margin: '0 0 1.5rem 0',
+            color: '#e0e7ff',
+            fontSize: isMobile ? '1.3rem' : '1.8rem',
+            fontWeight: 700,
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text'
+          }}>
+            🎵 Phonox
+          </h2>
           
           {/* Show existing users first - mobile-friendly */}
           {existingUsers.length > 0 && (
             <div>
-              <p style={{ margin: '0 0 1rem 0', color: '#666' }}>
+              <p style={{ 
+                margin: '0 0 1rem 0', 
+                color: 'rgba(255, 255, 255, 0.7)',
+                fontSize: isMobile ? '0.95rem' : '1rem'
+              }}>
                 Select your name:
               </p>
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                gap: '10px',
+                gridTemplateColumns: isMobile ? 'repeat(auto-fit, minmax(100px, 1fr))' : 'repeat(auto-fit, minmax(120px, 1fr))',
+                gap: isMobile ? '8px' : '10px',
                 margin: '0 0 1.5rem 0'
               }}>
                 {existingUsers.map(user => (
@@ -172,21 +196,29 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
                       setShowModal(false)
                     }}
                     style={{
-                      background: '#4CAF50',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                       color: 'white',
                       border: 'none',
-                      padding: '1rem',
-                      borderRadius: '8px',
-                      fontSize: '1rem',
+                      padding: isMobile ? '0.75rem' : '1rem',
+                      borderRadius: '10px',
+                      fontSize: isMobile ? '0.85rem' : '1rem',
                       cursor: 'pointer',
-                      minHeight: '60px',
+                      minHeight: isMobile ? '48px' : '60px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      transition: 'background-color 0.2s'
+                      transition: 'all 0.2s',
+                      fontWeight: 600,
+                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#45a049'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = '#4CAF50'}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.3)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.2)'
+                    }}
                   >
                     👤 {user}
                   </button>
@@ -194,11 +226,15 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
               </div>
               
               <div style={{ 
-                borderTop: '1px solid #eee', 
+                borderTop: '1px solid rgba(255, 255, 255, 0.1)', 
                 paddingTop: '1rem',
                 margin: '1rem 0'
               }}>
-                <p style={{ margin: '0 0 1rem 0', color: '#666', fontSize: '0.9rem' }}>
+                <p style={{ 
+                  margin: '0 0 1rem 0', 
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  fontSize: isMobile ? '0.85rem' : '0.9rem'
+                }}>
                   Or create a new user:
                 </p>
               </div>
@@ -213,12 +249,23 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
             placeholder={existingUsers.length > 0 ? "New username" : "Your name"}
             style={{
               width: '100%',
-              padding: '0.75rem',
-              border: '1px solid #ddd',
-              borderRadius: '4px',
+              padding: isMobile ? '0.75rem' : '0.75rem',
+              border: '1px solid rgba(102, 126, 234, 0.3)',
+              borderRadius: '10px',
               marginBottom: '1rem',
-              fontSize: '1rem',
-              boxSizing: 'border-box'
+              fontSize: isMobile ? '1rem' : '1rem',
+              boxSizing: 'border-box',
+              background: 'rgba(255, 255, 255, 0.05)',
+              color: '#e0e7ff',
+              transition: 'all 0.2s'
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.6)'
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.3)'
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
             }}
             onKeyDown={(e) => e.key === 'Enter' && handleSave()}
             autoFocus={existingUsers.length === 0}
@@ -227,14 +274,30 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
             onClick={handleSave}
             disabled={!username.trim()}
             style={{
-              background: username.trim() ? '#2196F3' : '#ccc',
+              background: username.trim() ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'rgba(255, 255, 255, 0.1)',
               color: 'white',
-              border: 'none',
-              padding: '0.75rem 1.5rem',
-              borderRadius: '4px',
-              fontSize: '1rem',
+              border: username.trim() ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
+              padding: isMobile ? '0.85rem 1.25rem' : '0.85rem 2rem',
+              borderRadius: '10px',
+              fontSize: isMobile ? '0.95rem' : '1rem',
               cursor: username.trim() ? 'pointer' : 'not-allowed',
-              minHeight: '48px'
+              minHeight: isMobile ? '48px' : '50px',
+              width: isMobile ? '100%' : 'auto',
+              fontWeight: 600,
+              transition: 'all 0.2s',
+              boxShadow: username.trim() ? '0 4px 16px rgba(102, 126, 234, 0.3)' : 'none'
+            }}
+            onMouseEnter={(e) => {
+              if (username.trim()) {
+                e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.4)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (username.trim()) {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 4px 16px rgba(102, 126, 234, 0.3)'
+              }
             }}
           >
             {existingUsers.length > 0 ? 'Create New User' : 'Continue'}
@@ -252,26 +315,34 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
       
       {/* Always visible user list for mobile */}
       {existingUsers.length > 0 && (
-        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: isMobile ? '4px' : '5px', flexWrap: 'wrap' }}>
           {existingUsers.map(user => (
             <button
               key={user}
               onClick={() => handleUserSwitch(user)}
               style={{
-                background: user === username ? 'rgba(76, 175, 80, 0.8)' : 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                color: 'rgba(255, 255, 255, 0.9)',
-                padding: '6px 10px',
+                background: user === username ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'rgba(255, 255, 255, 0.05)',
+                border: user === username ? 'none' : '1px solid rgba(102, 126, 234, 0.3)',
+                color: user === username ? 'white' : 'rgba(255, 255, 255, 0.8)',
+                padding: isMobile ? '6px 8px' : '6px 10px',
                 borderRadius: '10px',
-                fontSize: '0.7rem',
+                fontSize: isMobile ? '0.75rem' : '0.8rem',
                 cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '32px',
-                minWidth: 'auto',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s',
+                fontWeight: user === username ? 600 : 500,
+                boxShadow: user === username ? '0 2px 8px rgba(102, 126, 234, 0.3)' : 'none'
+              }}
+              onMouseEnter={(e) => {
+                if (user !== username) {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
+                  e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.5)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (user !== username) {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+                  e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.3)'
+                }
               }}
             >
               {user}
@@ -284,12 +355,12 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
       <button
         onClick={handleNewUser}
         style={{
-          background: 'rgba(76, 175, 80, 0.2)',
-          border: '1px solid rgba(76, 175, 80, 0.5)',
-          color: 'rgba(76, 175, 80, 1)',
-          padding: '6px 10px',
+          background: 'rgba(102, 126, 234, 0.2)',
+          border: '1px solid rgba(102, 126, 234, 0.5)',
+          color: 'rgba(102, 126, 234, 1)',
+          padding: isMobile ? '6px 8px' : '6px 10px',
           borderRadius: '10px',
-          fontSize: '0.7rem',
+          fontSize: isMobile ? '0.65rem' : '0.7rem',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
@@ -299,8 +370,16 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
           whiteSpace: 'nowrap',
           transition: 'all 0.2s'
         }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'rgba(102, 126, 234, 0.3)'
+          e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.8)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'rgba(102, 126, 234, 0.2)'
+          e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.5)'
+        }}
       >
-        ➕ Add
+        + New
       </button>
 
       {showNewUserForm && (
