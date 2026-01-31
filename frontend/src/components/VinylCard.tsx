@@ -338,7 +338,12 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
       (editData.spotify_url || undefined) : 
       (record.metadata?.spotify_url || undefined)
     
-    try {
+    console.log('VinylCard: handleRegisterAction started')
+    console.log('VinylCard: isEditing =', isEditing)
+    console.log('VinylCard: Using condition =', condition, 'from', isEditing ? 'editData' : 'record.metadata')
+    console.log('VinylCard: editData.condition =', editData.condition)
+    console.log('VinylCard: record.metadata?.condition =', record.metadata?.condition)
+        try {
       if (isInRegister) {
         // Upload new images if available
         if (uploadedImages.length > 0) {
@@ -353,10 +358,7 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
         console.log('VinylCard: Keeping images:', imagesToKeep)
         console.log('VinylCard: Deleted images:', Array.from(deletedImageUrls))
         
-        // Update existing record in register with ALL metadata fields
-        // Use editData values if form is being edited, otherwise use record.metadata
-        // Send actual values (including null/empty) to allow deletion
-        await registerApiClient.updateRegisterRecord({
+        const updateRequest = {
           record_id: record.record_id,
           artist: isEditing ? (editData.artist || undefined) : (record.metadata?.artist || record.artist || undefined),
           title: isEditing ? (editData.title || undefined) : (record.metadata?.title || record.title || undefined),
@@ -371,8 +373,17 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
           spotify_url: spotifyUrlToSave,
           user_tag: currentUser,
           image_urls: imagesToKeep  // Send images to keep - deleted ones are excluded
-        })
+        }
         
+        console.log('VinylCard: Sending update request with condition:', updateRequest.condition)
+        console.log('VinylCard: Full update request:', updateRequest)
+        
+        // Update existing record in register with ALL metadata fields
+        // Use editData values if form is being edited, otherwise use record.metadata
+        // Send actual values (including null/empty) to allow deletion
+        await registerApiClient.updateRegisterRecord(updateRequest)
+        
+
         // Update local metadata to reflect deleted images
         if (onMetadataUpdate) {
           onMetadataUpdate({
@@ -387,10 +398,7 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
           await registerApiClient.uploadImages(record.record_id, uploadedImages)
         }
         
-        // Add to register with ALL metadata fields
-        // Use editData values if form is being edited, otherwise use record.metadata
-        // Send actual values (including null/empty) to allow deletion
-        await registerApiClient.addToRegister({
+        const addRequest = {
           record_id: record.record_id,
           artist: isEditing ? (editData.artist || undefined) : (record.metadata?.artist || record.artist || undefined),
           title: isEditing ? (editData.title || undefined) : (record.metadata?.title || record.title || undefined),
@@ -404,7 +412,12 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
           user_notes: `Condition: ${condition} - Added ${new Date().toLocaleDateString()}`,
           spotify_url: spotifyUrlToSave,
           user_tag: currentUser
-        })
+        }
+        
+        console.log('VinylCard: Sending add request with condition:', addRequest.condition)
+        console.log('VinylCard: Full add request:', addRequest)
+        
+        await registerApiClient.addToRegister(addRequest)
         onAddToRegister?.(record)
       }
       
