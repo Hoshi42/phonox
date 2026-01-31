@@ -19,7 +19,7 @@ import uuid
 import json
 from typing import List, Optional, Dict
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Body
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -62,6 +62,11 @@ async def options_users():
     )
 
 
+class DeleteImagesRequest(BaseModel):
+    """Request model for deleting images."""
+    image_urls: List[str] = []
+
+
 class RegisterRecordRequest(BaseModel):
     record_id: str
     artist: Optional[str] = None
@@ -76,6 +81,7 @@ class RegisterRecordRequest(BaseModel):
     user_notes: Optional[str] = None
     spotify_url: Optional[str] = None
     user_tag: Optional[str] = None
+    image_urls: Optional[List[str]] = None  # For managing images on update
 
 
 class RegisterRecordResponse(BaseModel):
@@ -227,9 +233,34 @@ async def update_register_record(
     if not record:
         raise HTTPException(status_code=404, detail="Record not found in register")
     
+    # Handle image URLs if provided
+    if request.image_urls is not None:
+        # Extract image IDs from the URLs that should be kept
+        # Format: /api/register/images/{id}
+        image_ids_to_keep = set()
+        for url in request.image_urls:
+            if '/api/register/images/' in url:
+                image_id = url.split('/api/register/images/')[-1]
+                image_ids_to_keep.add(image_id)
+        
+        # Delete images that are not in the keep list
+        for image in record.images:
+            if image.id not in image_ids_to_keep:
+                try:
+                    # Delete file from disk
+                    if os.path.exists(image.file_path):
+                        os.remove(image.file_path)
+                except Exception as e:
+                    print(f"Warning: Could not delete file {image.file_path}: {e}")
+                
+                # Delete from database
+                db.delete(image)
+        
+        db.flush()  # Ensure deletes are processed before updating record
+    
     # Update fields from request - use model_dump to get only provided fields
     # This allows sending None/null to explicitly clear a field
-    update_data = request.model_dump(exclude_unset=True, exclude={'record_id'})
+    update_data = request.model_dump(exclude_unset=True, exclude={'record_id', 'image_urls'})
     
     for field, value in update_data.items():
         if field == 'genres':

@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.4.2
+
+### Docker & CLI Improvements
+- **Docker Network Recovery**: Fixed network connectivity issues after Docker updates with automatic recovery on restart
+- **CLI Health Checks**: Added network and database health monitoring to CLI
+- **CLI Network Status**: Display Docker network status in main menu alongside containers and backups
+- **CLI Restart Command**: New `restart` command with automatic network recovery (Option 6 in menu)
+
+### Register UI & UX Enhancements
+- **Error Modal**: Replaced browser alert with stylized, centered error modal matching app design
+  - Auto-dismiss after 5 seconds or manual close
+  - Gradient background and blur effect
+  - Better visibility and UX
+- **Image Management**: Simplified image deletion flow
+  - Deleted images removed from memory, not sent to backend
+  - Backend overwrites image list on update (cleaner approach)
+  - Deleted images properly persisted to database
+- **Update Indicator**: Added pulsing button with loading spinner during register update
+  - Shows "Updating..." text with rotating ⚙️ icon
+  - Button disabled during update (prevents double-clicks)
+  - Visual feedback for long-running operations
+
+
 ## 1.4.1
 
 ### Architecture & Backend Optimization
@@ -18,17 +41,6 @@
 - **Analysis Message Enhancement**: Added condition suggestion to "Analysis Complete" message in chat
 - **Edit Display Fix**: Condition field now correctly shows saved value when editing (not just "Good" default)
 
-### Bug Fixes
-- Fixed missing `Form` import in FastAPI routes that broke register access
-- Fixed undefined `isRecordInRegister` variable reference in reanalyze logic
-- Restored full register functionality after import error
-
-### Technical Details
-- [routes.py](backend/api/routes.py#L965-L1115): Complete `/reanalyze` endpoint refactor for in-memory processing
-- [client.ts](frontend/src/api/client.ts#L208-L230): Updated API client to send current record data
-- [App.tsx](frontend/src/App.tsx#L298-L330): Smart routing between `/identify` and `/reanalyze` based on register status
-- [ChatPanel.tsx](frontend/src/components/ChatPanel.tsx#L209-L230): Added condition field to analysis completion message
-- [VinylCard.tsx](frontend/src/components/VinylCard.tsx#L190-L225): Removed condition calculation, display only from metadata
 
 ## 1.4.0
 

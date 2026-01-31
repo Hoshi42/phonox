@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# Restore script for Phonox database and uploads
+# Restore script for Phonox database
+# Note: Image uploads are temporary and restored from backups is not needed
 # Usage: ./restore.sh <backup_timestamp>
 # Example: ./restore.sh 20260125_021500
 
@@ -9,14 +10,13 @@ if [ -z "$1" ]; then
     echo "Example: $0 20260125_021500"
     echo ""
     echo "Available backups:"
-    ls -1 backups/phonox_* 2>/dev/null | sed 's/.*phonox_[du]b_//' | sed 's/\.(sql|tar\.gz)$//' | sort -u
+    ls -1 backups/phonox_db_*.sql 2>/dev/null | sed 's/.*phonox_db_//' | sed 's/.sql$//' | sort
     exit 1
 fi
 
 TIMESTAMP="$1"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BACKUP_DIR="${ROOT_DIR}/backups"
-UPLOADS_VOLUME="phonox_phonox_uploads"
 
 echo "Stopping containers..."
 docker compose down
@@ -32,18 +32,7 @@ if [ -f "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql" ]; then
     echo "Database restored successfully!"
 else
     echo "Database backup file not found: ${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql"
-fi
-
-echo "Restoring uploads..."
-if [ -f "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" ]; then
-    # Clear existing uploads and restore
-        docker run --rm \
-            -v "${UPLOADS_VOLUME}:/data" \
-            -v "${BACKUP_DIR}:/backup" \
-            alpine sh -c "rm -rf /data/* && tar -xzf /backup/phonox_uploads_${TIMESTAMP}.tar.gz -C /data"
-    echo "Uploads restored successfully!"
-else
-    echo "Uploads backup file not found: ${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz"
+    exit 1
 fi
 
 echo "Starting all containers..."

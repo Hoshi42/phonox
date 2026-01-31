@@ -71,6 +71,7 @@ export interface RegisterRequest {
   user_notes?: string | null
   spotify_url?: string | null
   user_tag?: string
+  image_urls?: string[]  // For managing which images to keep on update
 }
 
 class RegisterApiClient {
@@ -197,20 +198,6 @@ class RegisterApiClient {
     }
 
     return response.json()
-  }
-
-  async deleteImages(recordId: string, imageUrls: string[]): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/images/${recordId}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ image_urls: imageUrls }),
-    })
-
-    if (!response.ok) {
-      throw new Error(`Failed to delete images: ${response.statusText}`)
-    }
   }
 
   getImageUrl(imageId: string): string {

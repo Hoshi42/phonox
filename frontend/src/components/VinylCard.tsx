@@ -20,6 +20,7 @@ import { VinylRecord } from '../App'
 import styles from './VinylCard.module.css'
 import { registerApiClient } from '../services/registerApi'
 import VinylSpinner from './VinylSpinner'
+import ErrorModal from './ErrorModal'
 
 const API_BASE = import.meta.env.VITE_API_URL
   || (typeof window !== 'undefined' && window.location.hostname
@@ -78,6 +79,8 @@ export default function VinylCard({
   const [appliedWebValue, setAppliedWebValue] = useState<number | null>(null)
   const [searchIntermediateResults, setSearchIntermediateResults] = useState<any>(null)
   const [lastRecordIdWithResults, setLastRecordIdWithResults] = useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [isUpdatingRegister, setIsUpdatingRegister] = useState(false)
   
   // Use ref to track if we've already sent this message (prevents double-send in StrictMode)
   const sentIntermediateResultsRef = useRef<string | null>(null)
@@ -133,23 +136,6 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
       console.log('VinylCard: No intermediate_results in record')
     }
   }, [record?.record_id, record?.intermediate_results, lastRecordIdWithResults])
-
-  // Determine condition from image analysis (simulated)
-  const getCondition = () => {
-    if (!record) return null
-    
-    // Check if we have ANY images (uploaded OR database)
-    const hasUploadedImages = uploadedImages.length > 0
-    const hasDatabaseImages = record.metadata?.image_urls && record.metadata.image_urls.length > 0
-    
-    if (!hasUploadedImages && !hasDatabaseImages) return null
-    
-    // In real implementation, this would analyze image quality
-    // For now, simulate based on confidence and some randomness
-    const conditions = ['Mint (M)', 'Near Mint (NM)', 'Very Good+ (VG+)', 'Very Good (VG)', 'Good+ (G+)', 'Good (G)']
-    const index = Math.floor((1 - record.confidence) * conditions.length)
-    return conditions[Math.min(index, conditions.length - 1)]
-  }
 
   const getConditionMultiplier = () => {
     const condition = record?.metadata?.condition
@@ -331,10 +317,12 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
   const handleRegisterAction = async () => {
     if (!record) return
     
+    setIsUpdatingRegister(true)
+    
     // Use values from record.metadata (which were saved via handleSave)
     // This ensures we use the latest user-edited values
     const estimatedValue = record.metadata?.estimated_value_eur || getEstimatedValue()
-    const condition = record.metadata?.condition || getCondition()
+    const condition = record.metadata?.condition || 'Good'
     const year = record.metadata?.year || record.year
     
     // Use edited spotify_url from metadata if available
@@ -342,16 +330,18 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
     
     try {
       if (isInRegister) {
-        // Delete images first if any were marked for deletion
-        if (deletedImageUrls.size > 0) {
-          await registerApiClient.deleteImages(record.record_id, Array.from(deletedImageUrls))
-          console.log('VinylCard: Deleted images:', Array.from(deletedImageUrls))
-        }
-        
         // Upload new images if available
         if (uploadedImages.length > 0) {
           await registerApiClient.uploadImages(record.record_id, uploadedImages)
         }
+
+        // Build the list of images to keep (exclude deleted ones)
+        const imagesToKeep = (record.metadata?.image_urls || []).filter(
+          (imageUrl: string) => !deletedImageUrls.has(imageUrl)
+        )
+
+        console.log('VinylCard: Keeping images:', imagesToKeep)
+        console.log('VinylCard: Deleted images:', Array.from(deletedImageUrls))
         
         // Update existing record in register with ALL metadata fields
         // Send actual values (including null/empty) to allow deletion
@@ -368,8 +358,17 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
           condition: condition,
           user_notes: `Condition: ${condition} - Updated ${new Date().toLocaleDateString()}`,
           spotify_url: spotifyUrlToSave,
-          user_tag: currentUser
+          user_tag: currentUser,
+          image_urls: imagesToKeep  // Send images to keep - deleted ones are excluded
         })
+        
+        // Update local metadata to reflect deleted images
+        if (onMetadataUpdate) {
+          onMetadataUpdate({
+            image_urls: imagesToKeep
+          })
+        }
+        
         onUpdateRegister?.(record)
       } else {
         // Upload images first if available
@@ -410,8 +409,23 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
       })
       
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'An unknown error occurred'
       console.error('Register operation failed:', error)
-      alert('Failed to update register. Please try again.')
+      console.error('Error details:', {
+        message: errorMsg,
+        stack: error instanceof Error ? error.stack : 'No stack trace'
+      })
+      
+      // Show styled error modal instead of alert
+      setErrorMessage(
+        errorMsg.includes('409') 
+          ? 'Conflict: Image may have been deleted already. Please refresh.' 
+          : errorMsg.includes('Failed to update') || errorMsg.includes('Failed to delete')
+            ? `Update failed: ${errorMsg}. Please try again.`
+            : 'Failed to update register. Please try again.'
+      )
+    } finally {
+      setIsUpdatingRegister(false)
     }
   }
 
@@ -799,9 +813,19 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
         <div className={styles.registerSection}>
           <button 
             onClick={handleRegisterAction}
-            className={`${styles.registerBtn} ${isInRegister ? styles.updateBtn : styles.addBtn}`}
+            disabled={isUpdatingRegister}
+            className={`${styles.registerBtn} ${isInRegister ? styles.updateBtn : styles.addBtn} ${isUpdatingRegister ? styles.loading : ''}`}
           >
-            {isInRegister ? '📝 Update in Register' : '📚 Add to Register'}
+            {isUpdatingRegister ? (
+              <>
+                <span className={styles.spinner}>⚙️</span>
+                {isInRegister ? 'Updating...' : 'Adding...'}
+              </>
+            ) : (
+              <>
+                {isInRegister ? '📝 Update in Register' : '📚 Add to Register'}
+              </>
+            )}
           </button>
         </div>
       )}
@@ -820,6 +844,15 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
           </div>
         )}
       </div>
+
+      {/* Error Modal */}
+      {errorMessage && (
+        <ErrorModal
+          message={errorMessage}
+          onClose={() => setErrorMessage(null)}
+          duration={5000}
+        />
+      )}
 
       {/* Web Search Loading Overlay */}
       {/* Overlay is now handled at App level for full viewport coverage */}

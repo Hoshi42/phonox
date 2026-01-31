@@ -49,6 +49,7 @@ class VinylMetadataModel(BaseModel):
     genres: List[str] = Field(default_factory=list)
     estimated_value_eur: Optional[float] = None
     estimated_value_usd: Optional[float] = None
+    condition: Optional[str] = None  # From agent image analysis
 
     class Config:
         """Pydantic config."""
