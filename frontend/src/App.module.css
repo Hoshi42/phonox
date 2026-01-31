@@ -352,13 +352,15 @@
     grid-template-columns: 1fr;
     grid-template-rows: auto auto;
     max-width: 100%;
+    display: flex;
+    flex-direction: column;
   }
   
   .chatContainer {
     height: auto;
     min-height: 350px;
     max-height: 65vh;
-    order: -1;
+    /* Removed order: -1 - was causing view to jump to chat when state changed */
   }
   
   .cardContainer {

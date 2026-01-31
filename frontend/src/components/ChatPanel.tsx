@@ -196,7 +196,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
     }
   }
 
-  // Add analysis result message when record updates
+  // Add analysis result message when record updates with analysis
   useEffect(() => {
     if (record && messages.length > 0) {
       const lastMessage = messages[messages.length - 1]
@@ -228,7 +228,7 @@ The vinyl card has been updated with all the details. You can edit any informati
         setLoading(false)
       }
     }
-  }, [record])
+  }, [record?.status, record?.record_id])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {

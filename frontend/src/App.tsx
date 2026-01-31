@@ -83,6 +83,7 @@ function App() {
   const [registerLoading, setRegisterLoading] = useState(false)
   const [currentUser, setCurrentUser] = useState('')
   const [isCheckingValue, setIsCheckingValue] = useState(false)
+  const metadataUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const handleUpload = async (files: File[]) => {
     const previousRecord = record  // Preserve previous record for error recovery
@@ -260,13 +261,21 @@ function App() {
 
   const handleMetadataUpdate = (metadata: any) => {
     if (record) {
-      setRecord(prev => prev ? {
-        ...prev,
-        metadata: {
-          ...prev.metadata,
-          ...metadata
-        }
-      } : null)
+      // Clear any pending metadata updates to debounce rapid changes (e.g., during typing)
+      if (metadataUpdateTimeoutRef.current) {
+        clearTimeout(metadataUpdateTimeoutRef.current)
+      }
+      
+      // Debounce metadata updates by 300ms to prevent excessive re-renders during editing
+      metadataUpdateTimeoutRef.current = setTimeout(() => {
+        setRecord(prev => prev ? {
+          ...prev,
+          metadata: {
+            ...prev.metadata,
+            ...metadata
+          }
+        } : null)
+      }, 300)
     }
   }
 
@@ -483,6 +492,18 @@ function App() {
       loadRegister(currentUser)
     }
   }, [currentUser])
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (metadataUpdateTimeoutRef.current) {
+        clearTimeout(metadataUpdateTimeoutRef.current)
+      }
+      if (pollInterval) {
+        clearInterval(pollInterval)
+      }
+    }
+  }, [])
 
   const handleUserChange = (username: string) => {
     console.log('[DEBUG] App: User changed from', currentUser, 'to', username)
