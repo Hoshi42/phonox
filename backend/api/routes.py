@@ -765,9 +765,6 @@ When web search information is provided below, use it to enhance your answer but
             # Even for text-only feedback, slightly increase confidence
             vinyl_record.confidence = min(1.0, vinyl_record.confidence + 0.05)
 
-        # Add user note
-        vinyl_record.user_notes = (vinyl_record.user_notes or "") + f"\nChat: {search_message[:200]}"
-
         # Commit changes
         db.commit()
         db.refresh(vinyl_record)
