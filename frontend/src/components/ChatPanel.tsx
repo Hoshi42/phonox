@@ -297,7 +297,7 @@ The vinyl card has been updated with all the details. You can edit any informati
             )}
             {message.role === 'system' && (
               <div className={styles.messageHeader}>
-                <span className={styles.sender}>System</span>
+                <span className={styles.sender}>📊 Collection Context</span>
               </div>
             )}
             
@@ -314,7 +314,7 @@ The vinyl card has been updated with all the details. You can edit any informati
                   ))}
                 </div>
               )}
-              {message.role === 'assistant' ? (
+              {(message.role === 'assistant' || message.role === 'system') ? (
                 <>
                   <div className={styles.markdown} dangerouslySetInnerHTML={{
                     __html: message.content
