@@ -45,6 +45,7 @@ export default function VinylRegister({
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid')
   const [sortBy, setSortBy] = useState<'artist' | 'title' | 'year' | 'value'>('artist')
   const [filterGenre, setFilterGenre] = useState<string>('')
+  const [searchText, setSearchText] = useState<string>('')
 
   const getRecordValue = (record: RegisterRecord) => {
     // Use the stored estimated_value_eur if available, otherwise calculate
@@ -76,11 +77,35 @@ export default function VinylRegister({
   })
 
   const filteredRecords = sortedRecords.filter(record => {
-    if (!filterGenre) return true
-    const genres = record.genres || []
-    return genres.some(genre => 
-      genre.toLowerCase().includes(filterGenre.toLowerCase())
-    )
+    // Genre filter
+    if (filterGenre) {
+      const genres = record.genres || []
+      if (!genres.some(genre => 
+        genre.toLowerCase().includes(filterGenre.toLowerCase())
+      )) {
+        return false
+      }
+    }
+    
+    // Text search filter - search across artist, title, label, catalog number, barcode
+    if (searchText) {
+      const searchLower = searchText.toLowerCase()
+      const artist = (record.artist || '').toLowerCase()
+      const title = (record.title || '').toLowerCase()
+      const label = (record.label || '').toLowerCase()
+      const catalogNumber = (record.catalog_number || '').toLowerCase()
+      const barcode = (record.barcode || '').toLowerCase()
+      
+      const matches = artist.includes(searchLower) ||
+                     title.includes(searchLower) ||
+                     label.includes(searchLower) ||
+                     catalogNumber.includes(searchLower) ||
+                     barcode.includes(searchLower)
+      
+      if (!matches) return false
+    }
+    
+    return true
   })
 
   const totalValue = filteredRecords.reduce((sum, record) => sum + getRecordValue(record), 0)
@@ -202,6 +227,14 @@ export default function VinylRegister({
           </div>
 
           <div className={styles.filters}>
+            <input
+              type="text"
+              placeholder="🔍 Search artist, title, label..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className={styles.searchInput}
+            />
+            
             <select 
               value={sortBy} 
               onChange={(e) => setSortBy(e.target.value as any)}

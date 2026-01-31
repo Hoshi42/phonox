@@ -127,6 +127,30 @@
 .filters {
   display: flex;
   gap: 12px;
+  align-items: center;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 200px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(102, 126, 234, 0.3);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: #e0e7ff;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.searchInput::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: rgba(102, 126, 234, 0.6);
+  background: rgba(102, 126, 234, 0.1);
+  box-shadow: 0 0 8px rgba(102, 126, 234, 0.2);
 }
 
 .sortSelect, .genreSelect {
@@ -543,7 +567,13 @@
   }
   
   .filters {
-    justify-content: space-between;
+    flex-direction: column;
+    justify-content: stretch;
+  }
+  
+  .searchInput {
+    min-width: auto;
+    width: 100%;
   }
   
   .recordsGrid.grid {
