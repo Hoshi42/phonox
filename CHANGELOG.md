@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.5.0
+
+### Collection Analysis & ChatPanel Integration
+- **Professional Collection Analysis**: Added "Estimate Complete Collection" feature with AI-powered analysis
+  - Compiles collection statistics (genres, decades, conditions, top artists)
+  - Sends to Claude for professional appraisal-style insights
+  - Displays formatted analysis with markdown support and tables
+  - Download analysis reports as markdown files
+- **ChatPanel Integration**: New button to send collection analysis to chat as context
+  - Seamlessly switch from register to chat with analysis pre-loaded
+  - Analysis appears as styled context message in ChatPanel
+  - Continue discussion about collection insights with AI
+
+### Data Export & Storage Improvements
+- **CSV Export Refinements**: 
+  - Changed delimiter from comma to semicolon for better European compatibility
+  - All fields exported as text format (prevents formula interpretation)
+  - European decimal formatting (comma-based)
+  - Barcode field prefixed with apostrophe to force text in spreadsheets
+  - Removed notes field from exports (chat entries no longer stored)
+- **Chat Storage Fix**: Fixed database pollution where chat messages were being stored in user_notes
+  - Chat is now purely ephemeral
+  - CSV exports clean and data-focused
+
+### UI/UX Enhancements
+- **VinylSpinner Integration**: Unified loading spinner using phonox.png across collection analysis
+- **Analysis Modal**: Professional styled modal with download and chat buttons
+- **System Messages**: New styled context messages for rich markdown content in chat
+
+
 ## 1.4.2
 
 ### Docker & CLI Improvements
