@@ -37,7 +37,7 @@ SessionLocal = None
 
 
 def override_get_db():
-    """Override get_db dependency."""
+    """Override get_db dependency to ensure SessionLocal is set."""
     if SessionLocal is None:
         raise HTTPException(
             status_code=503,
@@ -48,6 +48,7 @@ def override_get_db():
         yield db
     finally:
         db.close()
+
 
 
 @asynccontextmanager

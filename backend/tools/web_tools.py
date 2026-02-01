@@ -30,6 +30,7 @@ class WebSearchTool:
         if self.client:
             try:
                 logger.info(f"Searching web via Tavily for: {query}")
+                # Tavily search with a safety mechanism for slow responses
                 response = self.client.search(
                     query=query,
                     search_depth="basic",
@@ -45,14 +46,22 @@ class WebSearchTool:
                         "content": result.get("content", ""),
                         "score": result.get("score", 0.0)
                     })
+                
+                # If we got results, log and return early
+                if results:
+                    logger.info(f"Tavily search returned {len(results)} results")
+                    return results
 
             except Exception as e:
-                logger.error(f"Error searching Tavily: {e}")
+                logger.error(f"Error searching Tavily (will try DuckDuckGo): {e}")
 
-        # Secondary: DuckDuckGo HTML search (no API key required)
+        # Secondary: DuckDuckGo HTML search (no API key required, faster fallback)
         try:
+            logger.info(f"Searching via DuckDuckGo for: {query}")
             ddg_results = self._duckduckgo_search(query, max_results=max_results)
             results.extend(ddg_results)
+            if results:
+                logger.info(f"DuckDuckGo search returned {len(ddg_results)} results")
         except Exception as e:
             logger.error(f"Error searching DuckDuckGo: {e}")
 
@@ -67,6 +76,7 @@ class WebSearchTool:
 
         # Fallback if everything failed
         if not deduped:
+            logger.warning("No search results found, returning fallback message")
             return [{
                 "title": "Search unavailable",
                 "url": "#",
@@ -148,8 +158,8 @@ class WebScrapingTool:
             
             logger.info(f"Scraping URL: {url}")
             
-            # Make request with timeout
-            response = self.session.get(url, timeout=10)
+            # Make request with shorter timeout (5 seconds instead of 10)
+            response = self.session.get(url, timeout=5)
             response.raise_for_status()
             
             # Parse HTML
@@ -238,8 +248,8 @@ class EnhancedChatTools:
         }
         
         if scrape_results and search_results:
-            # Scrape top 2 results
-            urls_to_scrape = [r["url"] for r in search_results[:2] if r.get("url") and r["url"] != "#"]
+            # Scrape top 1 result only (reduced from 2 for faster response)
+            urls_to_scrape = [r["url"] for r in search_results[:1] if r.get("url") and r["url"] != "#"]
             if urls_to_scrape:
                 scraped = self.scraping_tool.scrape_multiple_urls(urls_to_scrape)
                 response["scraped_content"] = scraped
