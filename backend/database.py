@@ -138,11 +138,7 @@ class VinylImage(Base):  # type: ignore[misc,valid-type]
     filename: ColumnType = Column(String(255), nullable=False)
     content_type: ColumnType = Column(String(100), nullable=False)
     file_size: ColumnType = Column(Integer, nullable=False)
-    file_path: ColumnType = Column(String(500), nullable=True)  # OPTIONAL - path to file on disk (None = in-memory)
-    
-    # In-memory storage (base64 encoded image data)
-    # Allows storing images WITHOUT filling up disk space
-    image_data_base64: ColumnType = Column(Text, nullable=True)  # Base64 encoded image
+    file_path: ColumnType = Column(String(500), nullable=False)  # Path to file on disk
     
     # Metadata
     created_at: ColumnType = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -152,17 +148,8 @@ class VinylImage(Base):  # type: ignore[misc,valid-type]
     record = relationship("VinylRecord", back_populates="images")
     
     def get_image_data(self) -> Optional[bytes]:
-        """Get image data from disk or memory."""
-        import base64
-        
-        if self.image_data_base64:
-            # Image stored in-memory
-            try:
-                return base64.b64decode(self.image_data_base64)
-            except Exception:
-                return None
-        elif self.file_path and os.path.exists(self.file_path):
-            # Image stored on disk
+        """Get image data from disk."""
+        if self.file_path and os.path.exists(self.file_path):
             try:
                 with open(self.file_path, "rb") as f:
                     return f.read()
@@ -180,7 +167,6 @@ class VinylImage(Base):  # type: ignore[misc,valid-type]
             "file_size": self.file_size,
             "created_at": self.created_at,
             "is_primary": self.is_primary,
-            "storage_type": "memory" if self.image_data_base64 else "disk" if self.file_path else "unknown",
         }
 
 def get_db() -> Session:

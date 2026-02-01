@@ -28,7 +28,7 @@ from backend.database import get_db, VinylRecord, VinylImage
 
 router = APIRouter(prefix="/api/register", tags=["register"])
 
-# Upload directory
+# Image storage: Files are saved to disk
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/app/uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 

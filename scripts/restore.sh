@@ -1,7 +1,6 @@
 #!/bin/bash
 
-# Restore script for Phonox database
-# Note: Image uploads are temporary and restored from backups is not needed
+# Restore script for Phonox database and image uploads
 # Usage: ./restore.sh <backup_timestamp>
 # Example: ./restore.sh 20260125_021500
 
@@ -9,7 +8,7 @@ if [ -z "$1" ]; then
     echo "Usage: $0 <backup_timestamp>"
     echo "Example: $0 20260125_021500"
     echo ""
-    echo "Available backups:"
+    echo "Available database backups:"
     ls -1 backups/phonox_db_*.sql 2>/dev/null | sed 's/.*phonox_db_//' | sed 's/.sql$//' | sort
     exit 1
 fi
@@ -29,13 +28,24 @@ if [ -f "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql" ]; then
     
     # Restore database
     docker compose exec -T db psql -U phonox -d phonox < "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql"
-    echo "Database restored successfully!"
+    echo "✅ Database restored successfully!"
 else
-    echo "Database backup file not found: ${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql"
+    echo "❌ Database backup file not found: ${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql"
     exit 1
+fi
+
+# Restore image uploads if available
+if [ -f "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" ]; then
+    echo "Restoring image uploads..."
+    mkdir -p "${ROOT_DIR}/data"
+    tar -xzf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${ROOT_DIR}/data"
+    echo "✅ Image uploads restored successfully!"
+else
+    echo "⚠️  Image backup not found: ${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz"
+    echo "   (This is OK if no images were uploaded in that backup)"
 fi
 
 echo "Starting all containers..."
 docker compose up -d
 
-echo "Restore completed!"
+echo "✅ Restore completed!"
