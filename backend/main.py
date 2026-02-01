@@ -94,54 +94,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add CORS middleware - enhanced for mobile compatibility
+# Add CORS middleware FIRST - must be added before other middleware for proper functionality
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allow all origins for development including 192.x.x.x addresses
     allow_credentials=False,  # Must be False when using allow_origins=["*"]
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],
-    allow_headers=[
-        "*",
-        "Content-Type",
-        "Authorization", 
-        "X-Requested-With",
-        "Accept",
-        "Origin",
-        "User-Agent",
-        "Cache-Control",
-        "X-Mobile-Cache-Bust"
-    ],
-    expose_headers=[
-        "*",
-        "Content-Type",
-        "X-Total-Count",
-        "Access-Control-Allow-Origin"
-    ],
-    max_age=86400,  # Cache preflight responses for 24 hours
+    allow_headers=["*"],  # Allow all headers
+    expose_headers=["*"],  # Expose all headers to client
+    max_age=3600,  # Cache preflight responses for 1 hour
 )
 
 # Override get_db dependency
 app.dependency_overrides[get_db] = override_get_db
-
-# Add CORS debugging middleware
-@app.middleware("http")
-async def cors_debug_middleware(request: Request, call_next):
-    """Debug middleware to log CORS-related information."""
-    origin = request.headers.get("origin", "No Origin")
-    method = request.method
-    url = str(request.url)
-    
-    logger.info(f"CORS Debug - Method: {method}, URL: {url}, Origin: {origin}")
-    logger.info(f"CORS Debug - Headers: {dict(request.headers)}")
-    
-    # Call the next middleware/route
-    response = await call_next(request)
-    
-    # Log response headers
-    logger.info(f"CORS Debug - Response Status: {response.status_code}")
-    logger.info(f"CORS Debug - Response Headers: {dict(response.headers)}")
-    
-    return response
 
 # Include routers
 app.include_router(register_router)
