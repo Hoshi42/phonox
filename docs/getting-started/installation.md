@@ -49,6 +49,19 @@ DB_RETRY_DELAY=2
 DB_MAX_RETRY_DELAY=30
 ```
 
+**Web Search & Scraping** (optional - tune for network conditions):
+```env
+# Timeout for web scraping requests (seconds)
+# Default: 10 (good balance between timeout risk and response time)
+# Increase for slow internet, decrease for faster responses
+WEB_SCRAPING_TIMEOUT=10
+
+# Maximum URLs to scrape per search
+# Default: 3 (balances content depth with response time)
+# Increase for comprehensive searches, decrease for speed
+WEB_SCRAPING_MAX_URLS=3
+```
+
 **Frontend Configuration** (optional):
 ```env
 VITE_API_URL=http://localhost:8000

@@ -93,6 +93,8 @@ nano .env
 | `VITE_API_URL` | ⚠️ Optional | Backend API URL (auto-detected if not set) |
 | `DB_MAX_RETRIES` | ⚠️ Optional | Database connection retry attempts (default: 5) |
 | `DB_RETRY_DELAY` | ⚠️ Optional | Initial retry delay in seconds (default: 2) |
+| `WEB_SCRAPING_TIMEOUT` | ⚠️ Optional | Web scraping timeout in seconds (default: 10) |
+| `WEB_SCRAPING_MAX_URLS` | ⚠️ Optional | Maximum URLs to scrape per search (default: 3) |
 
 For all configuration options, see [`.env.example`](./.env.example)
 

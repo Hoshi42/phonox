@@ -21,6 +21,13 @@
   - Improved error handling with automatic DuckDuckGo fallback
   - `/web` command now responds within acceptable timeframe (25-40s)
 
+- **Web Scraping Configuration (NEW)**
+  - **`WEB_SCRAPING_TIMEOUT`**: Configurable timeout per URL (default: 10s)
+  - **`WEB_SCRAPING_MAX_URLS`**: Configurable URLs per search (default: 3)
+  - Full environment variable support for deployment flexibility
+  - Tuning recommendations in `.env.example` for different scenarios
+  - Configuration logged on startup for verification
+
 ### Verification
 - ✅ All health checks passing
 - ✅ CORS headers properly returned

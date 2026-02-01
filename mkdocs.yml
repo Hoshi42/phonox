@@ -40,6 +40,7 @@ nav:
   - Getting Started:
     - Overview: getting-started/overview.md
     - Installation: getting-started/installation.md
+    - Configuration: getting-started/configuration.md
     - Quick Start: getting-started/quick-start.md
   - User Guide:
     - Uploading Records: user-guide/uploading.md
@@ -52,7 +53,6 @@ nav:
     - Examples: api/examples.md
   - Troubleshooting & Support:
     - Database Connection: database-retry.md
-    - Configuration Guide: getting-started/installation.md
   - Contributing: contributing.md
   - Changelog: changelog.md
   - License: license.md
