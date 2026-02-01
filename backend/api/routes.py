@@ -682,20 +682,32 @@ When web search information is provided below, use it to enhance your answer but
                 logger.error(f"Error performing web search: {e}")
 
                 web_context = "\nNote: Web search temporarily unavailable."
-
         # Call Claude Haiku 4.5 (fastest, cheapest model) for intelligent response
         logger.debug(f"Calling Claude Haiku 4.5 for chat message: {request.message[:100]}")
         try:
+            # Build messages list with chat history for context
+            messages_for_claude = []
+            
+            # Add chat history if provided
+            if request.chat_history:
+                logger.debug(f"Including {len(request.chat_history)} messages from chat history")
+                for history_msg in request.chat_history:
+                    messages_for_claude.append({
+                        "role": history_msg.get("role", "user"),
+                        "content": history_msg.get("content", "")
+                    })
+            
+            # Add current message
+            messages_for_claude.append({
+                "role": "user",
+                "content": search_message,  # Use cleaned message without /web trigger
+            })
+            
             response = anthropic_client.messages.create(
                 model="claude-haiku-4-5-20251001",  # Fastest Claude model
                 max_tokens=800,  # Increased for web-enhanced responses
                 system=system_prompt + web_context,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": search_message,  # Use cleaned message without /web trigger
-                    }
-                ],
+                messages=messages_for_claude,
             )
             agent_response = response.content[0].text
             logger.debug(f"Claude response: {agent_response[:100]}")
@@ -843,16 +855,29 @@ async def general_chat(
         Keep responses informative but conversational."""
         
         try:
+            # Build messages list with chat history for context
+            messages_for_claude = []
+            
+            # Add chat history if provided
+            if request.chat_history:
+                logger.debug(f"General chat: Including {len(request.chat_history)} messages from chat history")
+                for history_msg in request.chat_history:
+                    messages_for_claude.append({
+                        "role": history_msg.get("role", "user"),
+                        "content": history_msg.get("content", "")
+                    })
+            
+            # Add current message
+            messages_for_claude.append({
+                "role": "user",
+                "content": request.message,
+            })
+            
             response = anthropic_client.messages.create(
                 model="claude-haiku-4-5-20251001",
                 max_tokens=4000,
                 system=system_prompt + "\n\n" + web_context,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": request.message,
-                    }
-                ],
+                messages=messages_for_claude,
             )
             agent_response = response.content[0].text
         except Exception as e:

@@ -242,6 +242,15 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
     setLoading(true)
 
     try {
+      // Prepare chat history (exclude current message, exclude system messages, exclude images)
+      const chatHistoryForContext = messages
+        .filter(msg => msg.role !== 'system' && !msg.images)
+        .slice(-8) // Send last 8 messages (4 pairs) for context window optimization
+        .map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }))
+
       let response: Response
       
       // Choose endpoint based on whether we have a record
@@ -250,7 +259,10 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
         response = await fetchWithTimeout(`/api/v1/identify/${record.record_id}/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: userMessage.content }),
+          body: JSON.stringify({ 
+            message: userMessage.content,
+            chat_history: chatHistoryForContext
+          }),
           timeout: TIMEOUT_PRESETS.NORMAL // 30s
         })
       } else {
@@ -258,7 +270,10 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
         response = await fetchWithTimeout('/api/v1/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: userMessage.content }),
+          body: JSON.stringify({ 
+            message: userMessage.content,
+            chat_history: chatHistoryForContext
+          }),
           timeout: TIMEOUT_PRESETS.NORMAL // 30s
         })
       }
@@ -274,7 +289,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
         web_enhanced: data.web_enhanced,
         sources_used: data.sources_used,
         search_results_count: data.search_results?.length || 0,
-        search_results: data.search_results
+        search_results: data.search_results,
+        history_context_sent: chatHistoryForContext.length
       })
       
       const assistantMessage: ChatMessage = {
