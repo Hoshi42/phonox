@@ -117,38 +117,76 @@ class WebSearchTool:
         resp = requests.get('https://duckduckgo.com/html/', params=params, headers=headers, timeout=10)
         resp.raise_for_status()
 
-        soup = BeautifulSoup(resp.text, 'html.parser')
-        results: List[Dict[str, Any]] = []
+        try:
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            results: List[Dict[str, Any]] = []
 
-        for result in soup.select('.result__body')[:max_results]:
-            link = result.select_one('a.result__a')
-            snippet_elem = result.select_one('.result__snippet')
-            if not link:
-                continue
+            for result in soup.select('.result__body')[:max_results]:
+                link = result.select_one('a.result__a')
+                snippet_elem = result.select_one('.result__snippet')
+                if not link:
+                    continue
 
-            href = link.get('href')
-            title = link.get_text(strip=True)
-            snippet = snippet_elem.get_text(strip=True) if snippet_elem else ''
+                href = link.get('href')
+                title = link.get_text(strip=True)
+                snippet = snippet_elem.get_text(strip=True) if snippet_elem else ''
 
-            results.append({
-                "title": title,
-                "url": href,
-                "content": snippet,
-                "score": 0.0  # DuckDuckGo HTML does not provide score
-            })
+                results.append({
+                    "title": title,
+                    "url": href,
+                    "content": snippet,
+                    "score": 0.0  # DuckDuckGo HTML does not provide score
+                })
 
-        logger.info(f"DuckDuckGo returned {len(results)} results for: {query}")
-        return results
+            logger.info(f"DuckDuckGo returned {len(results)} results for: {query}")
+            return results
+        finally:
+            # Always close connection to free resources
+            resp.close()
 
 
 class WebScrapingTool:
-    """Web scraping tool for extracting content from URLs."""
+    """Web scraping tool for extracting content from URLs.
+    
+    Manages requests.Session with proper cleanup and connection pooling.
+    Session is reused across scraping operations for efficiency.
+    """
     
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         })
+        # Configure connection pooling to reuse connections efficiently
+        adapter = requests.adapters.HTTPAdapter(
+            pool_connections=10,
+            pool_maxsize=10,
+            max_retries=requests.adapters.Retry(
+                total=2,
+                backoff_factor=0.3,
+                status_forcelist=(500, 502, 503, 504)
+            )
+        )
+        self.session.mount('https://', adapter)
+        self.session.mount('http://', adapter)
+    
+    def __del__(self):
+        """Cleanup session when object is garbage collected."""
+        try:
+            if hasattr(self, 'session') and self.session:
+                self.session.close()
+                logger.debug("WebScrapingTool session closed")
+        except Exception as e:
+            logger.error(f"Error closing WebScrapingTool session: {e}")
+    
+    def close(self):
+        """Explicitly close the session."""
+        try:
+            if self.session:
+                self.session.close()
+                logger.debug("WebScrapingTool session explicitly closed")
+        except Exception as e:
+            logger.error(f"Error closing WebScrapingTool session: {e}")
     
     def scrape_url(self, url: str, max_chars: int = 2000) -> Dict[str, Any]:
         """Scrape content from a URL."""

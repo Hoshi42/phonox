@@ -81,7 +81,12 @@ def lookup_discogs_metadata(
         )
         response.raise_for_status()
 
-        data = response.json()
+        try:
+            data = response.json()
+        finally:
+            # Always close connection to free resources
+            response.close()
+        
         results = data.get("results", [])
 
         if not results:
@@ -107,7 +112,11 @@ def lookup_discogs_metadata(
         )
         detail_response.raise_for_status()
 
-        release_data = detail_response.json()
+        try:
+            release_data = detail_response.json()
+        finally:
+            # Always close connection to free resources
+            detail_response.close()
 
         # Extract metadata
         metadata = {
@@ -174,7 +183,12 @@ def lookup_musicbrainz_metadata(
         )
         response.raise_for_status()
 
-        data = response.json()
+        try:
+            data = response.json()
+        finally:
+            # Always close connection to free resources
+            response.close()
+        
         releases = data.get("releases", [])
 
         if not releases:
