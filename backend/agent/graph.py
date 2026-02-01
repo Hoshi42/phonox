@@ -236,6 +236,8 @@ def vision_extraction_node(state: VinylState) -> VinylState:
                         vision_results["year"] = result.get("year")
                     if vision_results.get("label") == "Unknown" and result.get("label") != "Unknown":
                         vision_results["label"] = result.get("label")
+                    if not vision_results.get("catalog_number") and result.get("catalog_number"):
+                        vision_results["catalog_number"] = result.get("catalog_number")
             
             # Add aggregated data
             vision_results["all_barcodes"] = list(all_barcodes)
