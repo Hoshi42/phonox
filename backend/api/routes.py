@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from anthropic import Anthropic
 
 from backend.main import app
-from backend.database import VinylRecord, SessionLocal, VinylImage, VinylImage
+from backend.database import VinylRecord, get_db, VinylImage
 from backend.api.models import (
     VinylIdentifyRequest,
     VinylIdentifyResponse,
@@ -51,15 +51,6 @@ anthropic_client = Anthropic()
 chat_tools = EnhancedChatTools()
 
 router = APIRouter(prefix="/api/v1", tags=["vinyl"])
-
-
-def get_db():
-    """Get database session."""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 def _serialize_evidence_chain(evidence_chain: List[dict]) -> List[dict]:
