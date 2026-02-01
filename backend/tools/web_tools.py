@@ -11,6 +11,12 @@ from tavily import TavilyClient
 
 logger = logging.getLogger(__name__)
 
+# Web scraping configuration from environment
+WEB_SCRAPING_TIMEOUT = int(os.getenv("WEB_SCRAPING_TIMEOUT", "10"))  # seconds
+WEB_SCRAPING_MAX_URLS = int(os.getenv("WEB_SCRAPING_MAX_URLS", "3"))  # number of URLs
+
+logger.info(f"Web scraping configured: timeout={WEB_SCRAPING_TIMEOUT}s, max_urls={WEB_SCRAPING_MAX_URLS}")
+
 class WebSearchTool:
     """Web search tool using Tavily API."""
     
@@ -158,8 +164,8 @@ class WebScrapingTool:
             
             logger.info(f"Scraping URL: {url}")
             
-            # Make request with shorter timeout (5 seconds instead of 10)
-            response = self.session.get(url, timeout=5)
+            # Make request with configured timeout
+            response = self.session.get(url, timeout=WEB_SCRAPING_TIMEOUT)
             response.raise_for_status()
             
             # Parse HTML
@@ -223,7 +229,7 @@ class WebScrapingTool:
     def scrape_multiple_urls(self, urls: List[str], max_chars: int = 1500) -> List[Dict[str, Any]]:
         """Scrape multiple URLs and return results."""
         results = []
-        for url in urls[:3]:  # Limit to 3 URLs to prevent overload
+        for url in urls[:WEB_SCRAPING_MAX_URLS]:  # Limit to configured max URLs
             result = self.scrape_url(url, max_chars)
             results.append(result)
         return results
@@ -248,8 +254,8 @@ class EnhancedChatTools:
         }
         
         if scrape_results and search_results:
-            # Scrape top 1 result only (reduced from 2 for faster response)
-            urls_to_scrape = [r["url"] for r in search_results[:1] if r.get("url") and r["url"] != "#"]
+            # Scrape top results based on configuration
+            urls_to_scrape = [r["url"] for r in search_results[:WEB_SCRAPING_MAX_URLS] if r.get("url") and r["url"] != "#"]
             if urls_to_scrape:
                 scraped = self.scraping_tool.scrape_multiple_urls(urls_to_scrape)
                 response["scraped_content"] = scraped
