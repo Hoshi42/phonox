@@ -215,6 +215,7 @@ class ChatRequest(BaseModel):
     """Chat message request."""
     message: str = Field(..., min_length=1, max_length=2000)
     metadata: Optional[Dict[str, str]] = None  # e.g. {"pressing": "first", "condition": "VG+"}
+    chat_history: Optional[List[Dict[str, str]]] = None  # Previous messages for context: [{"role": "user"/"assistant", "content": "..."}]
 
     class Config:
         """Pydantic config."""
@@ -224,7 +225,11 @@ class ChatRequest(BaseModel):
                 "metadata": {
                     "pressing_year": "1987",
                     "country": "Japan"
-                }
+                },
+                "chat_history": [
+                    {"role": "user", "content": "What's the value of my record?"},
+                    {"role": "assistant", "content": "Based on the 1st pressing UK vinyl, approximately €150-200"}
+                ]
             }
         }
 
