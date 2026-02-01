@@ -15,7 +15,7 @@ from typing import Optional, Dict, Any, cast
 from io import BytesIO
 
 from anthropic import Anthropic
-from backend.agent.barcode_utils import validate_barcode, format_barcode_for_search
+from backend.agent.barcode_utils import validate_barcode, validate_catalog_number, format_barcode_for_search
 
 # Claude API timeout configuration
 CLAUDE_API_TIMEOUT = int(os.getenv("CLAUDE_API_TIMEOUT", "60"))  # seconds, default 60s
@@ -354,6 +354,16 @@ CRITICAL:
                 else:
                     logger.warning(f"Vision extraction: Invalid barcode '{metadata['barcode']}': {error}")
                     metadata["barcode"] = None
+            
+            # Validate and clean catalog_number if present
+            if metadata.get("catalog_number"):
+                is_valid, cleaned_catalog, error = validate_catalog_number(metadata["catalog_number"])
+                if is_valid and cleaned_catalog:
+                    metadata["catalog_number"] = cleaned_catalog
+                    logger.info(f"Vision extraction: Valid catalog number detected: {cleaned_catalog}")
+                else:
+                    logger.warning(f"Vision extraction: Invalid catalog number '{metadata['catalog_number']}': {error}")
+                    metadata["catalog_number"] = None
             
             # Log barcode detection success
             barcode_info = f" (barcode: {metadata.get('barcode', 'none')})" if metadata.get('barcode') else ""

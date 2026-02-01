@@ -146,3 +146,46 @@ def is_likely_barcode(text: str) -> bool:
     is_long_number = len(cleaned) >= 12 and ' ' not in text.strip()
     
     return has_keyword or is_long_number
+
+
+def validate_catalog_number(catalog_number: str) -> Tuple[bool, Optional[str], Optional[str]]:
+    """
+    Validate and clean a catalog number string.
+    
+    Catalog numbers typically have format like:
+    - "RIVET LP 005" (label + format + number)
+    - "ABC-123" (alphanumeric with hyphens)
+    - "LP-1234" (letter prefix + number)
+    - "2023-001" (year + number)
+    
+    Args:
+        catalog_number: Raw catalog number from vision extraction
+        
+    Returns:
+        Tuple of (is_valid, cleaned_catalog_number, error_message)
+    """
+    if not catalog_number or not isinstance(catalog_number, str):
+        return False, None, "Empty or invalid catalog number"
+    
+    cleaned = catalog_number.strip()
+    
+    # Must have at least 2 characters
+    if len(cleaned) < 2:
+        return False, None, f"Catalog number too short: {len(cleaned)} characters"
+    
+    # Must not be too long (catalog numbers are typically 20 chars max)
+    if len(cleaned) > 30:
+        return False, None, f"Catalog number too long: {len(cleaned)} characters"
+    
+    # Remove extra spaces
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    
+    # Catalog numbers should contain only letters, numbers, hyphens, spaces, slashes
+    if not re.match(r'^[A-Z0-9\s\-/\.]+$', cleaned, re.IGNORECASE):
+        return False, None, f"Invalid characters in catalog number: {cleaned}"
+    
+    # Must contain at least one letter or digit after cleaning
+    if not re.search(r'[A-Z0-9]', cleaned, re.IGNORECASE):
+        return False, None, "No alphanumeric characters found"
+    
+    return True, cleaned, None
