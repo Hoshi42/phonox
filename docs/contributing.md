@@ -12,16 +12,22 @@ Thank you for your interest in contributing to Phonox! We welcome contributions 
 
 ## Development Setup
 
-See [Development Guide](../development/setup.md) for detailed setup instructions.
+Use the CLI for easy setup:
 
-Quick start:
 ```bash
 git clone https://github.com/your-username/phonox.git
 cd phonox
+./phonox-cli install --up
+```
+
+Or manual setup:
+```bash
 cp .env.example .env
 # Edit .env with your API keys
 docker-compose up -d --build
 ```
+
+For troubleshooting, see [Database & Retry Configuration](database-retry.md).
 
 ## Code Style
 

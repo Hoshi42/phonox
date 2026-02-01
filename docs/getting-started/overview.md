@@ -46,11 +46,20 @@ nano .env  # or use your preferred editor
 ```
 
 **Required environment variables:**
-```
+```env
 ANTHROPIC_API_KEY=sk-ant-...
 TAVILY_API_KEY=tvly-...
 DATABASE_URL=postgresql://phonox:phonox123@db:5432/phonox
 ```
+
+**Optional database retry configuration:**
+```env
+DB_MAX_RETRIES=5
+DB_RETRY_DELAY=2
+DB_MAX_RETRY_DELAY=30
+```
+
+See [`.env.example`](../../.env.example) for all available configuration options.
 
 ### 3. Start Services
 

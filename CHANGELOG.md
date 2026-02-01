@@ -1,5 +1,66 @@
 # Changelog
 
+## 1.5.1
+
+### Database Connection & Infrastructure
+- **Automatic Database Retry Logic**: Added robust connection retry mechanism with exponential backoff
+  - Configurable retry attempts (default: 5)
+  - Exponential backoff delays: 2s → 4s → 8s → 16s → 30s
+  - Comprehensive error alerting with troubleshooting steps
+  - Critical alerts log when max retries exceeded
+  - Connection pooling with pre-ping and recycling
+  - Masked URLs in logs for security
+  - Graceful HTTP 503 responses when DB unavailable
+
+- **Enhanced CLI Installation**: Improved `install` command with detailed progress feedback
+  - Step-by-step progress indicators
+  - Database health verification during setup
+  - Clear access instructions after installation
+  - Better error messages and guidance
+
+- **CLI Documentation Command**: New `docs` command to start MkDocs server locally
+  - Automatic virtual environment detection and creation
+  - Uses existing .venv if available
+  - Automatically installs mkdocs from requirements
+  - Serves documentation at http://localhost:8001
+
+### Environment Configuration Consolidation
+- **Unified .env Configuration**: All environment variables centralized in root `.env.example`
+  - Consolidated backend, frontend, and database settings
+  - Database retry configuration fully documented
+  - Frontend polling and UI settings included
+  - Single source of truth for all configuration
+  - Removed duplicate frontend/.env.example
+
+- **Documentation Updates**:
+  - Added comprehensive environment variables table in README
+  - Installation guide includes all configuration options
+  - Database retry settings documented with examples
+  - Frontend configuration options explained
+
+### Documentation Improvements
+- **New User Guides** (3 comprehensive guides):
+  - Uploading Records: Image upload best practices, identification workflow
+  - Managing Collection: Collection organization, bulk operations, backups
+  - Chat Features: AI capabilities, query examples, web search integration
+
+- **Enhanced Installation Guide**: Complete environment setup with retry configuration
+- **Database Troubleshooting Guide**: Connection issues, retry examples, debugging tips
+- **Updated MkDocs Navigation**: Cleaned up structure, added troubleshooting section
+- **CLI Documentation**: All commands, usage examples, venv detection explained
+
+### Code Quality
+- **Improved CLI Design**: Better user feedback with styled progress messages
+- **Virtual Environment Detection**: Intelligent .venv detection before global installs
+- **Database Connection Manager**: New `backend/db_connection.py` module with:
+  - DatabaseConnectionManager class for robust connection handling
+  - Retry logic with configurable parameters
+  - Health check integration
+  - Logging and alerting system
+
+### Bugfix
+- **Frontend Environment Cleanup**: Removed redundant frontend/.env.example
+
 ## 1.5.0
 
 ### Collection Analysis & ChatPanel Integration

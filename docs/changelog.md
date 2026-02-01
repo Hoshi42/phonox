@@ -14,39 +14,37 @@ Phonox uses semantic versioning: `MAJOR.MINOR.PATCH`
 
 ## Versions
 
-### v1.3.2 (Current)
+### v1.5.1 (Current)
+
+**Database & Infrastructure**
+- Automatic database connection retry with exponential backoff
+- Configurable retry settings (attempts, delays)
+- Comprehensive error alerting and troubleshooting
+- New CLI `docs` command to view documentation locally
+- Virtual environment detection and management
+
+**Environment Configuration**
+- Unified .env configuration (all variables in one place)
+- Environment variables fully documented in README
+- Database retry configuration with examples
+- Frontend configuration options explained
 
 **Documentation**
-- Comprehensive documentation for open source release
-- API guide with endpoint documentation
-- Architecture documentation
-- Backend README with technical details
-- JSDoc comments on React components
-- Enhanced Python module docstrings
-- Environment template (.env.example)
+- 3 new user guides (uploading, collection management, chat)
+- Enhanced installation guide with all options
+- Database troubleshooting guide
+- Cleaned up MkDocs navigation structure
 
-### v1.3.1
+### v1.5.0
 
-**Cleanup**
-- Removed temporary development files
-- Project structure cleaned for open source
+**Collection Analysis & ChatPanel Integration**
+- Professional collection analysis feature
+- ChatPanel integration for analysis
+- CSV export refinements for European compatibility
+- Unified loading spinner
+- Analysis modal with download button
 
-### v1.3.0
-
-**Mobile Improvements**
-- Optimized ChatPanel for mobile (95% width, 65vh height)
-- Fixed mobile header layout (single row)
-- Aligned button styling across header
-- Responsive quick actions (2-column grid on mobile)
-
-### v1.2.3
-
-**Loading States**
-- Unified spinner across all analysis types
-- Glass-morphism overlays
-- Customizable spinner messages
-
-### v1.2.2
+### v1.4.2
 
 **Image Handling**
 - Fixed batch image processing

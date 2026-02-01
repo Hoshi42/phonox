@@ -64,7 +64,10 @@ cd phonox
 cp .env.example .env
 # Edit .env with your API keys
 
-# 3. Start services
+# 3. Use CLI for management
+./phonox-cli install --up  # Install and start
+
+# Or start services manually
 docker-compose up -d
 
 # 4. View logs
@@ -74,11 +77,30 @@ docker-compose logs -f
 ## 📚 Documentation
 
 - **[Getting Started](getting-started/overview.md)** - Installation and setup
-- **[User Guide](user-guide/uploading.md)** - How to use Phonox
+- **[Installation Guide](getting-started/installation.md)** - Detailed installation
+- **[Quick Start](getting-started/quick-start.md)** - Get started in 5 minutes
 - **[API Reference](api/introduction.md)** - Complete API documentation
-- **[Architecture](architecture/system-design.md)** - System design and internals
-- **[Development](development/setup.md)** - Developer setup and contribution
-- **[Deployment](deployment/cloud-run.md)** - Production deployment guides
+- **[Database & Retry Configuration](database-retry.md)** - Connection troubleshooting
+- **[Contributing](contributing.md)** - How to contribute
+
+## 💻 CLI Tools
+
+Phonox includes a management CLI for common tasks:
+
+```bash
+# Interactive menu
+./phonox-cli
+
+# Or specific commands
+./phonox-cli install --up       # Install and start
+./phonox-cli configure          # Configure API keys
+./phonox-cli start              # Start containers
+./phonox-cli stop               # Stop containers
+./phonox-cli restart            # Restart containers
+./phonox-cli backup             # Backup database
+./phonox-cli restore <timestamp> # Restore from backup
+./phonox-cli docs               # View documentation locally
+```
 
 ## 🛠️ Tech Stack
 
