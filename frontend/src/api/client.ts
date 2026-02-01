@@ -2,6 +2,8 @@
  * API client for communicating with Phonox FastAPI backend.
  */
 
+import { fetchWithTimeout, TIMEOUT_PRESETS } from './fetchWithTimeout'
+
 export interface ApiError {
   detail: string
 }
@@ -72,11 +74,12 @@ export class ApiClient {
     console.log('[API] identify() - Online:', navigator.onLine)
 
     try {
-      console.log('[API] identify() - Sending fetch request...')
-      const response = await fetch(url, {
+      console.log('[API] identify() - Sending fetch request with 60s timeout...')
+      const response = await fetchWithTimeout(url, {
         method: 'POST',
         body: formData,
-        headers: getCacheHeaders()
+        headers: getCacheHeaders(),
+        timeout: TIMEOUT_PRESETS.LONG // 60s for file upload
       })
 
       console.log('[API] identify() - Received response')
@@ -119,8 +122,9 @@ export class ApiClient {
     console.log('[API] getResult() - Fetching from:', url)
 
     try {
-      const response = await fetch(url, {
-        headers: getCacheHeaders()
+      const response = await fetchWithTimeout(url, {
+        headers: getCacheHeaders(),
+        timeout: TIMEOUT_PRESETS.NORMAL // 30s for polling
       })
 
       if (!response.ok) {
@@ -141,12 +145,13 @@ export class ApiClient {
   }
 
   async review(recordId: string, corrections: Record<string, unknown>): Promise<Record<string, unknown>> {
-    const response = await fetch(`${this.baseUrl}/api/v1/identify/${recordId}/review`, {
+    const response = await fetchWithTimeout(`${this.baseUrl}/api/v1/identify/${recordId}/review`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(corrections),
+      timeout: TIMEOUT_PRESETS.NORMAL // 30s
     })
 
     if (!response.ok) {
@@ -169,7 +174,7 @@ export class ApiClient {
         )
       : undefined
 
-    const response = await fetch(`${this.baseUrl}/api/v1/identify/${recordId}/chat`, {
+    const response = await fetchWithTimeout(`${this.baseUrl}/api/v1/identify/${recordId}/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -178,6 +183,7 @@ export class ApiClient {
         message,
         metadata: stringMetadata,
       }),
+      timeout: TIMEOUT_PRESETS.NORMAL // 30s for chat
     })
 
     if (!response.ok) {
@@ -199,8 +205,9 @@ export class ApiClient {
 
   async getHealth(): Promise<Record<string, unknown>> {
     const url = addCacheBustingParam(`${this.baseUrl}/health`)
-    const response = await fetch(url, {
-      headers: getCacheHeaders()
+    const response = await fetchWithTimeout(url, {
+      headers: getCacheHeaders(),
+      timeout: TIMEOUT_PRESETS.SHORT // 10s for health check
     })
     return response.json()
   }
@@ -222,9 +229,10 @@ export class ApiClient {
     console.log('[API] reanalyze() - Current record data provided:', !!currentRecord)
 
     try {
-      const response = await fetch(url, {
+      const response = await fetchWithTimeout(url, {
         method: 'POST',
         body: formData,
+        timeout: TIMEOUT_PRESETS.VERY_LONG // 2m for re-analysis (long operation)
       })
 
       console.log('[API] reanalyze() - Response status:', response.status, response.statusText)

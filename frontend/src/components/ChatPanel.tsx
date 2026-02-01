@@ -21,6 +21,7 @@
 
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
 import ReactMarkdown from 'react-markdown'
+import { fetchWithTimeout, TIMEOUT_PRESETS } from '../api/fetchWithTimeout'
 import styles from './ChatPanel.module.css'
 
 interface ChatMessage {
@@ -145,17 +146,19 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
       // Choose endpoint based on whether we have a record
       if (record) {
         // Record-specific chat with integrated web search
-        response = await fetch(`/api/v1/identify/${record.record_id}/chat`, {
+        response = await fetchWithTimeout(`/api/v1/identify/${record.record_id}/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: userMessage.content })
+          body: JSON.stringify({ message: userMessage.content }),
+          timeout: TIMEOUT_PRESETS.NORMAL // 30s
         })
       } else {
         // General chat with web search capabilities
-        response = await fetch('/api/v1/chat', {
+        response = await fetchWithTimeout('/api/v1/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: userMessage.content })
+          body: JSON.stringify({ message: userMessage.content }),
+          timeout: TIMEOUT_PRESETS.NORMAL // 30s
         })
       }
 
