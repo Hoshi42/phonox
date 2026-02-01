@@ -459,15 +459,6 @@ The vinyl card has been updated with all the details. You can edit any informati
                       }}>
                         📄 Sources ({message.sourcesUsed})
                       </div>
-                      {(() => {
-                        console.log('Rendering sources:', {
-                          sourcesUsed: message.sourcesUsed,
-                          hasSearchResults: !!message.searchResults,
-                          searchResultsLength: message.searchResults?.length || 0,
-                          searchResults: message.searchResults
-                        })
-                        return null
-                      })()}
                       {message.searchResults && message.searchResults.length > 0 && (
                         <div style={{ fontSize: '0.7rem' }}>
                           {message.searchResults.map((source, idx) => (
