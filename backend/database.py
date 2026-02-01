@@ -185,8 +185,13 @@ class VinylImage(Base):  # type: ignore[misc,valid-type]
 
 def get_db() -> Session:
     """Dependency for getting database session."""
-    # This will be configured in main.py
-    pass
+    if SessionLocal is None:
+        raise RuntimeError("Database session not initialized. Application startup failed.")
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 # Note: SessionLocal will be set up in main.py
