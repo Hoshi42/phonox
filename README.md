@@ -482,12 +482,13 @@ A: Currently manual. We're working on CSV import (see roadmap). For now, use the
 
 ---
 
-## What's New (Latest Version: 1.2.1)
+## What's New (Latest Version: 1.5.2)
 
-✨ **Version 1.2.1** (January 28, 2026)
-- Cleaned up debug artifacts
-- Improved stability
-- Fixed white screen issues
+✨ **Version 1.5.2** (February 1, 2026)
+- Fixed CORS headers blocking frontend-backend communication
+- Fixed 500 error on chat endpoint 
+- Optimized web search performance
+- All endpoints verified and working
 
 See [CHANGELOG.md](CHANGELOG.md) for complete history.
 
@@ -495,8 +496,8 @@ See [CHANGELOG.md](CHANGELOG.md) for complete history.
 
 ## Status & Roadmap
 
-**Last Updated**: 2026-01-28  
-**Current Version**: 1.2.1  
+**Last Updated**: 2026-02-01  
+**Current Version**: 1.5.2  
 **Status**: Production Ready ✅
 
 ### Completed Features

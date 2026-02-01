@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.5.2
+
+### Critical Bug Fixes
+- **Fixed CORS Headers Blocking Frontend-Backend Communication**
+  - Removed interfering debug middleware that prevented CORS header propagation
+  - Simplified and verified CORS configuration for all origins
+  - Ensures `Access-Control-Allow-Origin: *` is properly returned
+  - All cross-origin requests from frontend now work correctly
+
+- **Fixed 500 Error on Chat Endpoint**
+  - Removed duplicate `get_db()` function in routes.py
+  - Fixed `TypeError: 'NoneType' object is not callable` 
+  - Now properly imports initialized get_db from database module
+  - Chat endpoint (record-specific and general) fully operational
+
+- **Web Search Performance Optimization**
+  - Reduced URL scraping timeout from 10s to 5s
+  - Reduced scraped URLs per search from 2 to 1
+  - Improved error handling with automatic DuckDuckGo fallback
+  - `/web` command now responds within acceptable timeframe (25-40s)
+
+### Verification
+- ✅ All health checks passing
+- ✅ CORS headers properly returned
+- ✅ Database queries working
+- ✅ Chat endpoint fully functional
+- ✅ Update/Web Search buttons operational
+- ✅ Web search with `/web` command working
+
 ## 1.5.1
 
 ### Database Connection & Infrastructure

@@ -14,7 +14,15 @@ Phonox uses semantic versioning: `MAJOR.MINOR.PATCH`
 
 ## Versions
 
-### v1.5.1 (Current)
+### v1.5.2 (Current)
+
+**Critical Bug Fixes**
+- Fixed CORS headers blocking frontend-backend communication
+- Fixed 500 error on chat endpoint (duplicate get_db)
+- Optimized web search performance with timeout reductions
+- All endpoints verified and working
+
+### v1.5.1
 
 **Database & Infrastructure**
 - Automatic database connection retry with exponential backoff
