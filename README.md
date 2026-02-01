@@ -73,15 +73,28 @@ docker compose up -d
 ./phonox-cli configure --vision-model claude-sonnet-4-5-20250929 --chat-model claude-haiku-4-5-20251001
 ```
 
-Or edit `.env` file directly:
-```env
-ANTHROPIC_API_KEY=your_key_here
-TAVILY_API_KEY=your_key_here
+Or edit `.env` file directly. Use `.env.example` as a reference:
 
-# Anthropic Model Configuration (optional)
-ANTHROPIC_VISION_MODEL=claude-sonnet-4-5-20250929
-ANTHROPIC_CHAT_MODEL=claude-haiku-4-5-20251001
+```bash
+# Copy the template
+cp .env.example .env
+
+# Edit with your values
+nano .env
 ```
+
+**Key Environment Variables:**
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ANTHROPIC_API_KEY` | ✅ Yes | Claude AI API key from [console.anthropic.com](https://console.anthropic.com) |
+| `TAVILY_API_KEY` | ⚠️ Optional | Web search API key from [tavily.com](https://tavily.com) |
+| `DATABASE_URL` | ✅ Pre-configured | PostgreSQL connection (auto-configured for Docker) |
+| `VITE_API_URL` | ⚠️ Optional | Backend API URL (auto-detected if not set) |
+| `DB_MAX_RETRIES` | ⚠️ Optional | Database connection retry attempts (default: 5) |
+| `DB_RETRY_DELAY` | ⚠️ Optional | Initial retry delay in seconds (default: 2) |
+
+For all configuration options, see [`.env.example`](./.env.example)
 
 ### 3. Access the Application
 

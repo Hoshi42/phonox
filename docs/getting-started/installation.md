@@ -25,7 +25,7 @@ See [Getting Started Overview](overview.md) for comprehensive setup instructions
 
 ## Environment Configuration
 
-All configuration is done via `.env` file. See [Environment Variables](../../.env.example) for all options.
+All configuration is done via `.env` file. Copy `.env.example` to `.env` and update with your values.
 
 ### Minimum Required
 
@@ -33,12 +33,29 @@ All configuration is done via `.env` file. See [Environment Variables](../../.en
 # Anthropic API (for AI vision & chat)
 ANTHROPIC_API_KEY=sk-ant-...
 
-# Tavily API (for web search)
+# Tavily API (for web search) - optional
 TAVILY_API_KEY=tvly-...
 
 # Database (default works for Docker)
 DATABASE_URL=postgresql://phonox:phonox123@db:5432/phonox
 ```
+
+### Advanced Configuration
+
+**Database Connection Retry** (optional - handles slow database startup):
+```env
+DB_MAX_RETRIES=5
+DB_RETRY_DELAY=2
+DB_MAX_RETRY_DELAY=30
+```
+
+**Frontend Configuration** (optional):
+```env
+VITE_API_URL=http://localhost:8000
+VITE_POLL_INTERVAL=2000
+```
+
+For all available options, see [`.env.example`](../../.env.example)
 
 ## Verification
 

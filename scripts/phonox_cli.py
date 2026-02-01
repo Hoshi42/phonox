@@ -53,20 +53,47 @@ def get_compose_cmd():
 
 
 def cmd_install(args):
+    print(style("Installing Phonox...", "cyan"))
+    
+    # Create necessary directories
+    print(style("  📁 Creating directories...", "dim"))
     for path in [
         ROOT_DIR / "backups",
         ROOT_DIR / "data" / "uploads",
         ROOT_DIR / "data" / "postgres" / "data",
     ]:
         path.mkdir(parents=True, exist_ok=True)
-
+    print(style("  ✓ Directories created", "green"))
+    
     compose = get_compose_cmd()
+    
+    # Build images
     if not args.skip_build:
+        print(style("  🐳 Building Docker images...", "dim"))
         run(compose + ["build"])
+        print(style("  ✓ Images built", "green"))
+    
+    # Start containers and initialize database
     if args.up:
+        print(style("  🚀 Starting containers...", "dim"))
         run(compose + ["up", "-d"])
-
-    print("Install complete.")
+        print(style("  ✓ Containers started", "green"))
+        
+        # Check database health
+        print(style("  📊 Initializing database...", "dim"))
+        import time
+        time.sleep(5)  # Give database time to start
+        check_database_health()
+        print(style("  ✓ Database ready", "green"))
+        
+        print()
+        print(style("Installation complete! 🎉", "green"))
+        print(style("Access the application at:", "cyan"))
+        print(style("  • Frontend: http://localhost:5173", "dim"))
+        print(style("  • API Docs: http://localhost:8000/docs", "dim"))
+        print(style("  • Health Check: http://localhost:8000/health", "dim"))
+    else:
+        print(style("Install complete. Run 'phonox-cli start' to launch containers.", "green"))
 
 
 def cmd_configure(args):
@@ -260,6 +287,58 @@ def cmd_stop(_args):
     run(compose + ["down"])
 
 
+def cmd_docs(_args):
+    """Start the MkDocs documentation server."""
+    import os
+    
+    venv_path = ROOT_DIR / ".venv"
+    mkdocs_cmd = None
+    pip_cmd = None
+    
+    # Check if virtual environment exists
+    if venv_path.exists():
+        print(style("✓ ", "green") + "Using existing virtual environment (.venv)")
+        if sys.platform == "win32":
+            mkdocs_cmd = [str(venv_path / "Scripts" / "mkdocs")]
+            pip_cmd = [str(venv_path / "Scripts" / "pip")]
+        else:
+            mkdocs_cmd = [str(venv_path / "bin" / "mkdocs")]
+            pip_cmd = [str(venv_path / "bin" / "pip")]
+    else:
+        # Fall back to system mkdocs
+        if shutil.which("mkdocs"):
+            print(style("✓ ", "green") + "Using system mkdocs")
+            mkdocs_cmd = ["mkdocs"]
+            pip_cmd = ["pip"]
+        else:
+            print(style("ℹ ", "cyan") + "Virtual environment not found and mkdocs not installed globally")
+            print(style("  ", "dim") + "Creating virtual environment...")
+            
+            # Create venv
+            subprocess.run([sys.executable, "-m", "venv", str(venv_path)], check=True)
+            
+            if sys.platform == "win32":
+                mkdocs_cmd = [str(venv_path / "Scripts" / "mkdocs")]
+                pip_cmd = [str(venv_path / "Scripts" / "pip")]
+            else:
+                mkdocs_cmd = [str(venv_path / "bin" / "mkdocs")]
+                pip_cmd = [str(venv_path / "bin" / "pip")]
+    
+    # Check and install mkdocs if needed
+    if not Path(mkdocs_cmd[0]).exists():
+        print(style("ℹ ", "cyan") + "Installing MkDocs and dependencies...")
+        run(pip_cmd + ["install", "-r", "requirements-mkdocs.txt"])
+    
+    print(style("\nStarting MkDocs server...", "cyan"))
+    print(style("📚 Documentation: http://localhost:8001", "green"))
+    print(style("Press Ctrl+C to stop", "dim"))
+    
+    try:
+        run(mkdocs_cmd + ["serve", "-a", "localhost:8001"])
+    except KeyboardInterrupt:
+        print(style("\n✓ MkDocs server stopped", "green"))
+
+
 def print_logo():
     logo = r"""
  ██████╗ ██╗  ██╗ ██████╗ ███╗   ██╗ ██████╗ ██╗  ██╗
@@ -365,6 +444,7 @@ def main():
             print("6) Restart containers (with recovery)")
             print("7) Backup")
             print("8) Restore")
+            print("9) View documentation (MkDocs)")
             print("0) Exit")
 
             choice = input(style("Select an option: ", "bold")).strip()
@@ -405,6 +485,8 @@ def main():
                     print("No timestamp provided. Returning to menu.")
                     continue
                 sys.argv += ["restore", timestamp]
+            elif choice == "9":
+                sys.argv += ["docs"]
             elif choice == "0":
                 print("Goodbye.")
                 return
@@ -443,6 +525,9 @@ def main():
 
         stop = subparsers.add_parser("stop", help="Stop Docker containers")
         stop.set_defaults(func=cmd_stop)
+
+        docs = subparsers.add_parser("docs", help="Start MkDocs documentation server")
+        docs.set_defaults(func=cmd_docs)
 
         try:
             args = parser.parse_args()

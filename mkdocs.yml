@@ -43,7 +43,6 @@ nav:
     - Quick Start: getting-started/quick-start.md
   - User Guide:
     - Uploading Records: user-guide/uploading.md
-    - Viewing Results: user-guide/results.md
     - Managing Collection: user-guide/collection.md
     - Chat Features: user-guide/chat.md
   - API Reference:
@@ -51,20 +50,9 @@ nav:
     - Endpoints: api/endpoints.md
     - Authentication: api/authentication.md
     - Examples: api/examples.md
-  - Architecture:
-    - System Design: architecture/system-design.md
-    - Data Flow: architecture/data-flow.md
-    - Components: architecture/components.md
-    - Database: architecture/database.md
-  - Development:
-    - Setup: development/setup.md
-    - Backend: development/backend.md
-    - Frontend: development/frontend.md
-    - Testing: development/testing.md
-    - Docker: development/docker.md
-  - Deployment:
-    - Cloud Run: deployment/cloud-run.md
-    - Docker: deployment/docker.md
+  - Troubleshooting & Support:
+    - Database Connection: database-retry.md
+    - Configuration Guide: getting-started/installation.md
   - Contributing: contributing.md
   - Changelog: changelog.md
   - License: license.md

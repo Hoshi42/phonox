@@ -8,10 +8,11 @@ from typing import Dict, Any
 
 from fastapi import FastAPI, HTTPException, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from backend.database import Base, VinylRecord, get_db
+from backend.db_connection import DatabaseConnectionManager
 from backend.api.models import HealthCheckResponse
 from backend.api.register import router as register_router
 
@@ -22,16 +23,26 @@ logger = logging.getLogger(__name__)
 # Database configuration
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://phonox:phonox123@localhost:5432/phonox")
 
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Initialize database connection manager with retry logic
+db_manager = DatabaseConnectionManager(
+    database_url=DATABASE_URL,
+    max_retries=int(os.getenv("DB_MAX_RETRIES", "5")),
+    initial_retry_delay=int(os.getenv("DB_RETRY_DELAY", "2")),
+    max_retry_delay=int(os.getenv("DB_MAX_RETRY_DELAY", "30")),
+)
 
-# Update the global SessionLocal in database module
-import backend.database as db_module
-db_module.SessionLocal = SessionLocal
+# This will be set after successful connection
+engine = None
+SessionLocal = None
 
 
 def override_get_db():
     """Override get_db dependency."""
+    if SessionLocal is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Database connection not available. Server is initializing.",
+        )
     db = SessionLocal()
     try:
         yield db
@@ -42,15 +53,36 @@ def override_get_db():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for app startup/shutdown."""
+    global engine, SessionLocal
+    
     # Startup
     logger.info("Starting Phonox API server")
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database tables created/verified")
+    
+    try:
+        # Connect to database with retries
+        db_manager.connect()
+        engine = db_manager.get_engine()
+        SessionLocal = db_manager.get_session_maker()
+        
+        # Update the global SessionLocal in database module
+        import backend.database as db_module
+        db_module.SessionLocal = SessionLocal
+        
+        # Create tables
+        Base.metadata.create_all(bind=engine)
+        logger.info("✅ Database tables created/verified")
+        
+    except Exception as e:
+        logger.critical(f"❌ Failed to initialize database: {e}")
+        logger.critical("Application startup failed. Database connection is required.")
+        raise
 
     yield
 
     # Shutdown
     logger.info("Shutting down Phonox API server")
+    if engine:
+        db_manager.close()
 
 
 # Create FastAPI app

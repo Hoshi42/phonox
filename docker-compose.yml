@@ -35,6 +35,9 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       TAVILY_API_KEY: ${TAVILY_API_KEY}
       DATABASE_URL: ${DATABASE_URL}
+      DB_MAX_RETRIES: ${DB_MAX_RETRIES:-5}
+      DB_RETRY_DELAY: ${DB_RETRY_DELAY:-2}
+      DB_MAX_RETRY_DELAY: ${DB_MAX_RETRY_DELAY:-30}
     volumes:
       - ./backend:/app/backend
       - ./tests:/app/tests

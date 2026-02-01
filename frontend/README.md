@@ -131,12 +131,15 @@ On supported browsers:
 
 ## Environment Variables
 
-Create `.env.local` from `.env.example`:
+Create `.env.local` from the root `.env.example`:
 
 ```
 VITE_API_URL=http://localhost:8000
 VITE_POLL_INTERVAL=2000
+VITE_ENV=development
 ```
+
+For Docker environments, the root `.env` file is automatically loaded.
 
 ## Browser Support
 
