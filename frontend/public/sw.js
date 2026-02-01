@@ -31,9 +31,10 @@ self.addEventListener('activate', (event) => {
           })
         )
       }),
-      // Take control of all pages
+      // Take control of all pages (no messaging to avoid channel closing error)
       self.clients.matchAll().then((clients) => {
-        clients.forEach((client) => client.postMessage({type: 'SW_DISABLED'}))
+        console.log('SW: Matched', clients.length, 'clients')
+        // Don't send messages to clients - causes "message channel closed" error
       })
     ])
   )
