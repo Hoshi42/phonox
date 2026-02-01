@@ -1079,6 +1079,47 @@ async def reanalyze_vinyl(
             new_metadata = result_state.get("vision_extraction", {})
             logger.info(f"Extracted metadata from new images: {new_metadata}")
             
+            # ✅ CRITICAL: Validate that image detection/analysis actually succeeded
+            # If vision extraction failed or returned empty, the entire chain should fail
+            
+            # Check if vision extraction produced no results
+            if not new_metadata or len(new_metadata) == 0:
+                error_msg = result_state.get("error", "Vision extraction failed: no metadata detected from images")
+                logger.error(f"❌ Vision extraction returned empty for {record_id}: {error_msg}")
+                # Return failure - complete chain must fail if image detection fails
+                return VinylRecordResponse(
+                    record_id=record_id,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                    status="failed",
+                    error=f"Image analysis failed: {error_msg}. Could not detect vinyl record details.",
+                )
+            
+            # Check if graph invocation reported an error
+            if result_state.get("error"):
+                error_msg = result_state.get("error")
+                logger.error(f"❌ Graph invocation had error for {record_id}: {error_msg}")
+                # Return failure - chain fails if analysis had errors
+                return VinylRecordResponse(
+                    record_id=record_id,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                    status="failed",
+                    error=f"Image analysis failed: {error_msg}",
+                )
+            
+            # Check confidence score is not zero (indicates analysis failed)
+            analysis_confidence = result_state.get("confidence", 0)
+            if analysis_confidence == 0:
+                logger.error(f"❌ Analysis produced zero confidence for {record_id}")
+                return VinylRecordResponse(
+                    record_id=record_id,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                    status="failed",
+                    error="Image analysis could not produce confidence score. Check that valid vinyl record images were provided.",
+                )
+            
             # STEP 3: Intelligently enhance metadata using Claude
             from backend.agent.metadata_enhancer import MetadataEnhancer
             enhancer = MetadataEnhancer()
