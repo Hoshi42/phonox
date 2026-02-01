@@ -548,66 +548,67 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
       </div>
 
       {/* Images */}
-      {(uploadedImages.length > 0 || (record.metadata?.image_urls && record.metadata.image_urls.length > 0)) && (
-        <div className={styles.images}>
+      <div className={styles.images}>
+        {(uploadedImages.length > 0 || (record.metadata?.image_urls && record.metadata.image_urls.length > 0)) && (
           <h4>Images ({uploadedImages.length + (record.metadata?.image_urls?.length || 0) - deletedImageUrls.size})</h4>
-          <div className={styles.imageGrid}>
-            {/* Display images from database (loaded from register) */}
-            {record.metadata?.image_urls?.map((imageUrl: string, index: number) => (
-              !deletedImageUrls.has(imageUrl) && (
-                <div key={`db-${index}`} className={styles.imageItem}>
-                  <img 
-                    src={`${API_BASE}${imageUrl}`} 
-                    alt={`Record image ${index + 1}`}
-                    className={styles.image}
-                  />
-                  <button 
-                    onClick={() => {
-                      const newDeleted = new Set(deletedImageUrls)
-                      newDeleted.add(imageUrl)
-                      setDeletedImageUrls(newDeleted)
-                      console.log('VinylCard: Marked for deletion:', imageUrl)
-                    }}
-                    className={styles.removeBtn}
-                    title="Remove image"
-                  >
-                    ✕
-                  </button>
-                </div>
-              )
-            ))}
-            {/* Display uploaded images (preview before saving) */}
-            {uploadedImages.map((file, index) => (
-              <div key={`upload-${index}`} className={styles.imageItem}>
+        )}
+        <div className={styles.imageGrid}>
+          {/* Display images from database (loaded from register) */}
+          {record.metadata?.image_urls?.map((imageUrl: string, index: number) => (
+            !deletedImageUrls.has(imageUrl) && (
+              <div key={`db-${index}`} className={styles.imageItem}>
                 <img 
-                  src={URL.createObjectURL(file)} 
-                  alt={`Uploaded ${index + 1}`}
+                  src={`${API_BASE}${imageUrl}`} 
+                  alt={`Record image ${index + 1}`}
                   className={styles.image}
                 />
                 <button 
-                  onClick={() => onImageRemove?.(index)}
+                  onClick={() => {
+                    const newDeleted = new Set(deletedImageUrls)
+                    newDeleted.add(imageUrl)
+                    setDeletedImageUrls(newDeleted)
+                    console.log('VinylCard: Marked for deletion:', imageUrl)
+                  }}
                   className={styles.removeBtn}
                   title="Remove image"
                 >
                   ✕
                 </button>
               </div>
-            ))}
-          </div>
-          <label className={styles.addImageBtn}>
-            <input 
-              type="file" 
-              multiple 
-              accept="image/*"
-              onChange={(e) => {
-                if (e.target.files) {
-                  console.log('VinylCard: Adding images:', e.target.files.length)
-                  onImageAdd?.(e.target.files)
-                  // Reset the input value to allow selecting the same files again (mobile fix)
-                  e.target.value = ''
-                }
-              }}
-              style={{ display: 'none' }}
+            )
+          ))}
+          {/* Display uploaded images (preview before saving) */}
+          {uploadedImages.map((file, index) => (
+            <div key={`upload-${index}`} className={styles.imageItem}>
+              <img 
+                src={URL.createObjectURL(file)} 
+                alt={`Uploaded ${index + 1}`}
+                className={styles.image}
+              />
+              <button 
+                onClick={() => onImageRemove?.(index)}
+                className={styles.removeBtn}
+                title="Remove image"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+        <label className={styles.addImageBtn}>
+          <input 
+            type="file" 
+            multiple 
+            accept="image/*"
+            onChange={(e) => {
+              if (e.target.files) {
+                console.log('VinylCard: Adding images:', e.target.files.length)
+                onImageAdd?.(e.target.files)
+                // Reset the input value to allow selecting the same files again (mobile fix)
+                e.target.value = ''
+              }
+            }}
+            style={{ display: 'none' }}
             />
             + Add More Images
           </label>
@@ -625,8 +626,7 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
               📸 Analyze {uploadedImages.length} new image{uploadedImages.length > 1 ? 's' : ''}
             </button>
           )}
-        </div>
-      )}
+      </div>
 
       {/* Metadata */}
       <div className={styles.metadata}>
