@@ -9,6 +9,7 @@
  * - Context-aware responses based on personal record
  * - Quick action buttons for common queries
  * - Web sources attribution and citations
+ * - Chat history persistence with 10-message pair limit (20 max messages per record)
  * 
  * @component
  * @param {ChatPanelProps} props - Component props
@@ -23,6 +24,11 @@ import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 're
 import ReactMarkdown from 'react-markdown'
 import { fetchWithTimeout, TIMEOUT_PRESETS } from '../api/fetchWithTimeout'
 import styles from './ChatPanel.module.css'
+
+// Constants for chat history management
+const MAX_MESSAGE_PAIRS = 10 // Keep last 10 message pairs (prompt + response)
+const MAX_MESSAGES = MAX_MESSAGE_PAIRS * 2 // 20 total messages max
+const CHAT_HISTORY_STORAGE_KEY = 'phonox_chat_history'
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
@@ -60,25 +66,120 @@ export interface ChatPanelHandle {
   addMessage: (content: string, role?: 'user' | 'assistant' | 'system') => void
 }
 
+/**
+ * Get chat history for a specific record from localStorage
+ * @param recordId - The record ID to load history for
+ * @returns Array of stored chat messages
+ */
+const getStoredChatHistory = (recordId?: string): ChatMessage[] => {
+  if (!recordId) return []
+  try {
+    const storageKey = `${CHAT_HISTORY_STORAGE_KEY}_${recordId}`
+    const stored = localStorage.getItem(storageKey)
+    if (stored) {
+      return JSON.parse(stored).filter((msg: ChatMessage) => !msg.images) // Don't restore File objects
+    }
+  } catch (error) {
+    console.error('Error loading chat history from localStorage:', error)
+  }
+  return []
+}
+
+/**
+ * Save chat history to localStorage
+ * @param recordId - The record ID to save history for
+ * @param messages - Messages to save
+ */
+const saveChatHistory = (recordId: string | undefined, messages: ChatMessage[]): void => {
+  if (!recordId) return
+  try {
+    const storageKey = `${CHAT_HISTORY_STORAGE_KEY}_${recordId}`
+    // Don't store File objects in localStorage
+    const serializableMessages = messages.map(msg => ({
+      ...msg,
+      images: undefined
+    }))
+    localStorage.setItem(storageKey, JSON.stringify(serializableMessages))
+  } catch (error) {
+    console.error('Error saving chat history to localStorage:', error)
+  }
+}
+
+/**
+ * Enforce message limit by keeping only the last N messages
+ * @param messages - Current messages array
+ * @param maxMessages - Maximum number of messages to keep
+ * @returns Messages array trimmed to max size
+ */
+const enforceMessageLimit = (messages: ChatMessage[], maxMessages: number): ChatMessage[] => {
+  if (messages.length <= maxMessages) return messages
+  
+  // Keep greeting message + last N messages
+  const greeterIndex = messages.findIndex(msg => msg.role === 'assistant' && msg.timestamp === messages[0].timestamp)
+  const isFirstMessage = greeterIndex === 0
+  
+  if (isFirstMessage && messages.length > 1) {
+    // Keep first greeting + last (maxMessages - 1) messages
+    return [messages[0], ...messages.slice(-(maxMessages - 1))]
+  }
+  return messages.slice(-maxMessages)
+}
+
 const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
   record,
   onImageUpload,
   onAnalysisComplete,
   onMetadataUpdate,
 }: ChatPanelProps, ref) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: 'assistant',
-      content: record 
-        ? '👋 Hi! Ask me anything about this record - its value, history, pressing details, or collecting tips!'
-        : '👋 Hi! I\'m your vinyl expert with web search capabilities. Ask me about vinyl records, prices, market trends, collecting tips, or upload photos for identification!',
-      timestamp: new Date().toISOString(),
+  const initialGreeting = record 
+    ? '👋 Hi! Ask me anything about this record - its value, history, pressing details, or collecting tips!'
+    : '👋 Hi! I\'m your vinyl expert with web search capabilities. Ask me about vinyl records, prices, market trends, collecting tips, or upload photos for identification!'
+  
+  // Load initial messages from localStorage if available, otherwise use greeting
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    const stored = getStoredChatHistory(record?.record_id)
+    if (stored.length > 0) {
+      console.log(`💾 Loaded chat history for record ${record?.record_id}: ${stored.length} messages`)
+      return stored
     }
-  ])
+    return [
+      {
+        role: 'assistant',
+        content: initialGreeting,
+        timestamp: new Date().toISOString(),
+      }
+    ]
+  })
+  
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Save chat history whenever messages change
+  useEffect(() => {
+    saveChatHistory(record?.record_id, messages)
+  }, [messages, record?.record_id])
+
+  // Switch chat context when record changes
+  useEffect(() => {
+    if (record?.record_id) {
+      const stored = getStoredChatHistory(record.record_id)
+      if (stored.length > 0) {
+        console.log(`💾 Switched to chat history for record ${record.record_id}: ${stored.length} messages`)
+        setMessages(stored)
+      } else {
+        console.log(`📝 Starting new chat for record ${record.record_id}`)
+        setMessages([
+          {
+            role: 'assistant',
+            content: initialGreeting,
+            timestamp: new Date().toISOString(),
+          }
+        ])
+      }
+    }
+  }, [record?.record_id])
 
   // Expose addMessage method to parent
   useImperativeHandle(ref, () => ({
@@ -88,7 +189,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
         content,
         timestamp: new Date().toISOString(),
       }
-      setMessages(prev => [...prev, newMessage])
+      setMessages(prev => enforceMessageLimit([...prev, newMessage], MAX_MESSAGES))
     }
   }))
 
@@ -111,7 +212,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
       images: Array.from(files)
     }
 
-    setMessages(prev => [...prev, userMessage])
+    setMessages(prev => enforceMessageLimit([...prev, userMessage], MAX_MESSAGES))
 
     // Add system message
     const systemMessage: ChatMessage = {
@@ -120,7 +221,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
       timestamp: new Date().toISOString(),
     }
 
-    setMessages(prev => [...prev, systemMessage])
+    setMessages(prev => enforceMessageLimit([...prev, systemMessage], MAX_MESSAGES))
     setLoading(true)
 
     // Trigger analysis
@@ -136,7 +237,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
       timestamp: new Date().toISOString(),
     }
 
-    setMessages(prev => [...prev, userMessage])
+    setMessages(prev => enforceMessageLimit([...prev, userMessage], MAX_MESSAGES))
     setInput('')
     setLoading(true)
 
@@ -185,7 +286,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
         searchResults: data.search_results || []
       }
 
-      setMessages(prev => [...prev, assistantMessage])
+      setMessages(prev => enforceMessageLimit([...prev, assistantMessage], MAX_MESSAGES))
     } catch (error) {
       const errorMessage: ChatMessage = {
         role: 'assistant',
@@ -193,7 +294,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
         timestamp: new Date().toISOString(),
       }
 
-      setMessages(prev => [...prev, errorMessage])
+      setMessages(prev => enforceMessageLimit([...prev, errorMessage], MAX_MESSAGES))
     } finally {
       setLoading(false)
     }
@@ -226,7 +327,7 @@ ${record.metadata?.condition ? `💿 Condition: **${record.metadata.condition}**
 The vinyl card has been updated with all the details. You can edit any information if needed. Feel free to ask me questions about this record!`,
             timestamp: new Date().toISOString(),
           }
-          return [...newMessages, resultMessage]
+          return enforceMessageLimit([...newMessages, resultMessage], MAX_MESSAGES)
         })
         setLoading(false)
       }
