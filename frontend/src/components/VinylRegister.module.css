@@ -25,6 +25,13 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
+@media (max-width: 768px) {
+  .registerModal {
+    width: 95%;
+    height: 95%;
+  }
+}
+
 .header {
   display: flex;
   justify-content: space-between;
@@ -43,6 +50,33 @@
 .summary {
   font-size: 0.9rem;
   color: rgba(255, 255, 255, 0.7);
+}
+
+@media (max-width: 768px) {
+  .header {
+    padding: 12px 16px;
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .headerLeft h2 {
+    margin: 0 0 4px 0;
+    font-size: 1.2rem;
+  }
+
+  .summary {
+    font-size: 0.8rem;
+  }
+
+  .headerRight {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
 }
 
 .headerRight {
@@ -70,6 +104,16 @@
   background: rgba(16, 185, 129, 0.25);
 }
 
+@media (max-width: 768px) {
+  .csvBtn {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    gap: 4px;
+    flex: 1;
+    justify-content: center;
+  }
+}
+
 .analyzeBtn {
   background: rgba(102, 126, 234, 0.15);
   border: 1px solid rgba(102, 126, 234, 0.35);
@@ -92,6 +136,16 @@
 .analyzeBtn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .analyzeBtn {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    gap: 4px;
+    flex: 1;
+    justify-content: center;
+  }
 }
 
 .closeBtn {
@@ -122,6 +176,15 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+@media (max-width: 768px) {
+  .controls {
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px 16px;
+    align-items: stretch;
+  }
+}
+
 .viewToggle {
   display: flex;
   background: rgba(255, 255, 255, 0.05);
@@ -148,10 +211,25 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+@media (max-width: 768px) {
+  .toggleBtn {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+  }
+}
+
 .filters {
   display: flex;
   gap: 12px;
   align-items: center;
+}
+
+@media (max-width: 768px) {
+  .filters {
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
 }
 
 .searchInput {
@@ -164,6 +242,15 @@
   color: #e0e7ff;
   font-size: 0.9rem;
   transition: all 0.2s;
+}
+
+@media (max-width: 768px) {
+  .searchInput {
+    min-width: unset;
+    width: 100%;
+    font-size: 0.85rem;
+    padding: 6px 10px;
+  }
 }
 
 .searchInput::placeholder {
@@ -187,6 +274,14 @@
   cursor: pointer;
 }
 
+@media (max-width: 768px) {
+  .sortSelect, .genreSelect {
+    width: 100%;
+    font-size: 0.85rem;
+    padding: 6px 10px;
+  }
+}
+
 .sortSelect:focus, .genreSelect:focus {
   outline: none;
   border-color: rgba(102, 126, 234, 0.4);
@@ -197,6 +292,12 @@
   flex: 1;
   overflow-y: auto;
   padding: 24px;
+}
+
+@media (max-width: 768px) {
+  .recordsContainer {
+    padding: 12px;
+  }
 }
 
 .recordsGrid {
@@ -211,6 +312,17 @@
 .recordsGrid.list {
   grid-template-columns: 1fr;
   gap: 8px;
+}
+
+@media (max-width: 768px) {
+  .recordsGrid.grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 8px;
+  }
+
+  .recordsGrid {
+    gap: 8px;
+  }
 }
 
 .recordCard {
