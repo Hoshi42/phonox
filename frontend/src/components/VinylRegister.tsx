@@ -512,7 +512,7 @@ ${analysis.summary}
           <div className={styles.headerLeft}>
             <h2>🎵 My Vinyl Register</h2>
             <div className={styles.summary}>
-              {filteredRecords.length} records • Total value: €{totalValue}
+              {filteredRecords.length} records • Total value: €{totalValue.toFixed(2)}
             </div>
           </div>
           <div className={styles.headerRight}>
