@@ -163,12 +163,25 @@ TAVILY_API_KEY=tvly-...
 # Database
 DATABASE_URL=postgresql://user:pass@localhost/phonox
 
-# Upload directory
+# Image storage
 UPLOAD_DIR=/app/uploads
 
 # Server
 SERVER_PORT=8000
 ```
+
+## Image Storage
+
+Images are stored on disk at `UPLOAD_DIR` (`/app/uploads` in production):
+- One file per image upload
+- Database stores: filename, file_path, content_type, file_size
+- Backed up with `backup.sh` (tar.gz format)
+- Restored with `restore.sh`
+
+**Why disk storage?** 
+- Faster file access compared to database blobs
+- Standard practice for image-heavy applications
+- Separates concerns: metadata in DB, files on disk
 
 ## Development
 

@@ -167,6 +167,7 @@ def vision_extraction_node(state: VinylState) -> VinylState:
     all_results = []
     best_confidence = 0.0
     best_result = None
+    extraction_errors = []
     
     try:
         for idx, image in enumerate(images):
@@ -182,11 +183,20 @@ def vision_extraction_node(state: VinylState) -> VinylState:
                 
             # Call Claude 3 Sonnet for metadata extraction
             logger.info(f"vision_extraction: Analyzing image {idx + 1} with Claude 3 Sonnet (format: {image_format})...")
-            result = extract_vinyl_metadata(
-                image_base64=image_content,
-                image_format=image_format,
-                fallback_on_error=True
-            )
+            try:
+                result = extract_vinyl_metadata(
+                    image_base64=image_content,
+                    image_format=image_format,
+                    fallback_on_error=False  # No fallback - we want real errors
+                )
+            except Exception as e:
+                error_msg = str(e)
+                logger.error(f"vision_extraction: Error on image {idx + 1}: {error_msg}")
+                extraction_errors.append({
+                    "image": idx + 1,
+                    "error": error_msg
+                })
+                continue
             
             result["image_index"] = idx + 1
             result["image_path"] = image.get("path", f"image_{idx + 1}")
@@ -197,29 +207,40 @@ def vision_extraction_node(state: VinylState) -> VinylState:
             if confidence > best_confidence:
                 best_confidence = confidence
                 best_result = result
-                
-            logger.info(
-                f"vision_extraction: Image {idx + 1} - {result.get('artist', 'Unknown')} / {result.get('title', 'Unknown')} "
-                f"(confidence: {confidence:.2f})"
-            )
         
-        # Use the result with highest confidence, but aggregate barcodes and catalog numbers from all images
-        if best_result:
+        # Multi-image aggregation: Combine results intelligently
+        if best_result and all_results:
             vision_results = best_result.copy()
             
-            # Aggregate barcodes and catalog numbers from all images
+            # Aggregate data from all images for better coverage
             all_barcodes = set()
             all_catalog_numbers = set()
+            all_visible_text = []
             
             for result in all_results:
                 if result.get("barcode"):
                     all_barcodes.add(result["barcode"])
                 if result.get("catalog_number"):
                     all_catalog_numbers.add(result["catalog_number"])
+                if result.get("all_visible_text"):
+                    all_visible_text.append(result["all_visible_text"])
+            
+            # If artist or title is "Unknown" but other images found something, use it
+            if len(all_results) > 1:
+                for result in all_results:
+                    if vision_results.get("artist") == "Unknown" and result.get("artist") != "Unknown":
+                        vision_results["artist"] = result.get("artist")
+                    if vision_results.get("title") == "Unknown" and result.get("title") != "Unknown":
+                        vision_results["title"] = result.get("title")
+                    if not vision_results.get("year") and result.get("year"):
+                        vision_results["year"] = result.get("year")
+                    if vision_results.get("label") == "Unknown" and result.get("label") != "Unknown":
+                        vision_results["label"] = result.get("label")
             
             # Add aggregated data
             vision_results["all_barcodes"] = list(all_barcodes)
             vision_results["all_catalog_numbers"] = list(all_catalog_numbers)
+            vision_results["all_visible_text"] = all_visible_text
             vision_results["processed_images"] = len(all_results)
             vision_results["image_results"] = all_results
             
@@ -232,23 +253,42 @@ def vision_extraction_node(state: VinylState) -> VinylState:
                 logger.info(f"vision_extraction: Found barcodes: {list(all_barcodes)}")
             if all_catalog_numbers:
                 logger.info(f"vision_extraction: Found catalog numbers: {list(all_catalog_numbers)}")
+            if all_visible_text:
+                logger.info(f"vision_extraction: All visible text from images: {all_visible_text}")
         else:
-            # Fallback if no results
-            logger.warning("vision_extraction: No successful extractions from any image")
-            vision_results = {
-                "artist": "Unknown",
-                "title": "Unknown",
-                "year": None,
-                "label": "Unknown",
-                "catalog_number": None,
-                "barcode": None,
-                "genres": [],
-                "confidence": 0.0,
-                "processed_images": len(images),
-                "all_barcodes": [],
-                "all_catalog_numbers": [],
-                "image_results": []
-            }
+            # All images failed - raise error with details
+            if extraction_errors:
+                error_summary = "; ".join([f"Image {e['image']}: {e['error']}" for e in extraction_errors])
+                logger.error(f"vision_extraction: All images failed - {error_summary}")
+                # Return the first error as the state error
+                vision_results = {
+                    "error": extraction_errors[0]["error"],
+                    "all_errors": extraction_errors,
+                    "artist": "ERROR",
+                    "title": "ERROR",
+                    "year": None,
+                    "label": "ERROR",
+                    "catalog_number": None,
+                    "barcode": None,
+                    "genres": [],
+                    "confidence": 0.0,
+                    "processed_images": len(images)
+                }
+            else:
+                # No results at all
+                logger.warning("vision_extraction: No images were processed")
+                vision_results = {
+                    "error": "No images were successfully analyzed",
+                    "artist": "ERROR",
+                    "title": "ERROR",
+                    "year": None,
+                    "label": "ERROR",
+                    "catalog_number": None,
+                    "barcode": None,
+                    "genres": [],
+                    "confidence": 0.0,
+                    "processed_images": len(images)
+                }
 
     except Exception as e:
         logger.error(f"vision_extraction: Failed to extract metadata: {e}")
@@ -388,6 +428,11 @@ def websearch_fallback_node(state: VinylState) -> VinylState:
     artist = vision_data.get("artist", "")
     title = vision_data.get("title", "")
     barcode = vision_data.get("barcode", "")
+    
+    # Skip websearch if vision extraction failed (artist/title are ERROR)
+    if artist == "ERROR" or title == "ERROR":
+        logger.info("websearch_fallback: Skipping (vision extraction returned ERROR)")
+        return state
 
     # Try barcode search first if available (more accurate)
     websearch_results = []
@@ -570,6 +615,15 @@ def build_agent_graph():
         If confidence < 0.75, try websearch fallback.
         Otherwise, go straight to confidence_gate.
         """
+        # Skip websearch if vision extraction failed (artist/title are ERROR)
+        vision_data = state.get("vision_extraction", {})
+        artist = vision_data.get("artist", "")
+        title = vision_data.get("title", "")
+        
+        if artist == "ERROR" or title == "ERROR":
+            logger.info("route_from_lookup: Vision extraction failed (ERROR), skipping websearch")
+            return "confidence_gate"
+        
         evidence_chain = state.get("evidence_chain", [])
 
         # Calculate preliminary confidence from primary sources
