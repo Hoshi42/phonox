@@ -42,6 +42,7 @@ nav:
     - Installation: getting-started/installation.md
     - Configuration: getting-started/configuration.md
     - Quick Start: getting-started/quick-start.md
+    - CLI Tool: getting-started/cli.md
   - User Guide:
     - Uploading Records: user-guide/uploading.md
     - Managing Collection: user-guide/collection.md
