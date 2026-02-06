@@ -8,6 +8,8 @@ from typing import Dict, Any
 
 from fastapi import FastAPI, HTTPException, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -104,6 +106,31 @@ app.add_middleware(
     expose_headers=["*"],  # Expose all headers to client
     max_age=3600,  # Cache preflight responses for 1 hour
 )
+
+# Custom exception handler for RequestValidationError
+# This prevents FastAPI from trying to encode binary file data in error responses
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """
+    Handle validation errors without encoding binary data.
+    
+    This prevents UnicodeDecodeError when file uploads trigger validation errors.
+    Error responses will not include the actual request data that caused the error.
+    """
+    errors = []
+    for error in exc.errors():
+        # Create a sanitized error object without binary data
+        error_dict = {
+            "loc": error.get("loc", []),
+            "type": error.get("type", "unknown"),
+            "msg": error.get("msg", "Validation error"),
+        }
+        errors.append(error_dict)
+    
+    return JSONResponse(
+        status_code=422,
+        content={"detail": errors},
+    )
 
 # Override get_db dependency
 app.dependency_overrides[get_db] = override_get_db
