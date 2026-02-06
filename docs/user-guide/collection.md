@@ -4,248 +4,257 @@ Learn how to manage, organize, and maintain your vinyl collection in Phonox.
 
 ## Collection Overview
 
-The **Collection** panel shows all your saved records. You can:
+The **My Collection** feature stores all your saved vinyl records in a PostgreSQL database. You can:
 - View all records with thumbnails
-- Search and filter records
-- Sort by artist, title, year, or value
-- Edit record details
-- View statistics
+- Filter by user/collector
+- Load records back into VinylCard for viewing/editing
+- Delete records from your collection
+- Generate analysis reports
+
+## Opening Your Collection
+
+Click the **"My Collection"** button (top right) to open the VinylRegister modal.
+
+The register displays:
+- **User selector** - Filter by username/collector
+- **Record list** - All saved records with thumbnails
+- **Record count** - Total records for selected user
+- **Action buttons** - View, Delete, Report
 
 ## Viewing Records
 
-### Browse Your Collection
+### Browse Collection
 
-1. Click **"Collection"** tab
-2. See thumbnails of all your records
-3. Scroll to view more
-
-### Search Records
-
-Use the search bar to find:
-```
-Search for:
-- Artist name: "The Beatles"
-- Album title: "Abbey Road"
-- Year: "1969"
-- Label: "Apple"
-```
-
-### Sort & Filter
-
-**Sort by:**
-- Artist (A-Z)
-- Title (A-Z)
-- Year (oldest first)
-- Value (highest first)
-- Date added (newest first)
-
-**Filter by:**
-- Condition (poor/fair/good/excellent/near mint)
-- Genre
-- Decade
-- Collector tag
-
-## Editing Record Details
-
-### View Full Details
-
-Click any record to see:
-- Album artwork
-- Complete metadata
-- Current value
-- Your notes
-- Edit button
-
-### Edit Information
-
-Click **"Edit"** to modify:
-
-**Metadata:**
+The register shows each record with:
+- Album artwork thumbnail (if available)
 - Artist name
 - Album title
 - Release year
-- Label name
-- Catalog number
+- User/collector name
+- Date added to collection
 
-**Personal Info:**
-- Condition (select from dropdown)
-- Your notes/comments
-- Estimated value (your assessment)
-- Personal rating (1-5 stars)
-- Spotify link (paste URL)
+### Filter by User
 
-**Collector Info:**
-- Collector tag (your identifier)
-- Date acquired
-- Where purchased
-- Purchase price
+Use the user dropdown menu to:
+- View only your records
+- Switch between different collectors
+- See records from specific users
 
-### Save Changes
+### Search Within Collection
 
-Review changes and click **"Save"**
+While viewing the register:
+- Scroll through the list of records
+- Records are sorted by creation date (newest first)
+- Each record shows key identifying information
 
-## Removing Records
+### Load Record Details
+
+Click the **"View"** button on any record to:
+- Close the register modal
+- Load the complete record into VinylCard
+- Display full metadata and all images
+- Enable editing and value estimation
+- Add more images to the record
+
+## Adding Records
+
+### From Identification Results
+
+After identifying a vinyl record:
+1. Review the metadata in VinylCard
+2. Select your username from the dropdown (or type a new username)
+3. Click **"Add to Register"** button
+4. Record is saved with current date/time
+5. Confirmation message appears
+
+### Adding Images to Existing Records
+
+Once a record is in your collection:
+1. Load the record from the register (click "View")
+2. In VinylCard, click **"Add Image"** button
+3. Select up to 5 images total
+4. Images are uploaded to the record
+5. Maximum 10MB per image (PNG, JPG, GIF, WebP)
+
+## Managing Records
+
+### Edit Record Metadata
+
+To update a record:
+1. Load the record from register (click "View")
+2. In VinylCard, click on any field to edit:
+   - Artist, Title, Year, Label
+   - Catalog Number, Barcode
+   - Genres, Condition
+   - User Notes
+3. Click **"Update in Register"** to save changes
+4. Changes are persisted to database
 
 ### Delete from Collection
 
-1. Open record details
-2. Click **"Delete"** button
-3. Confirm deletion
+To remove a record:
+1. In the register, find the record
+2. Click **"Delete"** button next to the record
+3. Confirm deletion in the prompt
+4. Record is permanently removed from database
 
-**Note:** This cannot be undone. Your record history is deleted.
+**Note:** Deletion cannot be undone. The record data is permanently removed.
 
-## Collection Statistics
+### Re-analyze a Record
 
-View insights about your collection:
+To improve identification of a saved record:
+1. Load the record from register
+2. Click **"Re-analyze"** button
+3. Upload new/additional images
+4. System re-processes with updated images
+5. Metadata is refreshed
 
-- **Total Records**: Number of albums
-- **Total Value**: Sum of all estimated values
-- **Average Value**: Mean value per record
-- **By Condition**: Breakdown of conditions
-- **By Genre**: Genre distribution
-- **By Decade**: Records by release decade
-- **By Condition**: Records by physical condition
+## Collection Reports
 
-## Exporting Data
+### Generate Analysis Report
 
-### Export Collection
+Click **"Generate Report"** in the register to:
+- Create a comprehensive collection analysis
+- Export record list with metadata
+- View statistics and insights
+- Get valuation summaries
 
-Export your collection as:
-- **CSV** - Spreadsheet format
-- **JSON** - Machine-readable format
-- **PDF** - Printable format
+Report includes:
+- Total record count
+- Records by user
+- Date ranges
+- Metadata completeness
 
-Use for:
-- Insurance documentation
-- Backups
-- Analysis
-- Sharing with friends
+## User Management
 
-## Backup & Recovery
+### Multiple Collectors
 
-### Automated Backups
+Phonox supports multiple users/collectors:
+- Each user has their own collection view
+- Records are tagged with username
+- Filter collection by user
+- Useful for households or shared collections
 
-Phonox automatically backs up your collection:
-- Daily snapshots
-- Stored in `./backups/` folder
-- Kept for 7 days
+### Creating Users
 
-### Manual Backup
+Users are created automatically when:
+- Adding a record with a new username
+- Typing a new name in the user selector
+- No explicit user registration required
 
+### Switching Users
+
+To view another user's collection:
+1. Open register
+2. Select user from dropdown
+3. Register updates to show that user's records
+
+## Database & Backups
+
+### Automatic Database Storage
+
+All records are stored in PostgreSQL with:
+- Full metadata persistence
+- Image file references
+- User associations
+- Timestamps (created_at, updated_at)
+
+### Database Backups
+
+Phonox includes backup functionality:
+- Backups stored in `./backups/` directory
+- Manual backup via command line
+- Backup includes all records and images
+
+**Manual Backup:**
 ```bash
-./phonox-cli backup
+# From project root
+cd /home/hoshhie/phonox
+./scripts/backup.sh
 ```
 
-### Restore from Backup
-
+**Restore from Backup:**
 ```bash
 # List available backups
 ls -lh backups/
 
 # Restore specific backup
-./phonox-cli restore 20260201_120000
+./scripts/restore.sh backups/phonox_db_YYYYMMDD_HHMMSS.sql
 ```
 
-## Collection Best Practices
+### Docker Database
 
-### Keep Information Accurate
+If running via Docker:
+- Database is in the `db` container
+- Data persisted in Docker volume
+- Backups should be done regularly
+
+See [Database Retry Guide](../database-retry.md) for troubleshooting database connections.
+
+## Best Practices
+
+### Keep Metadata Accurate
 
 - Update condition as records age
-- Note any damage or repairs
-- Track purchases and sales
-- Update values periodically
+- Add detailed notes about pressing variants
+- Include catalog numbers when known
+- Tag records with correct user/collector
 
-### Add Detailed Notes
+### Image Management
 
-Include:
-- Pressing information (country, year)
-- Condition notes (scratches, etc.)
-- Grading (Mint/Near Mint/Very Good/etc.)
-- Purchase details
-- Seller/source information
+- Upload clear, well-lit photos
+- Include front and back covers
+- Add label photos for pressing details
+- Keep images under 10MB per file
 
-### Monitor Values
+### Organize by User
 
-- Check market prices periodically
-- Update estimated values
-- Track appreciation/depreciation
-- Review for insurance purposes
+Use different usernames for:
+- Different household members
+- Different collections (e.g., "jazz_collection", "rock_collection")
+- Gift records vs. purchased
+- Display vs. storage records
 
-### Organize Logically
+### Check Current Values
 
-Use collector tags for:
-- Genre
-- Decade
-- Series (e.g., "Pink Floyd Collection")
-- Quality tier (investment/casual)
-- Display location
-
-## Bulk Operations
-
-### Edit Multiple Records
-
-1. Select multiple records (checkboxes)
-2. Click **"Bulk Edit"**
-3. Choose fields to update:
-   - Condition
-   - Genre
-   - Collector tag
-4. Apply changes
-
-### Export Multiple Records
-
-Select records and export to:
-- CSV for spreadsheet
-- JSON for processing
-- PDF for printing
-
-## Sharing Your Collection
-
-### Share Collection Links
-
-Generate shareable link (optional):
-1. Click **"Share"** button
-2. Choose privacy level:
-   - Private (only you)
-   - Unlisted (anyone with link)
-   - Public (visible in Phonox)
-3. Copy and share link
-
-### Hide Sensitive Info
-
-Choose what to share:
-- Show/hide values
-- Show/hide personal notes
-- Show/hide condition details
-
-## Collection Goals
-
-Track collecting goals:
-
-- **Target Records**: Records you want
-- **Budget**: Monthly collecting budget
-- **Completion**: Percentage of artist/label completion
-- **Value Target**: Target collection value
+- Use **"Check Current Value"** to get market prices
+- Update periodically for insurance
+- Track appreciation over time
+- Values in both EUR and USD
 
 ## Troubleshooting
 
-**Can't find a record:**
-- Use search function
-- Check sorting/filters
-- Record may not be saved yet
+### Can't See My Records
 
-**Can't edit values:**
-- Ensure you're in Edit mode
-- Check for validation errors
-- Fields may be read-only
+- Check user filter - ensure correct user selected
+- Verify record was saved (look for confirmation message)
+- Check database connection (see top-right status indicator)
+- Refresh the page
 
-**Backup missing:**
-- Check `./backups/` folder
-- Run manual backup
-- Verify database connection
+### Images Not Loading
+
+- Check uploads/ directory has files
+- Verify file paths in database
+- Ensure images are under 10MB
+- Try uploading images again
+
+### Duplicate Records
+
+- Use "View" to check before adding duplicates
+- Compare catalog numbers and barcodes
+- Delete unwanted duplicate manually
+- Consider different pressings/editions
+
+### Database Connection Issues
+
+See [Database Retry Documentation](../database-retry.md) for:
+- Connection troubleshooting
+- Automatic retry configuration
+- PostgreSQL setup
+- Docker networking
 
 ## Next Steps
 
-- [Chat with your collection](./chat.md)
-- [Get valuations](./valuation.md)
-- [Setup backup schedule](../database-retry.md)
+- [Learn about Chat features](./chat.md)
+- [Upload new records](./uploading.md)
+- [API Reference](../api/endpoints.md)

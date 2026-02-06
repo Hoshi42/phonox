@@ -6,24 +6,37 @@ Learn how to upload and identify vinyl records in Phonox.
 
 - Phonox running locally (http://localhost:5173)
 - API keys configured in `.env`
-- Clear photos of vinyl records
+- Clear photos of vinyl records (1-5 images)
 
 ## Upload Process
 
 ### Step 1: Navigate to Upload
 
-1. Open Phonox in your browser
+1. Open Phonox in your browser at http://localhost:5173
 2. You'll see the main interface with:
-   - Chat panel (left)
-   - Upload area (center)
-   - Collection panel (right)
+   - Chat panel (left side)
+   - Upload area with drag-and-drop zone (center)
+   - Record display area (right side)
+   - "My Collection" button (top right)
 
-### Step 2: Select Image
+### Step 2: Upload Images
 
-Click the **"Upload Image"** button and choose from:
-- **Take Photo** - Use your device camera
-- **Upload File** - Select from your computer
-- **From URL** - Paste image URL
+Phonox supports **1 to 5 images** per upload. You can:
+
+**Drag and Drop:**
+- Drag image files directly onto the upload zone
+- Support for PNG, JPG, GIF, WebP formats
+- Maximum 10MB per image
+
+**Click to Upload:**
+- Click the upload zone
+- Select 1-5 images from your computer
+- Multiple images improve identification accuracy
+
+**Select Condition:**
+- Choose record condition: Poor, Fair, Good, Very Good, Near Mint, Mint
+- Default is "Good"
+- Can be updated later in the collection
 
 ### Step 3: Image Guidelines
 
@@ -44,60 +57,110 @@ For best results, use photos that show:
 - Too small
 - Reflections/glare
 
-### Step 4: Review Metadata
+### Step 4: Automatic Analysis
 
-Phonox will automatically:
-1. Extract barcode (if visible)
-2. Analyze cover art
-3. Search Discogs and MusicBrainz
-4. Retrieve metadata
-5. Estimate market value
+After upload, Phonox automatically:
+1. **Uploads images** - Displays progress for each image
+2. **AI Vision Analysis** - Analyzes cover art and labels with Claude Vision
+3. **Barcode Detection** - Extracts UPC/EAN barcodes if visible
+4. **Web Search** - Searches Discogs, MusicBrainz, and other sources
+5. **Metadata Extraction** - Retrieves artist, title, year, label, catalog number
+6. **Results Display** - Shows identified record in VinylCard
 
-Results display:
+Results display in the VinylCard:
 ```
 Artist: The Beatles
 Title: Abbey Road
 Year: 1969
 Label: Apple Records
-Confidence: 92%
-Estimated Value: €45.50
+Catalog: PCS 7088
+Barcode: 5099969945724
+Genres: Rock, Pop
 ```
+
+### Step 5: Review Results
+
+The VinylCard shows:
+- **Metadata** - All identified information
+- **Images** - Your uploaded photos
+- **Evidence Chain** - How identification was determined
+- **Edit Button** - Modify any field
+- **Value Estimation** - Get current market price
+- **Add to Collection** - Save to your register
 
 ## Improving Results
 
 ### Upload Multiple Images
 
-For better accuracy, upload:
-- Front cover
-- Back cover
-- Spine (if visible)
-- Vinyl label
+For best accuracy, upload multiple images (up to 5):
+- **Front cover** - Main identification
+- **Back cover** - Additional catalog info
+- **Vinyl label** - Pressing details
+- **Spine** - Catalog numbers
+- **Barcode** - Direct database lookup
 
-### Use Chat for Refinement
+### Use Chat for Questions
 
-Ask clarifying questions:
-- "Is this the 1975 pressing?"
-- "What's the condition?"
-- "Are there any cover variations?"
+Ask the AI assistant:
+- "Tell me more about this pressing"
+- "What's special about this edition?"
+- "What are similar albums?"
+- "Who played on this record?"
 
-### Edit Manually
+### Edit Metadata
 
-If the AI identification isn't perfect:
-1. Click **"Edit"** button
-2. Modify artist, title, year
-3. Add notes about pressing details
-4. Save
+Click on any field in VinylCard to edit:
+1. **Artist** - Click to modify
+2. **Title** - Click to edit
+3. **Year** - Change release year
+4. **Label** - Update label name
+5. **Catalog Number** - Correct catalog info
+6. **Genres** - Add or remove genres
+7. **User Notes** - Add personal notes
+8. **Condition** - Update condition rating
+
+Changes are saved automatically.
+
+### Estimate Market Value
+
+Click **"Check Current Value"** to:
+- Search current market listings
+- Get price estimates in EUR and USD
+- See value ranges by condition
+- View recent sales data
+
+### Add or Remove Images
+
+Manage images in your record:
+- **Add Images** - Upload additional photos (max 5 total)
+- **Remove Images** - Click X on any image thumbnail
+- Useful for adding better photos later
 
 ## Saving to Collection
 
-### Add to Collection
+### Add to Your Register
 
-1. Review the identified metadata
-2. Click **"Add to Collection"**
-3. Enter your collector tag (optional)
-4. Confirm
+1. Review the metadata in VinylCard
+2. Select your username from dropdown (or create new)
+3. Click **"Add to Register"** button
+4. Record is saved to your collection
 
-The record is now saved to your collection!
+### View Your Collection
+
+Click **"My Collection"** button to:
+- View all saved records
+- Search and filter
+- Load records back into VinylCard
+- Delete records
+- Generate reports
+
+## Re-analyzing Records
+
+If identification isn't accurate:
+1. Click **"Re-analyze"** button
+2. Upload better/different images
+3. System re-processes with new images
+4. Updates metadata automatically
 
 ### Edit After Saving
 

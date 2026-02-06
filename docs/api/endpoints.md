@@ -184,6 +184,54 @@ curl "http://localhost:8000/api/register?user_tag=collector123"
 
 ---
 
+### POST /api/register/images/{record_id}
+
+Add images to an existing record in the collection.
+
+**Request:**
+```bash
+curl -X POST http://localhost:8000/api/register/images/123 \
+  -F "images=@label1.jpg" \
+  -F "images=@cover2.jpg"
+```
+
+**Parameters:**
+- `record_id` (path) - Database ID of the record
+- `images` (multipart) - 1-5 image files (PNG, JPG, GIF, WebP)
+- Maximum 10MB per image
+
+**Response (200 OK):**
+```json
+{
+  "message": "Images uploaded successfully",
+  "uploaded": ["label1.jpg", "cover2.jpg"],
+  "failed": []
+}
+```
+
+**Response (400 Bad Request):**
+```json
+{
+  "detail": "No images provided"
+}
+```
+
+**Response (413 Payload Too Large):**
+```json
+{
+  "detail": "File too large: image.jpg (12.5 MB). Maximum size is 10 MB"
+}
+```
+
+**Validation:**
+- At least 1 image required
+- Maximum 5 images per request
+- Each file must be ≤ 10MB
+- Supported formats: PNG, JPG, JPEG, GIF, WebP
+- Files must not be empty
+
+---
+
 ### PUT /api/register/{record_id}
 
 Update record in collection.
