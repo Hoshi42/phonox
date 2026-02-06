@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.5.3
+
+### Critical Bug Fixes
+- **Fixed Image Upload UnicodeDecodeError**
+  - Added custom `RequestValidationError` handler to prevent encoding binary file data as UTF-8
+  - Prevents `UnicodeDecodeError: 'utf-8' codec can't decode byte 0x89...` when uploading PNG/JPEG files
+  - Error responses now only include sanitized error metadata (location, type, message)
+
+- **Enhanced Image Upload Endpoint**
+  - `POST /api/register/images/{record_id}` now has comprehensive error handling
+  - File size validation (max 10MB per file)
+  - Empty file detection
+  - Content-type validation for image files
+  - Individual error reporting per file (one file error doesn't block others)
+  - Proper database transaction management with rollback on failure
+  - Better error messages returned to frontend
+
+### Verification
+- ✅ Image uploads succeed without UnicodeDecodeError
+- ✅ Images saved to database and disk
+- ✅ Images visible in register list view
+- ✅ Images displayed on vinyl card detail view
+- ✅ Proper error handling for invalid files
+- ✅ Multi-file uploads partially succeed if some files fail
+
 ## 1.5.2
 
 ### Critical Bug Fixes
