@@ -14,7 +14,16 @@ Phonox uses semantic versioning: `MAJOR.MINOR.PATCH`
 
 ## Versions
 
-### v1.5.2 (Current)
+### v1.5.3 (Current)
+
+**Critical Bug Fixes**
+- Fixed Image Upload UnicodeDecodeError when uploading PNG/JPEG files
+- Added custom RequestValidationError handler to prevent binary data encoding
+- Enhanced POST /api/register/images/{record_id} endpoint with comprehensive validation
+- File size validation (max 10MB), empty file detection, content-type validation
+- Individual error reporting per file with proper database transaction management
+
+### v1.5.2
 
 **Critical Bug Fixes**
 - Fixed CORS headers blocking frontend-backend communication

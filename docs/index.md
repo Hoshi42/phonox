@@ -14,15 +14,17 @@ Phonox is an AI-powered application that helps you:
 ## ✨ Key Features
 
 ### 🤖 AI-Powered Identification
-- Upload photos of your vinyl records
-- Get instant identification using Claude 3.5 Sonnet vision analysis
+- Upload photos of your vinyl records (1-5 images)
+- Get instant identification using Claude Sonnet 4 vision analysis
+- Automatic barcode detection (UPC/EAN)
 - Automatic metadata enrichment from Discogs, MusicBrainz, and Spotify
 
 ### 💾 Collection Management
-- Build your personal vinyl collection
+- Build your personal vinyl collection in PostgreSQL database
 - Track condition, value, and notes
-- Sort by artist, title, year, or estimated value
-- Export your collection data
+- Multiple user/collector support
+- Filter and search your records
+- Add images to existing records
 
 ### 💬 Intelligent Chat
 - Ask questions about your records
@@ -114,7 +116,8 @@ Phonox includes a management CLI for common tasks:
 - **FastAPI** - Modern Python web framework
 - **SQLAlchemy** - ORM for database operations
 - **LangGraph** - Orchestration for AI workflows
-- **Claude 3.5 Sonnet** - Vision and chat models
+- **Claude Sonnet 4** - Vision analysis
+- **Claude Haiku 4.5** - Chat assistant
 
 ### External Services
 - **Anthropic Claude** - AI vision and chat
@@ -124,10 +127,9 @@ Phonox includes a management CLI for common tasks:
 - **Spotify** - Music streaming data
 
 ### Infrastructure
-- **PostgreSQL** - Production database
+- **PostgreSQL 15** - Production database
 - **Docker** - Containerization
-- **Docker Compose** - Local development
-- **Cloud Run** - Serverless deployment
+- **Docker Compose** - Multi-container orchestration
 
 ## 📊 System Architecture
 
@@ -136,7 +138,7 @@ Phonox uses a 6-node LangGraph workflow for record identification:
 ```
 Image Upload
     ↓
-Vision Analysis (Claude)
+Vision Analysis (Claude Sonnet 4)
     ↓
 Metadata Lookup (Discogs/MusicBrainz)
     ↓
@@ -148,8 +150,6 @@ Result Refinement
     ↓
 User Review & Storage
 ```
-
-See [System Design](architecture/system-design.md) for detailed architecture.
 
 ## 🔑 Required API Keys
 
@@ -229,9 +229,9 @@ Copyright © 2026 Phonox Contributors
 
 ## 🎵 Project Status
 
-**Version**: 1.3.2  
+**Version**: 1.5.3  
 **Status**: Active Development  
-**Last Updated**: January 29, 2026
+**Last Updated**: February 6, 2026
 
 See [Changelog](changelog.md) for version history.
 
