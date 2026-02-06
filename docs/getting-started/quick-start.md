@@ -2,102 +2,128 @@
 
 Get your first vinyl record identified in 5 minutes.
 
-## Step 1: Prepare an Image
+## Step 1: Prepare Images
 
-Get a clear photo of a vinyl record cover. Best results with:
-- Record sleeve/cover (clearly visible)
-- Good lighting
-- Straight angle (not too tilted)
-- At least 300x300 pixels
+Get 1-5 clear photos of your vinyl record. Best results with:
+- Front cover (album artwork)
+- Back cover (tracklist, barcode)
+- Vinyl label (pressing details)
+- Good lighting, straight angle
+- At least 300x300 pixels, max 10MB each
 
-## Step 2: Upload & Identify
+## Step 2: Upload & Analyze
 
 1. Open **http://localhost:5173** in your browser
-2. Click **"Upload Image"** button
-3. Select your vinyl photo
-4. Click **"Identify"**
+2. Drag images onto the upload zone (or click to select)
+3. Select condition: Poor / Fair / Good / Very Good / Near Mint / Mint
+4. Click **"Analyze"** button
 
-The app will:
-- Upload the image
-- Analyze with AI vision
-- Search for metadata
-- Show results in ~5-10 seconds
+System automatically:
+- Uploads all images
+- Analyzes with AI vision (Claude Sonnet 4)
+- Extracts barcodes if visible
+- Searches Discogs and MusicBrainz
+- Shows results in 5-10 seconds
 
 ## Step 3: Review Results
 
-You'll see:
+VinylCard displays identified metadata:
 
 ```
 Artist: The Beatles
 Title: Abbey Road
 Year: 1969
 Label: Apple Records
-Confidence: 92%
-Estimated Value: €45.50
+Catalog: PCS 7088
+Barcode: 5099969945724
+Genres: Rock, Pop
 ```
 
-**Actions:**
-- ✅ **Confirm** - Save as-is
-- ✏️ **Edit** - Modify details
-- 🔄 **Re-analyze** - Upload more images
-- 💬 **Chat** - Ask questions about the record
+## Step 4: Optional Actions
 
-## Step 4: Add to Collection
+**Edit Metadata**
+- Click any field to edit
+- Correct artist, title, year, etc.
+- Add personal notes
 
-1. Click **"Add to Collection"** button
-2. Enter your name (saves as "collector1" by default)
-3. Confirm
+**Check Market Value**
+- Click "Check Current Value"
+- Gets EUR and USD prices
+- Searches current market data
 
-Your record is now saved! View it anytime in the **"My Records"** panel on the right.
+**Chat About Record**
+- Ask questions in chat panel
+- AI has record context
+- Get pressing information
 
-## Step 5: Manage Collection
+## Step 5: Save to Collection
 
-In **"My Records"** panel:
-- **View Details** - Full record information
-- **Edit** - Change condition, notes, value
-- **Remove** - Delete from collection
-- **Sort** - By artist, title, year, value
-- **Filter** - By genre or condition
+1. Select your username from dropdown (or type new name)
+2. Click **"Add to Register"** button
+3. Record saved to PostgreSQL database
+4. View anytime in "My Collection"
+
+## Managing Your Collection
+
+Click **"My Collection"** button (top right):
+- View all saved records with thumbnails
+- Filter by user/collector
+- Click "View" to load record details
+- Click "Delete" to remove records
+- Generate analysis reports
 
 ## Tips for Best Results
 
-### Optimal Image Quality
-- 📸 Use clear, well-lit photos
-- 🎯 Focus on the album sleeve
-- 📐 Keep the record level/straight
-- 🚫 Avoid reflections and glare
+### Image Quality
+- 📸 Clear, well-lit photos
+- 🎯 Include barcode when visible
+- 📐 Straight angle, avoid glare
+- 📚 Multiple images improve accuracy (1-5 images)
+
+### Barcode Detection
+- UPC/EAN barcodes enable direct database lookup
+- Photo of back cover usually has barcode
+- Automatic extraction saves time
+- Most accurate identification method
 
 ### Improve Identification
-- 📚 Add more images (front + back + spine)
-- 💬 Use chat to refine results
-- ✏️ Correct any errors in the metadata
-- 🔄 Re-analyze with better photos
+- Upload front + back + label for best results
+- Use chat to refine uncertain identifications
+- Edit fields manually if needed
+- Re-analyze with better photos if accuracy low
 
-### Manage Your Collection
-- 🏷️ Add personal notes (condition, where bought, etc.)
-- 💰 Track estimated values
-- 🎵 Organize by genre or decade
-- 📊 View collection statistics
+### Collection Management
+- Use meaningful usernames/tags
+- Add notes about condition, pressing, source
+- Check values periodically
+- Keep backup of database
 
 ## Common Questions
 
-**Q: Why is identification taking so long?**
-A: First identification may take 8-10 seconds. Subsequent requests are faster due to caching.
+**Q: How many images should I upload?**
+A: 1-5 images. More images = better accuracy. Include front, back, and label when possible.
 
-**Q: Can I upload multiple images at once?**
-A: Yes! Upload 2-3 images (front/back/spine) for better accuracy.
+**Q: How long does identification take?**
+A: Usually 5-10 seconds. First request may take slightly longer.
 
-**Q: How accurate is the identification?**
-A: ~85-95% for common records. Less common pressings may need manual adjustment.
+**Q: Can I edit the results?**
+A: Yes! Click any field in VinylCard to edit. Changes are saved when you update or add to register.
 
-**Q: Can I export my collection?**
-A: See [User Guide - Collection Management](../user-guide/collection.md) for export options.
+**Q: How accurate is barcode detection?**
+A: Very accurate when barcode is visible and clear. Directly looks up in databases.
+
+**Q: Can I add more images later?**
+A: Yes! Load record from collection, click "Add Image" button in VinylCard.
+
+**Q: Where are images stored?**
+A: Locally in `./uploads/` directory with references in PostgreSQL database.
 
 ## Next Steps
 
-- 📖 Read [User Guide](../user-guide/uploading.md) for detailed features
-- 🤖 Learn about [AI Chat](../user-guide/chat.md)
-- 💬 Ask questions in the chat interface!
+- 📖 Read [Full Upload Guide](../user-guide/uploading.md)
+- 🗂️ Learn [Collection Management](../user-guide/collection.md)
+- 💬 Explore [Chat Features](../user-guide/chat.md)
+- 🔧 Review [API Reference](../api/endpoints.md)
 
 ## Troubleshooting
 

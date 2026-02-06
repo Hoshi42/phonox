@@ -1,90 +1,62 @@
 # Chat Features
 
-Learn how to interact with the AI chatbot about your vinyl records.
+Learn how to interact with the AI assistant about vinyl records in Phonox.
 
 ## Getting Started with Chat
 
-### Access Chat
+### Access Chat Panel
 
-The chat panel is on the left side of the main interface.
+The chat panel is on the left side of the main interface and is always visible.
 
-Start a conversation:
-1. Type your question in the message box
-2. Press Enter or click Send
-3. AI responds with information about records
+### Start a Conversation
+
+1. Type your message in the text input at the bottom
+2. Press Enter or click the Send button
+3. AI responds with information
+
+The chat uses **Claude 3.5 Haiku** for efficient, cost-effective responses.
 
 ## Chat Capabilities
 
-### Ask About Records
+### General Vinyl Questions
 
-**Identify records:**
-- "What Beatles albums do I have?"
-- "Show me my Pink Floyd collection"
-- "List all records from 1975"
+Ask about vinyl records in general:
+- "What makes a first pressing valuable?"
+- "How do I identify the condition of a record?"
+- "What's the difference between stereo and mono pressings?"
+- "Tell me about Beatles vinyl releases"
+- "What are the most collectible jazz albums?"
 
-**Get information:**
-- "Tell me about this album"
-- "What's the history of this artist?"
-- "Who are the musicians on this record?"
+### Record-Specific Chat
 
-**Get recommendations:**
-- "What should I listen to next?"
-- "Recommend albums similar to this"
-- "What other artists did this producer work with?"
+When you have a record loaded in VinylCard, chat becomes context-aware:
+- "Tell me more about this pressing"
+- "What's special about this edition?"
+- "What are similar albums I should look for?"
+- "Who were the musicians on this record?"
+- "What's the history of this label?"
 
-### Query Your Collection
+The AI automatically knows:
+- Current record's artist and title
+- Label and catalog information
+- Year and genres
+- Any barcode or pressing details
 
-**Search questions:**
-- "How many records do I have?"
-- "What's the most valuable record I own?"
-- "Which condition rating has the most records?"
-- "Show me my records from the 1980s"
+### Web-Enhanced Responses
 
-**Value questions:**
-- "What's my collection worth?"
-- "Which albums increased in value?"
-- "What are rare editions worth?"
-- "How does this pressing compare?"
+The chat can search the web in real-time for:
+- Current market prices and trends
+- Recent sales data
+- Pressing variants and editions
+- Artist background and discography
+- Label history
 
-## Advanced Queries
+Simply ask questions like:
+- "What's the current market value of this record?"
+- "Are there other pressings of this album?"
+- "What other albums did this artist release in 1973?"
 
-### Complex Searches
-
-Ask multi-part questions:
-- "Of my records from the 70s, which ones are worth over €100?"
-- "Show me all prog rock albums in excellent condition"
-- "Which David Bowie albums do I have and what are they worth?"
-
-### Web Search Integration
-
-Chat can search the web for:
-- Current market prices
-- Pressing information
-- Artist background
-- Upcoming releases
-- Music news
-
-Prefix question with "Search: " to use web search:
-```
-Search: What's the current price of this Pink Floyd pressing?
-```
-
-## Conversation Context
-
-The AI remembers:
-- Your uploaded records
-- Your collection
-- Previous questions in session
-- Album metadata
-
-### Continue Conversations
-
-Reference previous topics:
-- "What else did that artist release?"
-- "Are those albums also in my collection?"
-- "Tell me more about the variations"
-
-## Tips for Better Results
+## Chat Best Practices
 
 ### Be Specific
 
@@ -95,147 +67,178 @@ Instead of:
 
 Try:
 ```
-"What's special about the 1971 first pressing of this album?"
+"What makes the UK first pressing different from the US release?"
 ```
 
-### Use Album Details
+### Ask Follow-up Questions
 
-Provide context:
-- Album title
-- Artist name
-- Release year
-- Pressing country
-
-### Ask Follow-ups
-
+The chat maintains conversation context:
 ```
-Chat: "The Beatles' Abbey Road was released in 1969"
-You: "What pressing variations exist?"
-Chat: "Several pressings exist from different countries..."
-You: "How do I identify which I have?"
+You: "Tell me about Abbey Road"
+AI: [Response about Abbey Road]
+You: "What other albums did they release that year?"
+AI: [Continues conversation about Beatles' 1969 releases]
 ```
 
-## Collection Integration
+### Technical Questions
 
-### Chat About Your Records
+Ask about vinyl technology:
+- "What does 180g vinyl mean?"
+- "How do I clean vinyl records safely?"
+- "What's a gatefold sleeve?"
+- "What does DMM mastering mean?"
 
-The AI has access to:
-- All records in your collection
-- Metadata (artist, title, year, condition)
-- Your notes and ratings
-- Estimated values
+### Market and Value Questions
 
-### Example Conversations
+Get pricing insights:
+- "What's a fair price for this condition?"
+- "Has this album increased in value?"
+- "What affects vinyl record values?"
+- "Are picture discs worth collecting?"
 
-**User:** "What's the value trend of my collection?"
-**AI:** *Analyzes collection values over time*
+## Chat Integration
 
-**User:** "Which records should I look for?"
-**AI:** *Suggests missing albums from artists you own*
+### From VinylCard
 
-**User:** "Compare my pressing to the original"
-**AI:** *Details differences and value implications*
+When viewing a record in VinylCard:
+- Chat automatically has record context
+- Click "Chat about this record" for direct integration
+- AI references current record in responses
 
-## Troubleshooting
+### During Identification
 
-**Chat not responding:**
+While records are being analyzed:
+- Chat about general topics
+- Ask questions about the analysis process
+- Get help with image quality
+
+### In Collection View
+
+Navigate to different records:
+- Chat context updates automatically
+- Ask comparisons between records
+- Get collecting advice
+
+## Chat Features
+
+### Message History
+
+- See full conversation history
+- Scroll through previous messages
+- Context is maintained within session
+- Clear chat to start fresh conversation
+
+### Smart Context Switching
+
+When you load a new record:
+- Chat updates to new record context
+- Can still reference previous conversations
+- AI understands record transitions
+
+### Error Handling
+
+If chat encounters issues:
+- Error messages are displayed clearly
+- Try rephrasing your question
 - Check internet connection
-- API keys may be invalid
-- Restart if unresponsive
+- Refresh page if needed
 
-**Wrong information:**
-- Clarify your question
-- Provide more details
-- Ask differently
+## Example Conversations
 
-**Missing records:**
-- Ensure record is saved to collection
-- Chat sees only records you've added
-- Upload and save record first
-
-## Chat Command Examples
+### Identifying Records
 
 ```
-# Collection questions
-"Show me my complete collection"
-"How many records do I own?"
-"What's the most expensive record I have?"
-
-# Artist/Album questions
-"Tell me about The Beatles"
-"What albums did David Bowie release?"
-"Who produced this album?"
-
-# Valuation questions
-"What's my collection worth?"
-"Is this a valuable pressing?"
-"What's the market price?"
-
-# Search questions
-"Search: Current price for Pink Floyd DSOTM first pressing"
-"Search: Which The Beatles pressing is most valuable"
-
-# Condition/Rating questions
-"What records are in excellent condition?"
-"How should I rate this album?"
-"Rate my collection by condition"
+You: "I have a vinyl with a blue label that says 'Capitol'"
+AI: "Capitol Records used different label colors across eras. Blue labels 
+typically indicate releases from the 1970s. Can you describe the album 
+or show me an image?"
 ```
+
+### Valuation Questions
+
+```
+You: "What's this record worth?"
+AI: "Let me search current market data for [Album Name] by [Artist]...
+Based on recent sales, this pressing in 'Near Mint' condition typically
+sells for €45-60 EUR ($50-65 USD). Values vary by condition and 
+pressing variant."
+```
+
+### Collecting Advice
+
+```
+You: "Should I collect original pressings or reissues?"
+AI: "It depends on your goals:
+- Original pressings often have better value appreciation
+- First pressings may have superior mastering
+- Modern reissues can offer better sound quality
+- Budget matters - reissues are more affordable
+What's your collecting budget and focus?"
+```
+
+## Chat Limitations
+
+### What Chat Can Do
+
+✅ Answer general vinyl questions
+✅ Provide market insights via web search
+✅ Discuss specific records in VinylCard
+✅ Give collecting advice
+✅ Explain technical terms
+✅ Share historical information
+
+### What Chat Cannot Do
+
+❌ Directly modify your collection
+❌ Add/delete records from register
+❌ Edit metadata in VinylCard
+❌ Upload images
+❌ Access other users' collections
+❌ Perform transactions
+
+Use the UI buttons in VinylCard and VinylRegister for those actions.
 
 ## Privacy & Data
 
-- Chat history is NOT stored permanently
-- Your collection data is private
-- Messages help improve the AI
-- Use responsibly
+- Chat conversations are not stored permanently
+- No personal information is collected from chat
+- Web searches are performed anonymously
+- Record metadata shared with AI for context only
+- Clear chat history to remove conversation data
 
-## Advanced Features
+## Tips for Better Results
 
-### Set Preferences
+1. **Be descriptive** - Provide details about what you're asking
+2. **Use proper terminology** - "first pressing" vs "reissue"
+3. **Ask one question at a time** - Better focus and accuracy
+4. **Clarify condition** - Specify "Near Mint" vs "VG+"
+5. **Mention pressing details** - Country, year, label color
 
-Configure chat behavior:
-- Response style (concise/detailed)
-- Web search (always/ask/never)
-- Emoji usage (yes/no)
+## Troubleshooting
 
-### Export Conversations
+### Chat Not Responding
 
-Save chat logs:
-```bash
-# Currently not implemented
-# Feature planned for v2.0
-```
+- Check internet connection
+- Verify backend is running (http://localhost:8000/health)
+- Look for error messages in chat
+- Refresh the page
 
-### Multi-language Support
+### Web Search Not Working
 
-Chat supports multiple languages:
-- English (default)
-- German
-- French
-- Spanish
+- Tavily API key must be configured in `.env`
+- Check API quota/limits
+- Try again without web search dependency
+- See error details in backend logs
 
-Specify in preferences.
+### Context Not Working
 
-## Limitations
-
-The AI:
-- ✅ Knows public album information
-- ✅ Understands vinyl pressing variations
-- ✅ Has web search capability
-- ✅ Accesses your collection data
-- ❌ Cannot make purchase decisions for you
-- ❌ Market prices may not be 100% accurate
-- ❌ Cannot browse external websites directly
-
-## Getting Help
-
-For chat issues:
-1. Refresh the browser
-2. Clear browser cache
-3. Check API keys in `.env`
-4. Restart backend: `docker-compose restart backend`
+- Ensure a record is loaded in VinylCard
+- Try reloading the record
+- Ask explicitly about the specific album
+- Provide more context in your question
 
 ## Next Steps
 
+- [Upload and identify records](./uploading.md)
 - [Manage your collection](./collection.md)
-- [View valuations](./valuation.md)
-- [Upload more records](./uploading.md)
+- [API Reference](../api/endpoints.md)
