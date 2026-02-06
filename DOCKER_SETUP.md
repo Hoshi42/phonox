@@ -57,9 +57,13 @@ docker-compose exec frontend npm run test:e2e
 ```
 
 ### Database & Files
-- SQLite database: `./phonox.db` (mounted as volume)
-- Persistent between container restarts
-- Backed up in your local filesystem
+- **PostgreSQL database**: Managed by Docker Compose
+  - Container: `phonox_db`
+  - Data volume: `./data/postgres/data` (persistent storage)
+  - Connection: `postgresql://phonox:phonox123@db:5432/phonox`
+- **Image uploads**: Stored in `./data/uploads` (persistent)
+- All data persists between container restarts
+- Database backed up automatically in local filesystem
 
 ## Container Management
 
@@ -97,7 +101,8 @@ docker-compose up -d backend           # Restart backend
 **phonox_backend** (Python 3.12-slim)
 - FastAPI application
 - Port: 8000
-- Volume mounts: `./backend`, `./phonox.db`
+- Volume mounts: `./backend`, `./data/uploads`
+- Database: Connects to `phonox_db` container
 - Healthcheck: Curl to `/health` endpoint
 - Auto-reload: Enabled
 
@@ -108,10 +113,24 @@ docker-compose up -d backend           # Restart backend
 - Healthcheck: Wget to root path
 - Auto-reload: Enabled
 
+**phonox_db** (PostgreSQL 15-alpine)
+- PostgreSQL database server
+- Port: 5432 (internal only, not exposed to host)
+- Database: `phonox`
+- User: `phonox`
+- Password: `phonox123` (change for production!)
+- Volume mount: `./data/postgres/data` (persistent storage)
+- Healthcheck: pg_isready command
+
 ### Network
 - Network: `phonox_network` (bridge driver)
-- Backend accessible as: `http://backend:8000` from frontend container
-- Localhost accessible from host: `http://localhost:8000`, `http://localhost:5173`
+- Container-to-container communication:
+  - Backend → Database: `postgresql://phonox:phonox123@db:5432/phonox`
+  - Frontend → Backend: `http://backend:8000`
+- Host access:
+  - Frontend UI: `http://localhost:5173`
+  - Backend API: `http://localhost:8000`
+  - Database: Not exposed (internal only)
 
 ## Troubleshooting
 
@@ -131,6 +150,22 @@ docker-compose down
 # Find what's using the port (macOS/Linux)
 lsof -i :8000    # Backend
 lsof -i :5173    # Frontend
+lsof -i :5432    # PostgreSQL (if exposed)
+```
+
+### Database connection issues
+```bash
+# Check database container is running
+docker-compose ps db
+
+# View database logs
+docker-compose logs db
+
+# Test database connectivity from backend
+docker-compose exec backend python -c "from backend.database import engine; print('Connected!' if engine else 'Failed')"
+
+# Database automatically retries connection (5 attempts with exponential backoff)
+# If issues persist, check DATABASE_URL in docker-compose.yml
 ```
 
 ### Clear everything and start fresh
