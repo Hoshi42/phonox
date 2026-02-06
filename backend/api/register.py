@@ -362,48 +362,109 @@ async def upload_images(
     files: List[UploadFile] = File(...),
     db: Session = Depends(get_db)
 ):
-    """Upload images for a record."""
+    """
+    Upload images for a record.
+    
+    Handles multipart file uploads and stores them on disk and in database.
+    Only accepts image files. Returns uploaded image metadata.
+    """
+    # Validate record exists
     record = db.query(VinylRecord).filter(VinylRecord.id == record_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Record not found")
     
+    # Validate files list is not empty
+    if not files or len(files) == 0:
+        raise HTTPException(status_code=400, detail="No files provided")
+    
     uploaded_images = []
+    errors = []
     
-    for file in files:
-        # Validate file type
-        if not file.content_type or not file.content_type.startswith('image/'):
-            continue
-            
-        # Generate unique filename
-        file_extension = os.path.splitext(file.filename or '')[1] or '.jpg'
-        unique_filename = f"{uuid.uuid4()}{file_extension}"
-        file_path = os.path.join(UPLOAD_DIR, unique_filename)
+    try:
+        for idx, file in enumerate(files):
+            try:
+                # Validate file type
+                if not file.content_type or not file.content_type.startswith('image/'):
+                    errors.append({
+                        "file": file.filename or f"file_{idx}",
+                        "error": "Not an image file. Accepted types: image/jpeg, image/png, image/webp, etc."
+                    })
+                    continue
+                
+                # Read file content
+                content = await file.read()
+                
+                # Validate file size (max 10MB)
+                max_size = 10 * 1024 * 1024  # 10MB
+                if len(content) > max_size:
+                    errors.append({
+                        "file": file.filename or f"file_{idx}",
+                        "error": f"File too large. Maximum size is {max_size / 1024 / 1024:.0f}MB"
+                    })
+                    continue
+                
+                # Validate file is not empty
+                if len(content) == 0:
+                    errors.append({
+                        "file": file.filename or f"file_{idx}",
+                        "error": "File is empty"
+                    })
+                    continue
+                
+                # Generate unique filename
+                file_extension = os.path.splitext(file.filename or '')[1] or '.jpg'
+                unique_filename = f"{uuid.uuid4()}{file_extension}"
+                file_path = os.path.join(UPLOAD_DIR, unique_filename)
+                
+                # Ensure upload directory exists
+                os.makedirs(UPLOAD_DIR, exist_ok=True)
+                
+                # Save file to disk
+                with open(file_path, "wb") as buffer:
+                    buffer.write(content)
+                
+                # Create database record for image
+                vinyl_image = VinylImage(
+                    record_id=record_id,
+                    filename=file.filename or unique_filename,
+                    content_type=file.content_type,
+                    file_size=len(content),
+                    file_path=file_path,
+                    is_primary=len(record.images) == 0  # First image is primary
+                )
+                
+                db.add(vinyl_image)
+                db.flush()  # Flush to get the ID without committing
+                
+                uploaded_images.append({
+                    "id": vinyl_image.id,
+                    "filename": vinyl_image.filename,
+                    "url": f"/api/register/images/{vinyl_image.id}",
+                    "is_primary": vinyl_image.is_primary
+                })
+                
+            except Exception as e:
+                errors.append({
+                    "file": file.filename or f"file_{idx}",
+                    "error": f"Upload failed: {str(e)}"
+                })
         
-        # Save file
-        with open(file_path, "wb") as buffer:
-            content = await file.read()
-            buffer.write(content)
+        # Commit all successful uploads
+        if uploaded_images:
+            db.commit()
         
-        # Create database record
-        vinyl_image = VinylImage(
-            record_id=record_id,
-            filename=file.filename or unique_filename,
-            content_type=file.content_type,
-            file_size=len(content),
-            file_path=file_path,
-            is_primary=len(record.images) == 0  # First image is primary
+        response = {"uploaded_images": uploaded_images}
+        if errors:
+            response["errors"] = errors
+        
+        return response
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to upload images: {str(e)}"
         )
-        
-        db.add(vinyl_image)
-        uploaded_images.append({
-            "id": vinyl_image.id,
-            "filename": vinyl_image.filename,
-            "url": f"/api/register/images/{vinyl_image.id}"
-        })
-    
-    db.commit()
-    
-    return {"uploaded_images": uploaded_images}
 
 
 class UpdateSpotifyUrlRequest(BaseModel):
