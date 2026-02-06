@@ -85,7 +85,7 @@ curl http://localhost:8000/api/v1/health
 
 Expected response:
 ```json
-{"status":"healthy","version":"1.3.2","database":"connected"}
+{"status":"healthy","version":"1.5.3","database":"connected"}
 ```
 
 ## Docker Compose Services

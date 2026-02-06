@@ -91,8 +91,9 @@ Open your browser and go to: **http://localhost:5173**
 
 You should see the Phonox interface with:
 - Chat panel on the left
-- Upload area in the center
-- Collection panel on the right
+- Upload area with drag-and-drop in the center
+- VinylCard display area on the right
+- "My Collection" button (top right) to open collection modal
 
 ## Common Issues
 
@@ -146,7 +147,8 @@ docker-compose up -d --build
 
 - ✅ **[Quick Start Guide](quick-start.md)** - Your first vinyl identification
 - 📖 **[User Guide](../user-guide/uploading.md)** - Learn all features
-- 🔧 **[Development Setup](../development/setup.md)** - For developers
+- �️ **[CLI Tool](cli.md)** - Command-line management
+- 🤝 **[Contributing](../contributing.md)** - For developers
 
 ## Getting Help
 
