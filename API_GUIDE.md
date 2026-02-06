@@ -401,6 +401,97 @@ GET /api/register?user_tag=collector123 HTTP/1.1
 
 ---
 
+### POST /api/register/images/{record_id}
+
+Upload additional images for a record in the register.
+
+**Request**
+
+```http
+POST /api/register/images/f47ac10b-58cc-4372-a567-0e02b2c3d479 HTTP/1.1
+Content-Type: multipart/form-data
+
+files: [File, File, ...]  (1-10 image files)
+```
+
+**Request Body**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| files | File[] | Yes | 1-10 image files (JPEG, PNG, WebP) |
+
+**Response** (200 OK)
+
+```json
+{
+  "uploaded_images": [
+    {
+      "id": "img-uuid-1",
+      "filename": "cover.jpg",
+      "url": "/api/register/images/img-uuid-1",
+      "is_primary": true
+    },
+    {
+      "id": "img-uuid-2",
+      "filename": "back.jpg",
+      "url": "/api/register/images/img-uuid-2",
+      "is_primary": false
+    }
+  ],
+  "errors": []
+}
+```
+
+**Response with Errors** (200 OK)
+
+```json
+{
+  "uploaded_images": [
+    {
+      "id": "img-uuid-1",
+      "filename": "valid.jpg",
+      "url": "/api/register/images/img-uuid-1",
+      "is_primary": true
+    }
+  ],
+  "errors": [
+    {
+      "file": "large_file.jpg",
+      "error": "File too large. Maximum size is 10MB"
+    },
+    {
+      "file": "document.pdf",
+      "error": "Not an image file. Accepted types: image/jpeg, image/png, image/webp, etc."
+    }
+  ]
+}
+```
+
+**Error Responses**
+
+| Code | Meaning | Description |
+|------|---------|-------------|
+| 400 | Bad Request | No files provided |
+| 404 | Not Found | Record ID doesn't exist |
+| 422 | Validation Error | Invalid file format or size |
+| 500 | Server Error | Upload processing failed |
+
+**Validation Rules**
+- Maximum file size: 10MB per file
+- Supported formats: JPEG, PNG, WebP, GIF
+- Empty files rejected
+- First uploaded image automatically becomes primary
+
+**Example**
+
+```bash
+curl -X POST "http://localhost:8000/api/register/images/f47ac10b" \
+  -F "files=@album_cover.jpg" \
+  -F "files=@vinyl_disc.jpg"
+```
+
+---
+
 ### GET /api/register/{record_id}
 
 Get specific record from register.
