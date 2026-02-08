@@ -179,4 +179,4 @@ Playwright E2E tests cover:
 
 ## License
 
-© 2024 Phonox. Part of the Phonox vinyl record identification project.
+© 2026 Phonox. Part of the Phonox vinyl record identification project.
