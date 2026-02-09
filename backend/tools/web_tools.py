@@ -158,13 +158,16 @@ class WebScrapingTool:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         })
         # Configure connection pooling to reuse connections efficiently
+        # Retry configuration: 1 retry to avoid long waits (10s timeout × 2 retries = 30s per URL)
+        # Only retry on server errors (5xx), not on timeouts to fail faster
         adapter = requests.adapters.HTTPAdapter(
             pool_connections=10,
             pool_maxsize=10,
             max_retries=requests.adapters.Retry(
-                total=2,
+                total=1,  # Reduced from 2 to speed up failed requests
                 backoff_factor=0.3,
-                status_forcelist=(500, 502, 503, 504)
+                status_forcelist=(500, 502, 503, 504),
+                raise_on_redirect=False
             )
         )
         self.session.mount('https://', adapter)
