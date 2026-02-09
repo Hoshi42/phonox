@@ -54,17 +54,57 @@ router = APIRouter(prefix="/api/v1", tags=["vinyl"])
 
 
 def _serialize_evidence_chain(evidence_chain: List[dict]) -> List[dict]:
-    """Serialize evidence chain for JSON storage."""
+    """Serialize evidence chain for JSON storage, handling circular references."""
+    import json
+    
+    def safe_serialize_value(obj, depth=0, max_depth=10):
+        """Safely serialize a value, handling circular references with depth limit."""
+        # Prevent infinite recursion
+        if depth > max_depth:
+            return f"<truncated at depth {max_depth}>"
+        
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        elif hasattr(obj, "value"):
+            return obj.value
+        elif isinstance(obj, (str, int, float, bool, type(None))):
+            return obj
+        elif isinstance(obj, dict):
+            result = {}
+            for k, v in obj.items():
+                try:
+                    result[k] = safe_serialize_value(v, depth + 1, max_depth)
+                except (ValueError, TypeError, RecursionError):
+                    result[k] = str(v)[:200] if v is not None else None
+            return result
+        elif isinstance(obj, (list, tuple)):
+            try:
+                return [safe_serialize_value(item, depth + 1, max_depth) for item in obj[:100]]  # Limit list size
+            except (ValueError, TypeError, RecursionError):
+                return [str(item)[:200] for item in obj[:10]]
+        else:
+            # For any other type, convert to string
+            try:
+                return str(obj)[:200]
+            except:
+                return "<non-serializable>"
+    
     serialized = []
     for evidence in evidence_chain:
-        evidence_copy = evidence.copy()
-        # Convert datetime to ISO format string
-        if isinstance(evidence_copy.get("timestamp"), datetime):
-            evidence_copy["timestamp"] = evidence_copy["timestamp"].isoformat()
-        # Convert enum to string if needed
-        if hasattr(evidence_copy.get("source"), "value"):
-            evidence_copy["source"] = evidence_copy["source"].value
-        serialized.append(evidence_copy)
+        try:
+            evidence_copy = safe_serialize_value(evidence)
+            # Double-check it's JSON serializable
+            json.dumps(evidence_copy)
+            serialized.append(evidence_copy)
+        except (ValueError, TypeError, RecursionError) as e:
+            logger.warning(f"Skipping non-serializable evidence: {e}")
+            # Add simplified version
+            serialized.append({
+                "source": str(evidence.get("source", "unknown")),
+                "confidence": evidence.get("confidence", 0.0),
+                "timestamp": datetime.now().isoformat(),
+                "error": "Circular reference or non-serializable data"
+            })
     return serialized
 
 
@@ -116,6 +156,9 @@ async def identify_vinyl(
 
         # For now, return immediately (in production, would queue async job)
         # In a real implementation, this would trigger an async Celery task
+        # Initialize variable outside try block to ensure it's always defined
+        image_analysis_intermediate_results = None
+        
         try:
             # Initialize agent graph
             graph = build_agent_graph()
@@ -145,7 +188,7 @@ async def identify_vinyl(
                 "needs_review": True,
             }
 
-            # Invoke graph with config for checkpointer
+            # Invoke graph (config thread_id not used but kept for future expansion)
             config = {"configurable": {"thread_id": record_id}}
             result_state = graph.invoke(initial_state, config=config)
 
@@ -155,7 +198,6 @@ async def identify_vinyl(
             vinyl_record.validation_passed = result_state.get("validation_passed", False)
 
             # Extract metadata
-            image_analysis_intermediate_results = None  # Track for response
             if result_state.get("vision_extraction"):
                 vision_data = result_state["vision_extraction"]
                 vinyl_record.artist = vision_data.get("artist")
@@ -457,6 +499,9 @@ async def get_vinyl_record(
                 catalog_number=vinyl_record.catalog_number,
                 barcode=vinyl_record.barcode,
                 genres=vinyl_record.get_genres(),
+                condition=vinyl_record.condition,
+                estimated_value_eur=vinyl_record.estimated_value_eur,
+                estimated_value_usd=vinyl_record.estimated_value_usd,
             )
 
         return VinylRecordResponse(
@@ -558,6 +603,9 @@ async def review_vinyl(
                 catalog_number=vinyl_record.catalog_number,
                 barcode=vinyl_record.barcode,
                 genres=vinyl_record.get_genres(),
+                condition=vinyl_record.condition,
+                estimated_value_eur=vinyl_record.estimated_value_eur,
+                estimated_value_usd=vinyl_record.estimated_value_usd,
             )
 
         return VinylRecordResponse(
@@ -998,112 +1046,88 @@ async def update_vinyl_metadata(
 )
 async def reanalyze_vinyl(
     record_id: str,
-    files: List[UploadFile] = File(...),
+    files: List[UploadFile] = File(default=[]),  # Optional files - can reanalyze without new images
     current_record: Optional[str] = Form(None),
+    reanalyze_all: Optional[str] = Form(None),  # "true" to reanalyze existing images too
     db: Session = Depends(get_db),
 ) -> VinylRecordResponse:
     """
-    Smart re-analysis: Analyze only NEW images and intelligently enhance metadata.
+    Smart re-analysis: Analyze images from browser memory OR database (for registered records).
     
-    Works in two modes:
-    1. ANALYSIS (not yet saved): current_record provided, no DB lookup needed
-    2. REGISTERED (already saved): current_record provided, used instead of DB lookup
+    **Two scenarios:**
+    1. **Analyzing new images (not yet registered)**: 
+       - All images in browser memory
+       - Sent via files parameter
+       - No database access needed
     
-    OPTIMIZED WORKFLOW:
-    1. Use provided current_record data (no database lookup)
-    2. Analyze ONLY the newly uploaded images (not re-analyzing old images)
-    3. Extract metadata from new images
-    4. Compare with existing metadata using Claude
-    5. Intelligently merge/enhance metadata (only update if confident)
-    6. Return merged record (save to DB only if user clicks "Add to Register")
+    2. **Re-analyzing registered records**:
+       - Existing images in database
+       - Load from database + any new uploads
+       - Set reanalyze_all="true" to trigger database loading
     
-    This reduces:
-    - API costs (fewer images processed)
-    - Processing time
-    - Disk space usage
-    - Mobile upload issues
-    - Database dependencies
+    Parameters:
+        record_id: Vinyl record ID
+        files: New images to add (can be empty for registered records)
+        current_record: JSON string of current record data (optional)
+        reanalyze_all: "true" = load existing images from database (for registered records)
+        db: Database session
+    
+    Returns:
+        Updated vinyl record with analyzed/enhanced metadata (in-memory only)
     """
     try:
-        # Validate new files
-        if not files or len(files) == 0:
+        # Check if this is a registered record that needs existing images loaded
+        do_load_from_database = reanalyze_all and reanalyze_all.lower() == "true"
+        
+        # Validate that we have at least something to analyze
+        if not do_load_from_database and (not files or len(files) == 0):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="At least one image file is required for re-analysis",
             )
         
-        # Parse current record data from frontend
-        existing_metadata = {}
-        if current_record:
-            try:
-                import json
-                record_data = json.loads(current_record)
-                # Extract metadata from the provided record
-                existing_metadata = {
-                    "artist": record_data.get("artist") or record_data.get("metadata", {}).get("artist"),
-                    "title": record_data.get("title") or record_data.get("metadata", {}).get("title"),
-                    "year": record_data.get("year") or record_data.get("metadata", {}).get("year"),
-                    "label": record_data.get("label") or record_data.get("metadata", {}).get("label"),
-                    "catalog_number": record_data.get("catalog_number") or record_data.get("metadata", {}).get("catalog_number"),
-                    "barcode": record_data.get("barcode") or record_data.get("metadata", {}).get("barcode"),
-                    "genres": record_data.get("genres") or record_data.get("metadata", {}).get("genres"),
-                    "condition": record_data.get("condition") or record_data.get("metadata", {}).get("condition"),
-                }
-                existing_confidence = record_data.get("confidence", 0.5)
-            except Exception as e:
-                logger.warning(f"Could not parse current_record: {e}")
-                existing_metadata = {}
-                existing_confidence = 0.5
+        if do_load_from_database:
+            logger.info(f"Re-analyzing REGISTERED record {record_id} - loading existing images from database + {len(files) if files else 0} new")
         else:
-            # Fallback: try to get from database (for backwards compatibility)
-            existing_record = db.query(VinylRecord).filter(VinylRecord.id == record_id).first()
-            if not existing_record:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Record not found and no current_record provided"
-                )
-            existing_metadata = {
-                "artist": existing_record.artist,
-                "title": existing_record.title,
-                "year": existing_record.year,
-                "label": existing_record.label,
-                "catalog_number": existing_record.catalog_number,
-                "barcode": existing_record.barcode,
-                "genres": existing_record.get_genres(),
-                "condition": existing_record.metadata.get("condition") if existing_record.metadata else None,
-            }
-            existing_confidence = existing_record.confidence or 0.5
-            
-
-        logger.info(f"Smart re-analyzing record {record_id} with {len(files)} NEW images (old images NOT re-analyzed)")
+            logger.info(f"Re-analyzing record {record_id} with {len(files)} images from browser memory")
         
         try:
-            # STEP 1: Analyze ONLY new images (not all images)
+            # STEP 1: Analyze images from the request (all images are in memory/uploaded)
             graph = build_agent_graph()
             
             import base64
-            new_image_dicts = []
-            for file in files:
-                try:
-                    content = await file.read()
-                    file_content = base64.b64encode(content).decode('utf-8')
-                    new_image_dicts.append({
-                        "path": file.filename or f"new_image_{len(new_image_dicts)}",
-                        "content": file_content,
-                        "content_type": file.content_type or "image/jpeg"
-                    })
-                except Exception as e:
-                    logger.error(f"Error processing file {file.filename}: {e}")
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Failed to process image {file.filename}: {str(e)}"
-                    )
+            image_dicts = []
             
-            logger.info(f"Processing {len(new_image_dicts)} NEW images for metadata extraction")
+            # Process all uploaded images (they're in browser memory, not database yet)
+            if files:
+                for file in files:
+                    try:
+                        content = await file.read()
+                        file_content = base64.b64encode(content).decode('utf-8')
+                        image_dicts.append({
+                            "path": file.filename or f"image_{len(image_dicts)}",
+                            "content": file_content,
+                            "content_type": file.content_type or "image/jpeg"
+                        })
+                    except Exception as e:
+                        logger.error(f"Error processing file {file.filename}: {e}")
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Failed to process image {file.filename}: {str(e)}"
+                        )
             
-            # Create state with ONLY new images for analysis
+            logger.info(f"Processing {len(image_dicts)} images from browser memory")
+            
+            # Ensure we have at least one image to analyze
+            if len(image_dicts) == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No images available for re-analysis. Please upload at least one image or ensure the record has existing images.",
+                )
+            
+            # Create state with images for analysis
             initial_state: VinylState = {  # type: ignore
-                "images": new_image_dicts,
+                "images": image_dicts,
                 "validation_passed": False,
                 "image_features": {},
                 "vision_extraction": {},
@@ -1113,13 +1137,13 @@ async def reanalyze_vinyl(
                 "needs_review": True,
             }
             
-            # Invoke graph with new images only
-            config = {"configurable": {"thread_id": record_id + "_new_analysis"}}
+            # Invoke graph (config thread_id not used but kept for future expansion)
+            config = {"configurable": {"thread_id": record_id}}
             result_state = graph.invoke(initial_state, config=config)
             
-            # STEP 2: Extract metadata from new images
+            # STEP 2: Extract metadata from images
             new_metadata = result_state.get("vision_extraction", {})
-            logger.info(f"Extracted metadata from new images: {new_metadata}")
+            logger.info(f"Extracted metadata from images: {new_metadata}")
             
             # ✅ CRITICAL: Validate that image detection/analysis actually succeeded
             # If vision extraction failed or returned empty, the entire chain should fail
@@ -1162,51 +1186,196 @@ async def reanalyze_vinyl(
                     error="Image analysis could not produce confidence score. Check that valid vinyl record images were provided.",
                 )
             
-            # STEP 3: Intelligently enhance metadata using Claude
-            from backend.agent.metadata_enhancer import MetadataEnhancer
-            enhancer = MetadataEnhancer()
+            # STEP 3: Use the analyzed metadata directly
+            # Since we analyze ALL uploaded images together, the LLM aggregation already merged them
+            # No need for further enhancement - this IS the enhanced result
+            enhanced_metadata = new_metadata
+            new_confidence = analysis_confidence
+            logger.info(f"✅ Analysis complete with {len(files)} images (confidence: {new_confidence:.2f})")
             
-            enhanced_metadata, new_confidence, changes = enhancer.enhance_metadata(
-                existing_metadata,
-                new_metadata,
-                existing_confidence
-            )
+            # STEP 3B: Estimate value based on extracted metadata using web search
+            estimated_value_eur = None
+            valuation_factors = []
+            search_query = None
+            search_results_count = 0
+            valuation_text = None
+            search_sources = []
+            try:
+                if enhanced_metadata.get("artist") and enhanced_metadata.get("title"):
+                    logger.info(f"Performing web search for value estimation during reanalysis: {enhanced_metadata.get('artist')} - {enhanced_metadata.get('title')}")
+                    
+                    # Build search query with catalog number if available
+                    search_query = f"{enhanced_metadata.get('artist')} {enhanced_metadata.get('title')} vinyl record price"
+                    if enhanced_metadata.get("catalog_number"):
+                        search_query += f" {enhanced_metadata.get('catalog_number')}"
+                    if enhanced_metadata.get("year"):
+                        search_query += f" {enhanced_metadata.get('year')}"
+                    
+                    logger.info(f"Web search query for reanalysis: {search_query}")
+                    
+                    # Perform web search
+                    search_results = chat_tools.search_and_scrape(
+                        search_query,
+                        scrape_results=True
+                    )
+                    
+                    search_results_count = len(search_results.get("search_results", []))
+                    logger.info(f"Reanalysis web search found {search_results_count} results")
+                    
+                    # Build market context from search results
+                    market_context = "Market Research Results:\n"
+                    if search_results.get("search_results"):
+                        for result in search_results["search_results"][:12]:
+                            market_context += f"- {result.get('title', '')}: {result.get('content', '')}\n"
+                            # Capture for intermediate results
+                            search_sources.append({
+                                "title": result.get("title", ""),
+                                "content": result.get("content", "")[:200]
+                            })
+                    
+                    if search_results.get("scraped_content"):
+                        market_context += "\nDetailed Pricing Information:\n"
+                        for content in search_results["scraped_content"][:3]:
+                            if content.get("success"):
+                                market_context += f"- {content.get('title', '')}: {content.get('content', '')}\n"
+                    
+                    # Build record context
+                    record_context = f"""
+Vinyl Record Details:
+- Artist: {enhanced_metadata.get('artist')}
+- Title: {enhanced_metadata.get('title')}
+- Year: {enhanced_metadata.get('year') or 'Unknown'}
+- Label: {enhanced_metadata.get('label') or 'Unknown'}
+- Catalog Number: {enhanced_metadata.get('catalog_number') or 'Unknown'}
+- Genres: {', '.join(enhanced_metadata.get('genres', [])) if enhanced_metadata.get('genres') else 'Unknown'}
+- Image Analysis Confidence: {new_confidence * 100:.0f}%
+- Format: Vinyl LP
+"""
+                    
+                    # Use Claude Haiku to analyze market data
+                    valuation_prompt = f"""Based on the web search results and record details provided, estimate the fair market value of this vinyl record in EUR.
+
+{market_context}
+
+{record_context}
+
+Please provide:
+1. Estimated fair market value in EUR (single number)
+2. Price range (minimum and maximum in EUR)
+3. Key factors affecting the price
+4. Market condition assessment (strong/stable/weak)
+5. Brief explanation of your valuation
+
+Format your response as follows:
+ESTIMATED_VALUE: €XX.XX
+PRICE_RANGE: €XX.XX - €XX.XX
+MARKET_CONDITION: [strong/stable/weak]
+FACTORS: [list key factors]
+EXPLANATION: [brief explanation]"""
+                    
+                    try:
+                        # Get chat model from environment, with fallback
+                        chat_model = os.getenv("ANTHROPIC_CHAT_MODEL", "claude-haiku-4-5-20251001")
+                        response = anthropic_client.messages.create(
+                            model=chat_model,
+                            max_tokens=500,
+                            messages=[
+                                {
+                                    "role": "user",
+                                    "content": valuation_prompt,
+                                }
+                            ],
+                        )
+                        
+                        valuation_text = response.content[0].text
+                        logger.info(f"Claude valuation during reanalysis: {valuation_text[:200]}")
+                        
+                        # Parse Claude's response
+                        import re
+                        price_range_min = None
+                        price_range_max = None
+                        market_condition = "stable"
+                        explanation = ""
+                        
+                        for line in valuation_text.split('\n'):
+                            # Strip and check for key markers
+                            line_stripped = line.strip()
+                            if line_stripped.startswith('ESTIMATED_VALUE:') or 'ESTIMATED_VALUE:' in line_stripped:
+                                match = re.search(r'€?([\d.]+)', line)
+                                if match:
+                                    estimated_value_eur = float(match.group(1))
+                            elif line_stripped.startswith('PRICE_RANGE:') or 'PRICE_RANGE:' in line_stripped:
+                                # Extract all numbers from the line
+                                matches = re.findall(r'€?([\d.]+)', line)
+                                if len(matches) >= 2:
+                                    price_range_min = float(matches[0])
+                                    price_range_max = float(matches[1])
+                                    logger.info(f"Extracted price range from: {line} => min: {price_range_min}, max: {price_range_max}")
+                            elif line.startswith('MARKET_CONDITION:'):
+                                condition = line.replace('MARKET_CONDITION:', '').strip().lower()
+                                if condition in ['strong', 'stable', 'weak']:
+                                    market_condition = condition
+                            elif line.startswith('FACTORS:'):
+                                factors_text = line.replace('FACTORS:', '').strip()
+                                valuation_factors = [f.strip() for f in factors_text.split(',')]
+                            elif line.startswith('EXPLANATION:'):
+                                explanation = line.replace('EXPLANATION:', '').strip()
+                        
+                        # Fallback if parsing fails
+                        if estimated_value_eur is None:
+                            prices = re.findall(r'€([\d.]+)', valuation_text)
+                            if prices:
+                                estimated_value_eur = float(prices[0])
+                        
+                        if estimated_value_eur is not None:
+                            logger.info(f"Reanalysis: Web-based value estimate: €{estimated_value_eur}")
+                    
+                    except Exception as e:
+                        logger.error(f"Error calling Claude for reanalysis valuation: {e}")
+                        # Continue without valuation
+                
+            except Exception as e:
+                logger.error(f"Error during web search valuation in reanalysis: {e}")
+                # Continue without valuation
             
-            logger.info(f"Metadata enhancement complete. Changes: {changes}")
-            logger.info(f"New confidence: {new_confidence:.2f}")
+            # STEP 4: Build response with analyzed metadata
+            # Create intermediate results for display in chat panel
+            reanalysis_intermediate_results = None
+            if search_query:
+                reanalysis_intermediate_results = {
+                    "search_query": search_query,
+                    "search_results_count": search_results_count,
+                    "claude_analysis": valuation_text,
+                    "search_sources": search_sources
+                }
             
-            # STEP 4: Build response with enhanced metadata (NO database save)
-            # The frontend will decide whether to save this to the register
-            merged_metadata = existing_metadata.copy()
-            if enhanced_metadata:
-                merged_metadata.update({k: v for k, v in enhanced_metadata.items() if v is not None})
-            
-            # Create response with merged metadata (in-memory only)
             response_data = VinylRecordResponse(
                 record_id=record_id,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
                 status="analyzed",
                 metadata=VinylMetadataModel(
-                    artist=merged_metadata.get("artist"),
-                    title=merged_metadata.get("title"),
-                    year=merged_metadata.get("year"),
-                    label=merged_metadata.get("label"),
-                    catalog_number=merged_metadata.get("catalog_number"),
-                    barcode=merged_metadata.get("barcode"),
-                    genres=merged_metadata.get("genres"),
-                    condition=merged_metadata.get("condition"),
+                    artist=enhanced_metadata.get("artist"),
+                    title=enhanced_metadata.get("title"),
+                    year=enhanced_metadata.get("year"),
+                    label=enhanced_metadata.get("label"),
+                    catalog_number=enhanced_metadata.get("catalog_number"),
+                    barcode=enhanced_metadata.get("barcode"),
+                    genres=enhanced_metadata.get("genres"),
+                    condition=enhanced_metadata.get("condition"),
                     confidence=new_confidence,
+                    estimated_value_eur=estimated_value_eur,  # Include the newly estimated value
                 ),
                 evidence_chain=_serialize_evidence_chain(result_state.get("evidence_chain", [])),
                 confidence=new_confidence,
                 auto_commit=result_state.get("auto_commit", False),
                 needs_review=result_state.get("needs_review", True),
                 error=result_state.get("error"),
-                user_notes=f"Smart re-analysis: {enhancer.get_enhancement_summary(changes)}",
+                user_notes=None,
+                intermediate_results=reanalysis_intermediate_results,
             )
             
-            logger.info(f"Completed smart re-analysis for {record_id}: confidence={new_confidence:.2f}, changes={len(changes)}")
+            logger.info(f"Completed re-analysis for {record_id}: confidence={new_confidence:.2f}, estimated_value_eur={estimated_value_eur}")
             return response_data
         
         except HTTPException:

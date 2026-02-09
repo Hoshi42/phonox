@@ -1,5 +1,55 @@
 # Changelog
 
+## 1.6.1 - Re-Analysis & Image Management Fixes
+
+### Bug Fixes
+- **Fixed Image Duplication on Record Load**
+  - Images no longer duplicate when loading registered records into VinylCard
+  - Simplified image display logic: only shows `uploadedImages` in UI
+  - `image_urls` kept as metadata reference but not displayed to prevent duplication
+  - Root cause: was displaying both database URLs and File objects simultaneously
+
+- **Fixed Re-Analysis Status Polling**
+  - Changed from ineffective polling mechanism to immediate response
+  - Re-analysis endpoint now returns complete analyzed metadata immediately
+  - Removed get_identify status endpoint polls for re-analysis (not needed)
+  - Fixes "Failed to get re-analysis status" errors
+
+- **Simplified Image Management** 
+  - Removed unused `deletedImageUrls` state tracking
+  - Deletion now handled directly by removing from `uploadedImages`
+  - Single source of truth for image display
+  - Cleaner state management in VinylCard.tsx
+
+### Features
+- **Re-Analysis Now Mirrors Upload Flow**
+  - Re-analysis includes full web search and market value estimation
+  - Results sent to chat panel via `intermediate_results` field
+  - User sees search queries, sources, and Claude analysis in chat
+  - Same valuation logic as initial identify endpoint (Goldmine weighting)
+
+- **Memory-First Architecture Refinement**
+  - Images stay in browser memory until explicit "Update in Register" click
+  - Database only touched on explicit user action
+  - Loading from register: images fetched as File objects into memory
+  - Updated images: only newly added images are uploaded (no re-upload of existing)
+  - Metadata updates (condition, value) persist alongside correctly managed images
+
+### Improvements
+- **Cleaner Update Logic**
+  - VinylCard.handleRegisterAction now uploads all current `uploadedImages`
+  - Automatically replaces deleted images in database
+  - Combines with metadata updates in single transaction
+  - Fixed the "only upload new images" logic that was causing tracking issues
+
+### Files Modified
+- `frontend/src/components/VinylCard.tsx` - Image display and state management
+- `frontend/src/App.tsx` - Image loading from register, kept `image_urls` as reference
+- `backend/api/routes.py` - Re-analysis endpoint returns immediate response with intermediate results
+- `backend/agent/graph.py` - Removed LangGraph MemorySaver checkpointer (prevents recursion)
+
+---
+
 ## 1.6.0 - Multi-Image Intelligence & Condition Detection
 
 ### Major Features

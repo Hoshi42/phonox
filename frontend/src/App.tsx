@@ -312,8 +312,9 @@ function App() {
     setUploadedImages(prev => prev.filter((_, i) => i !== index))
   }
 
-  const handleReanalyze = async (images: File[]) => {
+  const handleReanalyze = async (images: File[], reanalyzeAll: boolean = false) => {
     console.log('App: Re-analyzing with', images.length, 'uploaded images')
+    console.log('App: Mode:', reanalyzeAll ? 'COMPLETE RE-ANALYSIS (all images)' : 'ENHANCEMENT (new images only)')
     console.log('App: Current record ID:', recordId)
     console.log('App: Is in register:', isRecordInRegister)
     console.log('App: Current record has database images:', record?.metadata?.image_urls?.length || 0)
@@ -336,83 +337,45 @@ function App() {
       return
     }
     
-    console.log('App: Using enhanced re-analysis endpoint for record:', recordId)
+    console.log('App: Using re-analysis endpoint for record:', recordId)
     
     try {
       setError(null)
       setLoading(true)
       
-      // Use the new reanalyze endpoint that can handle existing records
-      // Pass current record data so backend doesn't need to query database
-      const response = await apiClient.reanalyze(recordId, images, record)
-      console.log('App: Re-analysis started:', response.record_id)
+      // Call reanalyze endpoint - returns immediate response with analyzed data
+      const response = await apiClient.reanalyze(recordId, images, record, reanalyzeAll)
+      console.log('App: Re-analysis response status:', response.status)
+      console.log('App: Re-analysis response:', response)
       
-      // Start polling for results with timeout
-      let pollCount = 0
-      const maxPolls = 300 // 5 minutes with 1-second intervals
-      const interval = setInterval(async () => {
-        pollCount++
-        try {
-          const statusResponse = await apiClient.getResult(recordId)
-          
-          if (statusResponse.status === 'analyzed' || statusResponse.status === 'complete' || statusResponse.status === 'error') {
-            clearInterval(interval)
-            setLoading(false)
-            setPollInterval(null)
-            
-            if (statusResponse.status === 'analyzed' || statusResponse.status === 'complete') {
-              const updatedRecord = statusResponse as unknown as VinylRecord
-              setRecord(updatedRecord)
-              // Clear uploaded images since they're now saved to database and included in metadata.image_urls
-              setUploadedImages([])
-              console.log('App: Re-analysis completed successfully, uploaded images cleared')
-              console.log('App: Updated record now has', updatedRecord.metadata?.image_urls?.length || 0, 'images in database')
-              
-              // Update localStorage
-              localStorage.setItem('phonox_current_record', JSON.stringify(updatedRecord))
-              localStorage.setItem('phonox_current_record_id', recordId)
-            } else {
-              // Restore previous state on error
-              console.error('App: Re-analysis failed, restoring previous state')
-              setRecord(originalRecord)
-              setRecordId(originalRecordId)
-              setUploadedImages(originalUploadedImages)
-              setError((statusResponse as any).error || 'Re-analysis failed')
-            }
-          } else if (pollCount > maxPolls) {
-            // Timeout after 5 minutes
-            clearInterval(interval)
-            setLoading(false)
-            setPollInterval(null)
-            console.error('App: Re-analysis timeout after', pollCount, 'polls')
-            setRecord(originalRecord)
-            setRecordId(originalRecordId)
-            setUploadedImages(originalUploadedImages)
-            setError('Re-analysis timeout - took too long. Please try again.')
-          }
-        } catch (err) {
-          clearInterval(interval)
-          setLoading(false)
-          setPollInterval(null)
-          // Restore previous state on error
-          console.error('App: Re-analysis status check failed:', err)
-          setRecord(originalRecord)
-          setRecordId(originalRecordId)
-          setUploadedImages(originalUploadedImages)
-          setError('Failed to get re-analysis status')
-        }
-      }, 1000) // Poll every second
-      
-      setPollInterval(interval)
-      
-    } catch (error) {
-      console.error('App: Re-analysis request failed:', error)
       setLoading(false)
-      // Restore previous state on error
+      
+      if (response.status === 'analyzed' || response.status === 'complete') {
+        const updatedRecord = response as unknown as VinylRecord
+        setRecord(updatedRecord)
+        // Keep uploaded images in memory (memory-first architecture)
+        console.log('App: Re-analysis completed successfully, keeping', originalUploadedImages.length, 'images in memory')
+        console.log('App: Updated record metadata:', updatedRecord.metadata)
+        
+        // Update localStorage
+        localStorage.setItem('phonox_current_record', JSON.stringify(updatedRecord))
+        localStorage.setItem('phonox_current_record_id', recordId)
+      } else if (response.status === 'failed' || response.status === 'error') {
+        // Restore previous state on error
+        console.error('App: Re-analysis failed with status:', response.status, response.error)
+        setRecord(originalRecord)
+        setRecordId(originalRecordId)
+        setError('Re-analysis failed. Please try again.')
+      } else {
+        console.warn('App: Unexpected re-analysis status:', response.status)
+        setError('Unexpected response from re-analysis. Please try again.')
+      }
+    } catch (error) {
+      console.error('App: Re-analysis error:', error)
+      setLoading(false)
       setRecord(originalRecord)
       setRecordId(originalRecordId)
-      setUploadedImages(originalUploadedImages)
-      setError('Re-analysis failed. Please try again.')
+      setError('Re-analysis failed. ' + (error instanceof Error ? error.message : 'Please try again.'))
     }
   }
 
@@ -438,7 +401,7 @@ function App() {
     }
   }
 
-  const handleRecordSelectFromRegister = (registerRecord: RegisterRecord) => {
+  const handleRecordSelectFromRegister = async (registerRecord: RegisterRecord) => {
     console.log('App: Loading record from register:', registerRecord.artist, '-', registerRecord.title)
     console.log('App: Browser:', navigator.userAgent)
     console.log('App: Register record has images:', registerRecord.image_urls?.length || 0)
@@ -477,14 +440,38 @@ function App() {
       user_notes: registerRecord.user_notes,
     }
 
-    // CRITICAL: Set record state first, then clear uploaded images
+    // CRITICAL: Set record state first, then load images into memory
     console.log('App: Setting register record with', vinylRecord.metadata?.image_urls?.length || 0, 'database images')
     setRecord(vinylRecord)
     setRecordId(registerRecord.id)
     
-    // Clear uploaded images since we're loading from register (these are database images)
-    console.log('App: Clearing uploaded images for register record (database images will be used)')
-    setUploadedImages([])
+    // Load images from URLs into memory as File objects
+    console.log('App: Loading images from database URLs into memory...')
+    try {
+      const fileObjects = await Promise.all(
+        (registerRecord.image_urls || []).map(async (url) => {
+          const response = await fetch(url);
+          if (!response.ok) {
+            console.error(`Failed to fetch image from ${url}: ${response.statusText}`);
+            return null;
+          }
+          const blob = await response.blob();
+          const filename = url.split('/').pop() || 'image.jpg';
+          return new File([blob], filename, { type: blob.type });
+        })
+      );
+      // Filter out any failed fetches
+      const validFiles = fileObjects.filter((f): f is File => f !== null);
+      console.log(`App: Loaded ${validFiles.length} images into memory`);
+      setUploadedImages(validFiles);
+      
+      // Keep image_urls in metadata (don't clear them) so we can track which images are original
+      // VinylCard will prioritize displaying uploadedImages for consistency
+      console.log('App: Kept image_urls in metadata as reference for database images');
+    } catch (error) {
+      console.error('App: Error loading images into memory:', error);
+      setUploadedImages([]);
+    }
     
     // Close the register view
     setShowRegister(false)

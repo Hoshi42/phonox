@@ -74,12 +74,12 @@ export class ApiClient {
     console.log('[API] identify() - Online:', navigator.onLine)
 
     try {
-      console.log('[API] identify() - Sending fetch request with 60s timeout...')
+      console.log('[API] identify() - Sending fetch request with 120s timeout (includes web scraping for value estimation)...')
       const response = await fetchWithTimeout(url, {
         method: 'POST',
         body: formData,
         headers: getCacheHeaders(),
-        timeout: TIMEOUT_PRESETS.LONG // 60s for file upload
+        timeout: TIMEOUT_PRESETS.VERY_LONG // 120s for file upload + value estimation via web scraping
       })
 
       console.log('[API] identify() - Received response')
@@ -212,7 +212,7 @@ export class ApiClient {
     return response.json()
   }
 
-  async reanalyze(recordId: string, files: File[], currentRecord?: any): Promise<{ record_id: string; id?: string }> {
+  async reanalyze(recordId: string, files: File[], currentRecord?: any, reanalyzeAll?: boolean): Promise<{ record_id: string; id?: string }> {
     const formData = new FormData()
     files.forEach((file) => {
       formData.append('files', file)
@@ -222,9 +222,15 @@ export class ApiClient {
     if (currentRecord) {
       formData.append('current_record', JSON.stringify(currentRecord))
     }
+    
+    // Set reanalyze_all flag for complete re-analysis mode
+    if (reanalyzeAll) {
+      formData.append('reanalyze_all', 'true')
+    }
 
     const url = `${this.baseUrl}/api/v1/reanalyze/${recordId}`
     console.log('[API] reanalyze() - Re-analyzing record:', recordId)
+    console.log('[API] reanalyze() - Mode:', reanalyzeAll ? 'COMPLETE RE-ANALYSIS (all images)' : 'ENHANCEMENT (new images only)')
     console.log('[API] reanalyze() - Files count:', files.length, files.map(f => ({ name: f.name, size: f.size, type: f.type })))
     console.log('[API] reanalyze() - Current record data provided:', !!currentRecord)
 

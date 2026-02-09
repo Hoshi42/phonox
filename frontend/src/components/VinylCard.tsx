@@ -36,7 +36,7 @@ interface VinylCardProps {
   onAddToRegister?: (record: VinylRecord) => void
   onUpdateRegister?: (record: VinylRecord) => void
   onRegisterSuccess?: () => void
-  onReanalyze?: (images: File[]) => void
+  onReanalyze?: (images: File[], reanalyzeAll?: boolean) => void
   onAddChatMessage?: (content: string, role?: 'user' | 'assistant' | 'system') => void
   isInRegister?: boolean
   currentUser?: string
@@ -73,7 +73,6 @@ export default function VinylCard({
     condition: 'Good',
     estimated_value_eur: '' // ADD estimated_value_eur
   })
-  const [deletedImageUrls, setDeletedImageUrls] = useState<Set<string>>(new Set())
   const [showRawData, setShowRawData] = useState(false)
   const [webValue, setWebValue] = useState<string | null>(null)
   const [appliedWebValue, setAppliedWebValue] = useState<number | null>(null)
@@ -365,18 +364,18 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
     console.log('VinylCard: record.metadata?.condition =', record.metadata?.condition)
         try {
       if (isInRegister) {
-        // Upload new images if available
+        // Upload current images from uploadedImages
+        // This replaces any deleted images - user controls what to keep via UI
+        let allImageUrls: string[] = []
+        
         if (uploadedImages.length > 0) {
-          await registerApiClient.uploadImages(record.record_id, uploadedImages)
+          console.log(`VinylCard: Uploading ${uploadedImages.length} images`)
+          const uploadResponse = await registerApiClient.uploadImages(record.record_id, uploadedImages)
+          allImageUrls = uploadResponse.uploaded_images.map((img: any) => img.url)
+          console.log('VinylCard: Uploaded images:', allImageUrls)
+        } else {
+          console.log('VinylCard: No images to upload')
         }
-
-        // Build the list of images to keep (exclude deleted ones)
-        const imagesToKeep = (record.metadata?.image_urls || []).filter(
-          (imageUrl: string) => !deletedImageUrls.has(imageUrl)
-        )
-
-        console.log('VinylCard: Keeping images:', imagesToKeep)
-        console.log('VinylCard: Deleted images:', Array.from(deletedImageUrls))
         
         const updateRequest = {
           record_id: record.record_id,
@@ -392,22 +391,20 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
           user_notes: `Condition: ${condition} - Updated ${new Date().toLocaleDateString()}`,
           spotify_url: spotifyUrlToSave,
           user_tag: currentUser,
-          image_urls: imagesToKeep  // Send images to keep - deleted ones are excluded
+          image_urls: allImageUrls  // Use the newly uploaded URLs
         }
         
         console.log('VinylCard: Sending update request with condition:', updateRequest.condition)
         console.log('VinylCard: Full update request:', updateRequest)
         
         // Update existing record in register with ALL metadata fields
-        // Use editData values if form is being edited, otherwise use record.metadata
-        // Send actual values (including null/empty) to allow deletion
         await registerApiClient.updateRegisterRecord(updateRequest)
         
 
-        // Update local metadata to reflect deleted images
+        // Update local metadata to reflect new images
         if (onMetadataUpdate) {
           onMetadataUpdate({
-            image_urls: imagesToKeep
+            image_urls: allImageUrls
           })
         }
         
@@ -443,9 +440,6 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
       
       // Notify parent component of successful register operation
       onRegisterSuccess?.()
-      
-      // Clear deleted images tracking after successful update
-      setDeletedImageUrls(new Set())
       
       console.log('VinylCard: Record successfully updated in register with values:', {
         estimated_value_eur: estimatedValue,
@@ -549,40 +543,17 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
 
       {/* Images */}
       <div className={styles.images}>
-        {(uploadedImages.length > 0 || (record.metadata?.image_urls && record.metadata.image_urls.length > 0)) && (
-          <h4>Images ({uploadedImages.length + (record.metadata?.image_urls?.length || 0) - deletedImageUrls.size})</h4>
+        {uploadedImages.length > 0 && (
+          <h4>Images ({uploadedImages.length})</h4>
         )}
         <div className={styles.imageGrid}>
-          {/* Display images from database (loaded from register) */}
-          {record.metadata?.image_urls?.map((imageUrl: string, index: number) => (
-            !deletedImageUrls.has(imageUrl) && (
-              <div key={`db-${index}`} className={styles.imageItem}>
-                <img 
-                  src={`${API_BASE}${imageUrl}`} 
-                  alt={`Record image ${index + 1}`}
-                  className={styles.image}
-                />
-                <button 
-                  onClick={() => {
-                    const newDeleted = new Set(deletedImageUrls)
-                    newDeleted.add(imageUrl)
-                    setDeletedImageUrls(newDeleted)
-                    console.log('VinylCard: Marked for deletion:', imageUrl)
-                  }}
-                  className={styles.removeBtn}
-                  title="Remove image"
-                >
-                  ✕
-                </button>
-              </div>
-            )
-          ))}
-          {/* Display uploaded images (preview before saving) */}
+          {/* Display only uploaded images (whether from new upload or loaded from register) */}
+          {/* image_urls are kept in metadata as reference for database URLs but not displayed to avoid duplication */}
           {uploadedImages.map((file, index) => (
             <div key={`upload-${index}`} className={styles.imageItem}>
               <img 
                 src={URL.createObjectURL(file)} 
-                alt={`Uploaded ${index + 1}`}
+                alt={`Image ${index + 1}`}
                 className={styles.image}
               />
               <button 
@@ -595,23 +566,38 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
             </div>
           ))}
         </div>
-        <label className={styles.addImageBtn}>
-          <input 
-            type="file" 
-            multiple 
-            accept="image/*"
-            onChange={(e) => {
-              if (e.target.files) {
-                console.log('VinylCard: Adding images:', e.target.files.length)
-                onImageAdd?.(e.target.files)
-                // Reset the input value to allow selecting the same files again (mobile fix)
-                e.target.value = ''
-              }
-            }}
-            style={{ display: 'none' }}
-            />
-            + Add More Images
-          </label>
+        <div className={styles.imageActionButtons}>
+          <label className={styles.addImageBtn}>
+            <input 
+              type="file" 
+              multiple 
+              accept="image/*"
+              onChange={(e) => {
+                if (e.target.files) {
+                  console.log('VinylCard: Adding images:', e.target.files.length)
+                  onImageAdd?.(e.target.files)
+                  // Reset the input value to allow selecting the same files again (mobile fix)
+                  e.target.value = ''
+                }
+              }}
+              style={{ display: 'none' }}
+              />
+              + Add More Images
+            </label>
+            {isInRegister && onReanalyze && (record.metadata?.image_urls?.length || 0) > 0 && (
+            <button 
+              onClick={() => {
+                // Complete re-analysis: Re-analyze ALL images (existing + new) from scratch
+                console.log('VinylCard: Triggering COMPLETE re-analysis of all images')
+                onReanalyze(uploadedImages, true)
+              }}
+              className={styles.reanalyzeAllBtn}
+              title="Re-analyze ALL images from scratch with latest AI models"
+            >
+              🔄 Reanalyze All
+            </button>
+          )}
+        </div>
           {uploadedImages.length > 0 && onReanalyze && (
             <button 
               onClick={() => {

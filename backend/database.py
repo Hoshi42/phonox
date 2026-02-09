@@ -1,6 +1,7 @@
 """SQLAlchemy ORM models for database persistence."""
 
 import json
+import logging
 import os
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Any as ColumnType
@@ -11,6 +12,8 @@ from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
 Base = declarative_base()  # type: ignore[misc]
+
+logger = logging.getLogger(__name__)
 
 
 class VinylRecord(Base):  # type: ignore[misc,valid-type]
@@ -72,15 +75,32 @@ class VinylRecord(Base):  # type: ignore[misc,valid-type]
             return []
 
     def set_evidence_chain(self, chain: List[Dict[str, Any]]) -> None:
-        """Set evidence chain from list of dicts."""
-        # Convert datetime objects to ISO format strings
-        serializable_chain = []
-        for evidence in chain:
-            evidence_copy = evidence.copy()
-            if isinstance(evidence_copy.get("timestamp"), datetime):
-                evidence_copy["timestamp"] = evidence_copy["timestamp"].isoformat()
-            serializable_chain.append(evidence_copy)
-        self.evidence_chain = json.dumps(serializable_chain)
+        """Set evidence chain from list of dicts, handling circular references."""
+        try:
+            # Try direct serialization first
+            self.evidence_chain = json.dumps(chain)
+        except (ValueError, TypeError, RecursionError) as e:
+            # Handle circular references or non-serializable objects
+            logger.warning(f"Evidence chain serialization failed: {e}")
+            serializable_chain = []
+            for evidence in chain:
+                try:
+                    # Try to serialize each evidence individually
+                    json.dumps(evidence)
+                    serializable_chain.append(evidence)
+                except (ValueError, TypeError, RecursionError):
+                    # If this evidence has issues, create simplified version
+                    serializable_chain.append({
+                        "source": str(evidence.get("source", "unknown")),
+                        "confidence": evidence.get("confidence", 0.0),
+                        "timestamp": evidence.get("timestamp", datetime.now().isoformat()),
+                        "error": "Serialization failed"
+                    })
+            try:
+                self.evidence_chain = json.dumps(serializable_chain)
+            except:
+                # Ultimate fallback
+                self.evidence_chain = json.dumps([])
 
     def get_evidence_chain(self) -> List[Dict[str, Any]]:
         """Get evidence chain as list of dicts."""

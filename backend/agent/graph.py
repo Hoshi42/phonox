@@ -19,7 +19,6 @@ from datetime import datetime
 from typing import Literal, List, Dict, Any, Tuple, Optional
 
 from langgraph.graph import StateGraph, START, END
-from langgraph.checkpoint.memory import MemorySaver
 from anthropic import Anthropic
 
 from backend.agent.state import VinylState, Evidence, EvidenceType
@@ -860,8 +859,9 @@ def build_agent_graph():
     graph.add_edge("auto_commit", END)
     graph.add_edge("needs_review", END)
 
-    # Compile with memory checkpointing
-    return graph.compile(checkpointer=MemorySaver())
+    # Compile without checkpointer to avoid recursion limit issues
+    # Checkpointer not needed for single-shot analysis
+    return graph.compile()
 
 
 if __name__ == "__main__":

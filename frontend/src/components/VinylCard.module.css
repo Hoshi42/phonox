@@ -257,6 +257,40 @@
   transform: translateY(-1px);  /* Subtle lift effect */
 }
 
+.imageActionButtons {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.imageActionButtons .addImageBtn {
+  flex: 1;
+}
+
+.reanalyzeAllBtn {
+  padding: 12px 16px;
+  background: rgba(139, 92, 246, 0.15);
+  border: 2px solid rgba(139, 92, 246, 0.4);
+  border-radius: 8px;
+  color: #a78bfa;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.reanalyzeAllBtn:hover {
+  background: rgba(139, 92, 246, 0.25);
+  border-color: rgba(139, 92, 246, 0.6);
+  transform: translateY(-1px);
+}
+
 .reanalyzeBtn {
   width: 100%;
   padding: 10px 12px;
