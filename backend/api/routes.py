@@ -711,8 +711,9 @@ When web search information is provided below, use it to enhance your answer but
                 "content": search_message,  # Use cleaned message without /web trigger
             })
             
+            chat_model = os.getenv("ANTHROPIC_CHAT_MODEL", "claude-haiku-4-5-20251001")
             response = anthropic_client.messages.create(
-                model="claude-haiku-4-5-20251001",  # Fastest Claude model
+                model=chat_model,
                 max_tokens=800,  # Increased for web-enhanced responses
                 system=system_prompt + web_context,
                 messages=messages_for_claude,
@@ -888,8 +889,9 @@ Keep responses informative but conversational."""
                 "content": request.message,
             })
             
+            chat_model = os.getenv("ANTHROPIC_CHAT_MODEL", "claude-haiku-4-5-20251001")
             response = anthropic_client.messages.create(
-                model="claude-haiku-4-5-20251001",
+                model=chat_model,
                 max_tokens=4000,
                 system=system_prompt + "\n\n" + web_context,
                 messages=messages_for_claude,
@@ -1327,8 +1329,9 @@ FACTORS: [list key factors]
 EXPLANATION: [brief explanation]"""
         
         try:
+            chat_model = os.getenv("ANTHROPIC_CHAT_MODEL", "claude-haiku-4-5-20251001")
             response = anthropic_client.messages.create(
-                model="claude-haiku-4-5-20251001",
+                model=chat_model,
                 max_tokens=500,
                 messages=[
                     {

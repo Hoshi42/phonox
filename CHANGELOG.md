@@ -1,5 +1,103 @@
 # Changelog
 
+## 1.6.0 - Multi-Image Intelligence & Condition Detection
+
+### Major Features
+- **LLM-Based Metadata Aggregation** 🤖
+  - Replaced complex rule-based aggregation with Claude-powered intelligent merging
+  - Automatically resolves conflicts between multiple image analyses
+  - Normalizes capitalization ("PINK FLOYD" → "Pink Floyd")
+  - Merges barcodes, catalog numbers, and genres intelligently
+  - Provides reasoning for aggregation decisions
+  - ~75% reduction in code complexity (170 lines → 40 lines)
+  - New environment variable: `ANTHROPIC_AGGREGATION_MODEL` (default: claude-sonnet-4-5-20250929)
+
+- **Condition Assessment** 🔍
+  - Automatic vinyl condition detection from images
+  - Uses Goldmine grading scale (M, NM, VG+, VG, G+, G, F, P)
+  - Conservative multi-image approach (uses worst condition seen)
+  - Condition notes with visible wear descriptions
+  - Condition badge in UI with color coding
+  - Condition multiplier affects value calculations
+  - Integrated into aggregation and enhancement workflows
+
+- **Advanced Retry Logic** 🔄
+  - Exponential backoff for transient API failures (1s → 2s → 4s)
+  - Up to 3 retry attempts per image
+  - Handles timeouts, rate limits, and temporary unavailability
+  - Detailed retry logging with attempt tracking
+  - Image-specific error reporting
+  - Graceful fallback to simple merge when LLM fails
+
+- **Image-Context Aware Prompts** 🎯
+  - Image 1 optimized for artist/title extraction
+  - Images 2+ optimized for barcode/catalog/genres
+  - Context-aware prompts reference previous results
+  - Better multi-image coordination
+  - Reduced duplicate analysis
+  - Higher accuracy with focused instructions
+
+### Model Configuration Management
+- **Centralized Model Configuration**
+  - All Claude models configurable via environment variables
+  - `ANTHROPIC_VISION_MODEL`: Image analysis (default: claude-sonnet-4-5-20250929)
+  - `ANTHROPIC_CHAT_MODEL`: Chat responses (default: claude-haiku-4-5-20251001)
+  - `ANTHROPIC_AGGREGATION_MODEL`: Multi-image merging (default: claude-sonnet-4-5-20250929)
+  - `ANTHROPIC_ENHANCEMENT_MODEL`: Metadata enrichment (default: claude-opus-4-1-20250805)
+  - All models documented in `.env.example` with alternatives
+  - Cost optimization strategies documented
+  - Easy switching between model tiers
+
+### Bug Fixes
+- **Fixed f-string Format Specifier Errors**
+  - Properly escaped JSON examples in prompts with `{{}}` and `{{{{}}}}`
+  - Fixed "Invalid format specifier" errors during vision extraction
+  - Affected files: `graph.py`, `vision.py`, `metadata_enhancer.py`
+  - All multi-image analysis now works correctly
+
+### Improvements
+- **Metadata Quality Validation**
+  - Validates confidence thresholds
+  - Checks for placeholder values (Unknown, N/A, ERROR)
+  - Validates year range (1900-2026)
+  - Warns about missing genres
+  - Validates barcode format (12-13 digits)
+  - Quality issues logged and tracked
+
+- **Enhanced Confidence Scoring**
+  - Updated weights: Discogs 40%, MusicBrainz 20%, Vision 18%, WebSearch 12%
+  - Added Image (5%) and User Input (5%) sources
+  - Better reflects reliability of each source
+  - More accurate confidence calculations
+
+### Documentation
+- **New Documentation Files**
+  - `LLM_AGGREGATION_APPROACH.md`: Why and how LLM aggregation works
+  - `MODEL_CONFIGURATION.md`: Complete model configuration guide
+  - `METADATA_DETECTION_ANALYSIS.md`: Technical analysis of multi-image issues
+  - `METADATA_DETECTION_IMPLEMENTATION.md`: Implementation details
+  - `METADATA_DETECTION_QUICKSTART.md`: Quick reference guide
+  - `IMPROVEMENTS_IMPLEMENTED.md`: Summary of all improvements
+  - `TESTING_GUIDE_IMPROVEMENTS.md`: Testing procedures
+
+### Cost Analysis
+- **Per 2-Image Upload** (with new aggregation):
+  - Vision analysis: $0.008 (2 × $0.004)
+  - LLM aggregation: $0.001
+  - **Total: $0.009** (12.5% increase, worth it for intelligence gain)
+- Condition extraction: included in vision analysis (no extra cost)
+- Enhancement: $0.003 when adding images to existing records
+
+### Verification
+- ✅ Multi-image uploads work without f-string errors
+- ✅ LLM aggregation merges metadata intelligently
+- ✅ Retry logic handles transient failures
+- ✅ Image-specific prompts improve accuracy
+- ✅ Condition detected and displayed in UI
+- ✅ All model configurations via environment variables
+- ✅ Quality validation catches suspicious data
+- ✅ Backend starts without errors
+
 ## 1.5.3
 
 ### Critical Bug Fixes
