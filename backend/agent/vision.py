@@ -11,6 +11,7 @@ import base64
 import logging
 import os
 import json
+import time
 from typing import Optional, Dict, Any, cast
 from io import BytesIO
 
@@ -27,6 +28,98 @@ class VisionExtractionError(Exception):
     """Raised when vision extraction fails."""
 
     pass
+
+
+def extract_vinyl_metadata_with_retry(
+    image_base64: str,
+    image_format: str = "jpeg",
+    fallback_on_error: bool = False,
+    max_retries: int = 3,
+    base_delay: float = 1.0,
+    image_context: Optional[Dict[str, Any]] = None  # NEW: context for optimized prompts
+) -> Dict[str, Any]:
+    """
+    Extract vinyl metadata with automatic retry on failures.
+    
+    Implements exponential backoff for transient failures (timeouts, rate limits).
+    
+    Args:
+        image_base64: Base64-encoded image string
+        image_format: Image format (jpeg, png, webp, gif)
+        fallback_on_error: If False, raise on error (default)
+        max_retries: Maximum number of retry attempts (default: 3)
+        base_delay: Initial delay between retries in seconds (default: 1.0)
+        image_context: Optional dict with 'image_index', 'total_images', 'previous_results'
+    
+    Returns:
+        Dict with extracted metadata
+    
+    Raises:
+        VisionExtractionError: If all retry attempts fail
+    """
+    last_error = None
+    
+    for attempt in range(max_retries):
+        try:
+            logger.info(
+                f"Vision extraction attempt {attempt + 1}/{max_retries} "
+                f"(format: {image_format}, size: {len(image_base64)/1024:.1f}KB)"
+            )
+            
+            # Try to extract metadata
+            result = extract_vinyl_metadata(
+                image_base64=image_base64,
+                image_format=image_format,
+                fallback_on_error=fallback_on_error,
+                image_context=image_context  # Pass context for optimized prompts
+            )
+            
+            if attempt > 0:
+                logger.info(f"Vision extraction succeeded on attempt {attempt + 1}")
+            
+            return result
+        
+        except VisionExtractionError as e:
+            last_error = e
+            error_msg = str(e)
+            
+            # Check if error is retryable
+            retryable_errors = ['timeout', 'rate_limit', 'temporarily unavailable', 'overloaded', 'timed out']
+            is_retryable = any(keyword in error_msg.lower() for keyword in retryable_errors)
+            
+            if not is_retryable:
+                # Non-retryable error, fail immediately
+                logger.error(f"Non-retryable error on image: {error_msg}")
+                raise
+            
+            if attempt < max_retries - 1:
+                # Calculate exponential backoff delay
+                delay = base_delay * (2 ** attempt)
+                logger.warning(
+                    f"Vision extraction failed (attempt {attempt + 1}/{max_retries}): {error_msg}. "
+                    f"Retrying in {delay:.1f}s..."
+                )
+                time.sleep(delay)
+            else:
+                logger.error(
+                    f"Vision extraction failed after {max_retries} attempts: {error_msg}"
+                )
+        
+        except Exception as e:
+            # Unexpected error
+            logger.error(f"Unexpected error during vision extraction: {type(e).__name__}: {e}")
+            if attempt < max_retries - 1:
+                delay = base_delay * (2 ** attempt)
+                logger.warning(f"Retrying in {delay:.1f}s...")
+                time.sleep(delay)
+            else:
+                raise VisionExtractionError(f"Extraction failed after {max_retries} attempts: {e}") from e
+    
+    # All retries failed
+    if last_error:
+        raise last_error
+    else:
+        raise VisionExtractionError("Extraction failed for unknown reason")
 
 
 def compress_image_to_claude_limits(image_base64: str, image_format: str = "jpeg", max_size_mb: float = 4.5) -> str:
@@ -127,10 +220,91 @@ def encode_image_to_base64(image_path: str) -> str:
         return base64.standard_b64encode(image_file.read()).decode("utf-8")
 
 
+def get_optimized_vision_prompt(
+    image_index: int = 1,
+    total_images: int = 1,
+    previous_results: Optional[Dict[str, Any]] = None
+) -> str:
+    """
+    Get optimized vision extraction prompt based on image context.
+    
+    Customizes prompt based on:
+    - Image position (1st image usually has artist/title, 2nd has back cover details)
+    - Number of total images
+    - What was already extracted from previous images
+    
+    Args:
+        image_index: Which image in sequence (1-based)
+        total_images: Total number of images being analyzed
+        previous_results: Results from earlier images (if any)
+    
+    Returns:
+        Optimized extraction prompt string
+    """
+    
+    # Position-specific guidance
+    if total_images == 1:
+        position_guidance = """
+This is the ONLY image of the record. Extract all available metadata:
+- Artist name (usually largest, most prominent text)
+- Album title (usually second largest)
+- Release year (4-digit number)
+- Record label (distinctive branding text)
+- Catalog number (alphanumeric code)
+- Barcode/UPC (black/white vertical lines with numbers)
+- Genres (based on visual style and any text indicators)
+- Physical condition (visual wear, scratches, dust)"""
+    
+    elif image_index == 1:
+        position_guidance = f"""
+This is IMAGE 1 of {total_images} images of the same record.
+PRIMARY FOCUS: Extract ARTIST and ALBUM TITLE clearly.
+These are the most critical fields. Other images will provide supporting details.
+
+Extraction priorities:
+1. Artist name (usually LARGEST, most prominent text at top)
+2. Album title (usually second-largest, often in different color/style below artist)
+3. Label and catalog number (if visible)
+4. Barcode (if visible on this side)
+5. Genres
+6. Physical condition"""
+    
+    else:  # image_index > 1
+        position_guidance = f"""
+This is IMAGE {image_index} of {total_images} images.
+The first image already extracted: Artist/Title.
+
+FOCUS ON THESE FIELDS (if not captured by image 1):
+- Barcode/UPC (commonly on back cover or label - CRITICAL!)
+- Catalog number (on back cover, label, or sleeve)
+- Record label (distinctive text/logo)
+- Genres (often listed on back cover)
+- Physical condition (any visible wear/damage)
+
+Also VERIFY and CONFIRM Artist/Title if visible in this image (helps validate image 1 results)."""
+    
+    # Add context if previous results provided
+    previous_context = ""
+    if previous_results:
+        prev_artist = previous_results.get('artist', 'Unknown')
+        prev_title = previous_results.get('title', 'Unknown')
+        previous_context = f"""
+
+FOR REFERENCE (from previous images):
+- Artist: {prev_artist}
+- Title: {prev_title}
+
+If you see these same values in this image, it validates previous extraction.
+If you see DIFFERENT values, note the differences (might be variant editions)."""
+    
+    return position_guidance + previous_context
+
+
 def extract_vinyl_metadata(
     image_base64: str,
     image_format: str = "jpeg",
     fallback_on_error: bool = False,  # Changed to False - errors should be reported, not silenced
+    image_context: Optional[Dict[str, Any]] = None,  # NEW: context about image position
 ) -> Dict[str, Any]:
     """
     Extract vinyl record metadata from album artwork using Claude 3 Sonnet.
@@ -149,6 +323,8 @@ def extract_vinyl_metadata(
         image_format: Image format (jpeg, png, webp, gif)
         fallback_on_error: If False (default), raise VisionExtractionError on failure.
                           If True, return mock data on error (NOT RECOMMENDED)
+        image_context: Optional dict with 'image_index', 'total_images', 'previous_results'
+                      for optimized prompt generation
 
     Returns:
         Dict with keys: artist, title, year, label, catalog_number, genres, confidence
@@ -171,8 +347,19 @@ Your task is to extract metadata from vinyl record images with maximum accuracy 
 Be thorough in examining all visible text, especially prominent text that might be artist or title.
 Focus on finding barcodes and correctly identifying metadata fields."""
 
+    # Get optimized prompt based on image context (if provided)
+    position_specific_guidance = ""
+    if image_context:
+        position_specific_guidance = get_optimized_vision_prompt(
+            image_index=image_context.get('image_index', 1),
+            total_images=image_context.get('total_images', 1),
+            previous_results=image_context.get('previous_results')
+        )
+
     # Chain-of-thought extraction prompt
-    extraction_prompt = """Analyze this vinyl record image step-by-step:
+    extraction_prompt = f"""Analyze this vinyl record image step-by-step:
+
+{position_specific_guidance}
 
 STEP 1: DESCRIBE THE IMAGE
 - What do you see? (front cover, back cover, label, sleeve, etc.)
@@ -231,7 +418,7 @@ How confident are you in your extraction?
 - Low (0.0-0.5): Unclear, ambiguous, or uncertain
 
 STEP 8: RETURN STRUCTURED JSON
-{
+{{
     "artist": "LARGEST visible text from step 2, exactly as written",
     "title": "second-largest or distinctly different colored text",
     "year": 1969 or null if not visible,
@@ -243,7 +430,7 @@ STEP 8: RETURN STRUCTURED JSON
     "condition": "Mint (M)" through "Poor (P)" based on visible damage,
     "condition_notes": "brief description of wear/damage observed",
     "confidence": 0.75
-}
+}}
 
 CRITICAL: 
 - Return ONLY valid JSON

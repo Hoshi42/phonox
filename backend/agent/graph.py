@@ -13,18 +13,213 @@ Phase 1.1 Implementation (Weeks 2-3)
 """
 
 import logging
+import json
+import os
 from datetime import datetime
-from typing import Literal
+from typing import Literal, List, Dict, Any, Tuple, Optional
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
+from anthropic import Anthropic
 
 from backend.agent.state import VinylState, Evidence, EvidenceType
-from backend.agent.vision import extract_vinyl_metadata
+from backend.agent.vision import extract_vinyl_metadata, extract_vinyl_metadata_with_retry
 from backend.agent.metadata import lookup_metadata_from_both
 from backend.agent.websearch import search_vinyl_metadata, search_vinyl_by_barcode, search_spotify_album
 
 logger = logging.getLogger(__name__)
+
+# Initialize Anthropic client for LLM-based aggregation
+anthropic_client = Anthropic()
+
+
+# ============================================================================
+# LLM-BASED AGGREGATION (Simpler & More Intelligent)
+# ============================================================================
+
+
+def aggregate_with_llm(all_results: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Use Claude to intelligently aggregate metadata from multiple images.
+    
+    This is simpler than rule-based logic and leverages Claude's intelligence
+    for conflict resolution and metadata merging.
+    
+    Args:
+        all_results: List of metadata dicts from each image
+    
+    Returns:
+        Aggregated metadata dict with all fields merged
+    """
+    if not all_results:
+        return {}
+    
+    if len(all_results) == 1:
+        # Only one image, no aggregation needed
+        return all_results[0]
+    
+    logger.info(f"Using Claude to aggregate {len(all_results)} image results...")
+    
+    # Build prompt for Claude
+    aggregation_prompt = f"""You are a vinyl record metadata expert. Multiple images of the same record have been analyzed separately, and you need to merge the results intelligently.
+
+IMAGE ANALYSIS RESULTS:
+{json.dumps(all_results, indent=2, default=str)}
+
+TASK: Merge these results into a single, accurate metadata object.
+
+RULES:
+1. **Artist/Title**: Choose the result with highest confidence. If similar (e.g., "Pink Floyd" vs "PINK FLOYD"), normalize to standard capitalization.
+2. **Year**: If all agree, use that. If conflict, choose highest confidence.
+3. **Label**: Choose highest confidence value.
+4. **Catalog Number**: If multiple found, include all (they might be different editions).
+5. **Barcode**: Include all valid barcodes found (12-13 digits).
+6. **Genres**: Merge all genres, remove duplicates, keep lowercase normalized.
+7. **Condition**: Choose WORST condition seen across all images (most conservative assessment). Use Goldmine scale: M, NM, VG+, VG, G+, G, F, P.
+8. **Confidence**: Calculate as weighted average of all image confidences.
+
+If images conflict on key fields (artist/title), explain the conflict but choose the most confident value.
+
+Return ONLY valid JSON:
+{{{{
+    "artist": "normalized artist name",
+    "title": "normalized title",
+    "year": 1973,
+    "label": "label name",
+    "catalog_number": "CAT123",
+    "barcode": "724384260729",
+    "genres": ["rock", "progressive rock"],
+    "condition": "Near Mint (NM)",
+    "condition_notes": "Minor sleeve wear visible",
+    "all_barcodes": ["724384260729"],
+    "all_catalog_numbers": ["CAT123", "CAT456"],
+    "confidence": 0.88,
+    "reasoning": "Brief explanation of key decisions made",
+    "conflicts_resolved": ["Brief description of any conflicts and how resolved"]
+}}}}"""
+    
+    try:
+        aggregation_model = os.getenv("ANTHROPIC_AGGREGATION_MODEL", "claude-sonnet-4-5-20250929")
+        response = anthropic_client.messages.create(
+            model=aggregation_model,
+            max_tokens=1500,
+            temperature=0.3,  # Deterministic for consistent merging
+            messages=[{"role": "user", "content": aggregation_prompt}]
+        )
+        
+        response_text = response.content[0].text if response.content else ""
+        
+        # Parse JSON from response
+        json_start = response_text.find("{")
+        json_end = response_text.rfind("}") + 1
+        
+        if json_start == -1 or json_end == 0:
+            logger.error("No JSON found in Claude aggregation response")
+            # Fallback to simple merge
+            return simple_merge_fallback(all_results)
+        
+        aggregated = json.loads(response_text[json_start:json_end])
+        
+        logger.info(f"Claude aggregation: {aggregated.get('artist')} / {aggregated.get('title')}")
+        logger.info(f"  Confidence: {aggregated.get('confidence', 0.0):.2f}")
+        logger.info(f"  Reasoning: {aggregated.get('reasoning', 'N/A')}")
+        
+        if aggregated.get('conflicts_resolved'):
+            for conflict in aggregated['conflicts_resolved']:
+                logger.info(f"  Resolved conflict: {conflict}")
+        
+        return aggregated
+        
+    except Exception as e:
+        logger.error(f"LLM aggregation failed: {e}, falling back to simple merge")
+        return simple_merge_fallback(all_results)
+
+
+def simple_merge_fallback(all_results: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Simple fallback merge when LLM aggregation fails.
+    Just picks the result with highest confidence.
+    """
+    if not all_results:
+        return {}
+    
+    # Sort by confidence, pick highest
+    sorted_results = sorted(all_results, key=lambda x: x.get('confidence', 0.0), reverse=True)
+    best = sorted_results[0].copy()
+    
+    # Collect all barcodes and catalogs
+    all_barcodes = set()
+    all_catalogs = set()
+    for r in all_results:
+        if r.get('barcode'):
+            all_barcodes.add(r['barcode'])
+        if r.get('catalog_number'):
+            all_catalogs.add(r['catalog_number'])
+    
+    best['all_barcodes'] = list(all_barcodes)
+    best['all_catalog_numbers'] = list(all_catalogs)
+    
+    logger.info("Using simple fallback merge (highest confidence)")
+    return best
+
+
+def validate_metadata_quality(
+    metadata: Dict[str, Any], 
+    confidence_threshold: float = 0.5
+) -> Tuple[bool, List[str]]:
+    """
+    Validate that extracted metadata meets quality standards.
+    
+    Args:
+        metadata: Extracted metadata dict
+        confidence_threshold: Minimum acceptable confidence (0.0-1.0)
+    
+    Returns:
+        Tuple of (is_valid, list_of_issues)
+    """
+    issues = []
+    
+    # Check confidence threshold
+    confidence = metadata.get('confidence', 0.0)
+    if confidence < confidence_threshold:
+        issues.append(
+            f"Low confidence: {confidence:.2f} (threshold: {confidence_threshold:.2f})"
+        )
+    
+    # Check for placeholder/unknown values
+    placeholders = {'Unknown', 'N/A', 'UNKNOWN', 'TBD', '???', '', 'ERROR'}
+    
+    for field in ['artist', 'title', 'label']:
+        value = metadata.get(field)
+        if value in placeholders:
+            issues.append(f"Field '{field}' is placeholder: '{value}'")
+    
+    # Validate year if present
+    year = metadata.get('year')
+    if year:
+        try:
+            year_int = int(year)
+            if not (1900 <= year_int <= 2026):
+                issues.append(f"Year out of valid range: {year_int}")
+        except (ValueError, TypeError):
+            issues.append(f"Year is not a valid integer: {year}")
+    
+    # Warn if no genres
+    genres = metadata.get('genres', [])
+    if not genres or len(genres) == 0:
+        issues.append("No genres detected - analysis might be incomplete")
+    
+    # Check barcode format if present
+    barcode = metadata.get('barcode')
+    if barcode:
+        barcode_digits = ''.join(c for c in str(barcode) if c.isdigit())
+        if not (12 <= len(barcode_digits) <= 14):
+            issues.append(
+                f"Barcode format suspicious: {barcode} ({len(barcode_digits)} digits)"
+            )
+    
+    is_valid = len(issues) == 0
+    return is_valid, issues
 
 
 # ============================================================================
@@ -181,13 +376,23 @@ def vision_extraction_node(state: VinylState) -> VinylState:
                 logger.warning(f"vision_extraction: No content for image {idx + 1}")
                 continue
                 
-            # Call Claude 3 Sonnet for metadata extraction
+            # Call Claude 3 Sonnet for metadata extraction with retry logic
             logger.info(f"vision_extraction: Analyzing image {idx + 1} with Claude 3 Sonnet (format: {image_format})...")
             try:
-                result = extract_vinyl_metadata(
+                # Prepare image context for optimized prompts
+                image_context = {
+                    'image_index': idx + 1,
+                    'total_images': len(images),
+                    'previous_results': best_result  # Pass best result so far for context
+                }
+                
+                result = extract_vinyl_metadata_with_retry(
                     image_base64=image_content,
                     image_format=image_format,
-                    fallback_on_error=False  # No fallback - we want real errors
+                    fallback_on_error=False,  # No fallback - we want real errors
+                    max_retries=3,  # Retry up to 3 times
+                    base_delay=1.0,  # Start with 1 second, then 2, then 4
+                    image_context=image_context  # Pass context for optimized prompts
                 )
             except Exception as e:
                 error_msg = str(e)
@@ -208,55 +413,35 @@ def vision_extraction_node(state: VinylState) -> VinylState:
                 best_confidence = confidence
                 best_result = result
         
-        # Multi-image aggregation: Combine results intelligently
+        # Multi-image aggregation: Let Claude intelligently merge all results
         if best_result and all_results:
-            vision_results = best_result.copy()
+            logger.info(f"vision_extraction: Aggregating {len(all_results)} image results using Claude...")
             
-            # Aggregate data from all images for better coverage
-            all_barcodes = set()
-            all_catalog_numbers = set()
-            all_visible_text = []
+            # Use LLM-based aggregation for intelligent merging
+            vision_results = aggregate_with_llm(all_results)
             
-            for result in all_results:
-                if result.get("barcode"):
-                    all_barcodes.add(result["barcode"])
-                if result.get("catalog_number"):
-                    all_catalog_numbers.add(result["catalog_number"])
-                if result.get("all_visible_text"):
-                    all_visible_text.append(result["all_visible_text"])
-            
-            # If artist or title is "Unknown" but other images found something, use it
-            if len(all_results) > 1:
-                for result in all_results:
-                    if vision_results.get("artist") == "Unknown" and result.get("artist") != "Unknown":
-                        vision_results["artist"] = result.get("artist")
-                    if vision_results.get("title") == "Unknown" and result.get("title") != "Unknown":
-                        vision_results["title"] = result.get("title")
-                    if not vision_results.get("year") and result.get("year"):
-                        vision_results["year"] = result.get("year")
-                    if vision_results.get("label") == "Unknown" and result.get("label") != "Unknown":
-                        vision_results["label"] = result.get("label")
-                    if not vision_results.get("catalog_number") and result.get("catalog_number"):
-                        vision_results["catalog_number"] = result.get("catalog_number")
-            
-            # Add aggregated data
-            vision_results["all_barcodes"] = list(all_barcodes)
-            vision_results["all_catalog_numbers"] = list(all_catalog_numbers)
-            vision_results["all_visible_text"] = all_visible_text
+            # Preserve per-image results for reference
             vision_results["processed_images"] = len(all_results)
             vision_results["image_results"] = all_results
             
-            logger.info(
-                f"vision_extraction: FINAL RESULT - {vision_results.get('artist', 'Unknown')} / {vision_results.get('title', 'Unknown')} "
-                f"(confidence: {vision_results.get('confidence', 0.0):.2f}, processed {len(all_results)} images)"
-            )
+            # Collect all visible text from all images
+            all_visible_text = []
+            for result in all_results:
+                if result.get("all_visible_text"):
+                    all_visible_text.append(result["all_visible_text"])
+            vision_results["all_visible_text"] = all_visible_text
             
-            if all_barcodes:
-                logger.info(f"vision_extraction: Found barcodes: {list(all_barcodes)}")
-            if all_catalog_numbers:
-                logger.info(f"vision_extraction: Found catalog numbers: {list(all_catalog_numbers)}")
-            if all_visible_text:
-                logger.info(f"vision_extraction: All visible text from images: {all_visible_text}")
+            # Validate quality of aggregated metadata
+            is_valid, quality_issues = validate_metadata_quality(vision_results, confidence_threshold=0.4)
+            if not is_valid:
+                logger.warning(f"vision_extraction: Quality issues detected: {quality_issues}")
+                vision_results["_quality_issues"] = quality_issues
+            
+            logger.info(
+                f"vision_extraction: FINAL RESULT - "
+                f"{vision_results.get('artist', 'Unknown')} / {vision_results.get('title', 'Unknown')} "
+                f"(confidence: {vision_results.get('confidence', 0.0):.2f})"
+            )
         else:
             # All images failed - raise error with details
             if extraction_errors:
@@ -514,12 +699,14 @@ def confidence_gate_node(state: VinylState) -> VinylState:
     """
     evidence_chain = state.get("evidence_chain", [])
 
-    # Initialize weights dict (using string keys to match evidence source values)
+    # Initialize weights dict from state module (using enum keys)
     weights = {
-        EvidenceType.DISCOGS: 0.45,
-        EvidenceType.MUSICBRAINZ: 0.25,
-        EvidenceType.VISION: 0.20,
-        EvidenceType.WEBSEARCH: 0.10,
+        EvidenceType.DISCOGS: 0.40,
+        EvidenceType.MUSICBRAINZ: 0.20,
+        EvidenceType.VISION: 0.18,
+        EvidenceType.WEBSEARCH: 0.12,
+        EvidenceType.IMAGE: 0.05,
+        EvidenceType.USER_INPUT: 0.05,
     }
 
     # Calculate weighted confidence

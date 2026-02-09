@@ -25,7 +25,7 @@ class Evidence(TypedDict):
     Single piece of evidence about a vinyl record.
     
     Attributes:
-        source: Origin of this evidence (EvidenceType enum)
+        source: Origin of this evidence (EvidenceType enum value)
         confidence: Numeric confidence score (0.0 to 1.0)
         data: Raw tool response or extracted features
         timestamp: When this evidence was collected
@@ -49,7 +49,12 @@ class VinylMetadata(TypedDict):
         year: Release year (if known)
         label: Record label
         catalog_number: Label catalog number (if available)
+        barcode: UPC/EAN barcode (typically 12-13 digits)
         genres: List of genre tags
+        condition: Vinyl condition assessment (e.g., "mint", "near_mint", "good", "fair", "poor")
+        estimated_value_eur: Estimated value in EUR
+        estimated_value_usd: Estimated value in USD
+        spotify_url: Spotify album URL (if available)
         evidence: Chain of evidence sources backing this metadata
         overall_confidence: Weighted confidence across all sources
     """
@@ -58,7 +63,12 @@ class VinylMetadata(TypedDict):
     year: Optional[int]
     label: str
     catalog_number: Optional[str]
+    barcode: Optional[str]
     genres: List[str]
+    condition: Optional[str]
+    estimated_value_eur: Optional[float]
+    estimated_value_usd: Optional[float]
+    spotify_url: Optional[str]
     evidence: List[Evidence]
     overall_confidence: float  # Weighted average of evidence confidences
 
@@ -111,10 +121,12 @@ class VinylState(TypedDict, total=False):
 # Confidence scoring weights (must sum to 1.0)
 # Used to calculate overall_confidence in VinylMetadata
 CONFIDENCE_WEIGHTS = {
-    "discogs": 0.45,        # Most reliable (official database)
-    "musicbrainz": 0.25,    # Reliable (crowdsourced but verified)
-    "vision": 0.20,         # Claude 3 multimodal analysis (NEW)
-    "websearch": 0.10,      # Web search fallback (NEW)
+    "discogs": 0.40,        # Most reliable (official database)
+    "musicbrainz": 0.20,    # Reliable (crowdsourced but verified)
+    "vision": 0.18,         # Claude 3 multimodal analysis
+    "websearch": 0.12,      # Web search fallback
+    "image": 0.05,          # Raw image feature extraction
+    "user_input": 0.05,     # User-provided corrections
 }
 
 # Confidence thresholds for decision gates

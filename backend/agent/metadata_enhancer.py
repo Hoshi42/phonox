@@ -14,6 +14,7 @@ Instead of re-analyzing all images, we:
 
 import logging
 import json
+import os
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 from anthropic import Anthropic
@@ -71,45 +72,50 @@ RULES FOR MERGING:
 - Catalog Number: Keep existing if present, add new if different (separate with "/")
 - Barcode: Only update if existing is missing AND new is valid (12-13 digits)
 - Genres: Merge lists intelligently (avoid duplicates, keep consistent style)
+- Condition: If both have condition, use WORST condition (most conservative assessment). Goldmine scale: M, NM, VG+, VG, G+, G, F, P
 - Confidence: Calculate overall confidence based on agreement level
 
 IMPORTANT: Be CONSERVATIVE - only enhance if you're confident (>0.80) the new data is correct.
 If there are conflicts, prefer the existing data (it was already verified).
 
 Return ONLY a valid JSON object with this structure:
-{{
-    "enhanced_metadata": {{
+{{{{
+    "enhanced_metadata": {{{{
         "artist": "value or null",
         "title": "value or null",
         "year": null,
         "label": "value or null",
         "catalog_number": "value or null",
         "barcode": "value or null",
-        "genres": ["genre1", "genre2"] or null
-    }},
-    "field_confidences": {{
+        "genres": ["genre1", "genre2"] or null,
+        "condition": "Near Mint (NM)" or null,
+        "condition_notes": "description of wear" or null
+    }}}},
+    "field_confidences": {{{{
         "artist": 0.95,
         "title": 0.95,
         "year": 0.8,
         "label": 0.85,
         "catalog_number": 0.9,
         "barcode": 0.85,
-        "genres": 0.75
-    }},
+        "genres": 0.75,
+        "condition": 0.8
+    }}}},
     "overall_confidence": 0.87,
     "changes": [
         "Field: explanation of what changed and why",
         "..."
     ]
-}}
+}}}}
 
 Focus on HIGH CONFIDENCE enhancements only."""
 
         try:
             logger.info("Calling Claude for intelligent metadata enhancement")
+            enhancement_model = os.getenv("ANTHROPIC_ENHANCEMENT_MODEL", "claude-opus-4-1-20250805")
 
             response = self.client.messages.create(
-                model="claude-opus-4-1-20250805",  # Use more capable model for complex logic
+                model=enhancement_model,
                 max_tokens=1000,
                 messages=[
                     {
