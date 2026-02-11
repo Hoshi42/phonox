@@ -21,6 +21,18 @@
   - Single source of truth for image display
   - Cleaner state management in VinylCard.tsx
 
+- **Fixed Spotify URL Deletion on Re-Analysis**
+  - Backend: Added missing `spotify_url` and `estimated_value_usd` fields to reanalyze response
+  - Spotify URL now properly preserved when re-analyzing records
+  - Previously was being dropped because response didn't include the field
+  - URL correctly detected by agent graph but wasn't passed through to client
+
+- **Fixed Re-Analyze Button Visibility** 
+  - Button now only appears when NEW images are added to a register record
+  - No longer shows when just loading a record from register
+  - Correctly counts only newly added images (excludes database images)
+  - Prevents accidental re-analysis when no new images have been uploaded
+
 ### Features
 - **Re-Analysis Now Mirrors Upload Flow**
   - Re-analysis includes full web search and market value estimation
