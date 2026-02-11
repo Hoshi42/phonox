@@ -1362,9 +1362,11 @@ EXPLANATION: [brief explanation]"""
                     catalog_number=enhanced_metadata.get("catalog_number"),
                     barcode=enhanced_metadata.get("barcode"),
                     genres=enhanced_metadata.get("genres"),
+                    spotify_url=enhanced_metadata.get("spotify_url"),
                     condition=enhanced_metadata.get("condition"),
                     confidence=new_confidence,
                     estimated_value_eur=estimated_value_eur,  # Include the newly estimated value
+                    estimated_value_usd=None,  # USD not calculated in reanalysis, set to None
                 ),
                 evidence_chain=_serialize_evidence_chain(result_state.get("evidence_chain", [])),
                 confidence=new_confidence,

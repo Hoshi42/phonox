@@ -598,20 +598,25 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
             </button>
           )}
         </div>
-          {uploadedImages.length > 0 && onReanalyze && (
-            <button 
-              onClick={() => {
-                // Analyze only newly uploaded images and intelligently merge metadata
-                const allImagesToAnalyze = uploadedImages
-                console.log('VinylCard: Analyzing', uploadedImages.length, 'new images (will intelligently merge with existing metadata)')
-                onReanalyze(allImagesToAnalyze)
-              }}
-              className={styles.reanalyzeBtn}
-              title="Analyze new images and intelligently update metadata"
-            >
-              📸 Analyze {uploadedImages.length} new image{uploadedImages.length > 1 ? 's' : ''}
-            </button>
-          )}
+          {(() => {
+            // Only show analyze button when there are NEW images added (not just loaded from register)
+            const originalImageCount = isInRegister ? (record?.metadata?.image_urls?.length || 0) : 0
+            const newImagesCount = uploadedImages.length - originalImageCount
+            return newImagesCount > 0 && onReanalyze ? (
+              <button 
+                onClick={() => {
+                  // Analyze only newly uploaded images and intelligently merge metadata
+                  const newImages = uploadedImages.slice(originalImageCount)
+                  console.log('VinylCard: Analyzing', newImages.length, 'new images (will intelligently merge with existing metadata)')
+                  onReanalyze(newImages)
+                }}
+                className={styles.reanalyzeBtn}
+                title="Analyze new images and intelligently update metadata"
+              >
+                📸 Analyze {newImagesCount} new image{newImagesCount > 1 ? 's' : ''}
+              </button>
+            ) : null
+          })()}
       </div>
 
       {/* Metadata */}
