@@ -9,9 +9,12 @@ Triggered when: Primary source confidence < 0.75
 """
 
 import logging
+import os
 from typing import Optional, Dict, List, Any
 
 from tavily import TavilyClient
+import requests
+from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +31,7 @@ def search_vinyl_metadata(
     fallback_on_error: bool = True,
 ) -> List[Dict[str, Any]]:
     """
-    Search for vinyl record metadata using Tavily API.
+    Search for vinyl record metadata using Tavily API with DuckDuckGo fallback.
 
     Args:
         artist: Artist or group name
@@ -48,13 +51,13 @@ def search_vinyl_metadata(
     if not artist or not title:
         raise ValueError("Artist and title are required")
 
-    client = TavilyClient()
-
     # Construct search query
     search_query = f"{artist} {title} vinyl record album"
 
+    # Try Tavily first
     try:
         logger.info(f"Searching Tavily for: {search_query}")
+        client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
 
         response: Dict[str, Any] = client.search(
             query=search_query,
@@ -64,17 +67,33 @@ def search_vinyl_metadata(
 
         # Parse Tavily response
         results = _parse_tavily_response(response)
-        logger.info(f"Found {len(results)} search results")
-
-        return results
+        if results:
+            logger.info(f"Found {len(results)} search results via Tavily")
+            return results
+        else:
+            logger.info("Tavily returned no results, trying DuckDuckGo fallback")
 
     except Exception as e:
-        logger.error(f"Tavily search failed: {e}")
-        if fallback_on_error:
-            logger.warning("Returning empty results due to error")
-            return []
+        logger.warning(f"Tavily search failed: {e}, trying DuckDuckGo fallback")
+
+    # Fallback to DuckDuckGo
+    try:
+        ddg_results = _duckduckgo_search(search_query, max_results=7)
+        if ddg_results:
+            logger.info(f"Found {len(ddg_results)} search results via DuckDuckGo")
+            return ddg_results
         else:
-            raise WebsearchError(f"Websearch failed: {e}") from e
+            logger.warning("Both Tavily and DuckDuckGo returned no results")
+            
+    except Exception as e:
+        logger.error(f"DuckDuckGo fallback also failed: {e}")
+
+    # If we get here, all searches failed
+    if fallback_on_error:
+        logger.warning("Returning empty results due to all search methods failing")
+        return []
+    else:
+        raise WebsearchError(f"Websearch failed: Tavily and DuckDuckGo both unavailable")
 
 
 def search_vinyl_by_barcode(
@@ -84,7 +103,7 @@ def search_vinyl_by_barcode(
     fallback_on_error: bool = True,
 ) -> List[Dict[str, Any]]:
     """
-    Search for vinyl record information using barcode/UPC.
+    Search for vinyl record information using barcode/UPC with fallback to DuckDuckGo.
 
     Args:
         barcode: UPC/EAN barcode number (12-13 digits)
@@ -112,13 +131,10 @@ def search_vinyl_by_barcode(
         else:
             raise ValueError(f"Invalid barcode format: {barcode}")
 
-    client = TavilyClient()
-
     # Construct barcode-focused search queries
     search_queries = [
         f"UPC {clean_barcode} vinyl record album",
         f"barcode {clean_barcode} vinyl LP",
-        f"{clean_barcode} record album discogs"
     ]
     
     # Add context-specific queries if artist/title provided
@@ -131,46 +147,175 @@ def search_vinyl_by_barcode(
 
     all_results = []
     
+    # Try Tavily first
     try:
-        # Try multiple search strategies
+        logger.info(f"Trying Tavily barcode search for: {clean_barcode}")
+        client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
+        
         for i, query in enumerate(search_queries[:2]):  # Limit to 2 searches to control costs
-            logger.info(f"Barcode search {i+1}: {query}")
+            logger.info(f"Tavily barcode search {i+1}: {query}")
             
             try:
                 response: Dict[str, Any] = client.search(
                     query=query,
                     include_images=False,
-                    max_results=7,  # Fewer results per query since we're doing multiple queries
+                    max_results=7,
                 )
                 
                 results = _parse_tavily_response(response)
                 all_results.extend(results)
-                
-                logger.info(f"Barcode search {i+1} found {len(results)} results")
+                logger.info(f"Tavily barcode search {i+1} found {len(results)} results")
                 
             except Exception as e:
-                logger.warning(f"Barcode search {i+1} failed: {e}")
+                logger.warning(f"Tavily barcode search {i+1} failed: {e}")
                 continue
         
-        # Remove duplicates based on URL
-        seen_urls = set()
-        unique_results = []
-        for result in all_results:
-            url = result.get('url', '')
-            if url not in seen_urls:
-                seen_urls.add(url)
-                unique_results.append(result)
-        
-        logger.info(f"Found {len(unique_results)} unique barcode search results")
-        return unique_results[:5]  # Return top 5 unique results
+        if all_results:
+            # Return Tavily results
+            seen_urls = set()
+            unique_results = []
+            for result in all_results:
+                url = result.get('url', '')
+                if url not in seen_urls:
+                    seen_urls.add(url)
+                    unique_results.append(result)
+            
+            logger.info(f"Found {len(unique_results)} unique barcode search results via Tavily")
+            return unique_results[:5]
 
     except Exception as e:
-        logger.error(f"Barcode search failed for {clean_barcode}: {e}")
-        if fallback_on_error:
-            logger.warning("Returning empty results due to barcode search error")
-            return []
-        else:
-            raise WebsearchError(f"Barcode search failed: {e}") from e
+        logger.warning(f"Tavily barcode search failed: {e}, trying DuckDuckGo fallback")
+
+    # Fallback to DuckDuckGo
+    try:
+        logger.info(f"Trying DuckDuckGo barcode search for: {clean_barcode}")
+        for query in search_queries[:2]:
+            logger.info(f"DuckDuckGo barcode search: {query}")
+            
+            try:
+                ddg_results = _duckduckgo_search(query, max_results=7)
+                all_results.extend(ddg_results)
+                logger.info(f"DuckDuckGo barcode search found {len(ddg_results)} results")
+            except Exception as e:
+                logger.warning(f"DuckDuckGo barcode search failed: {e}")
+                continue
+
+        if all_results:
+            # Deduplicate and return
+            seen_urls = set()
+            unique_results = []
+            for result in all_results:
+                url = result.get('url', '')
+                if url not in seen_urls:
+                    seen_urls.add(url)
+                    unique_results.append(result)
+            
+            logger.info(f"Found {len(unique_results)} unique barcode search results via DuckDuckGo")
+            return unique_results[:5]
+
+    except Exception as e:
+        logger.error(f"DuckDuckGo barcode search also failed: {e}")
+
+    # If we get here, both search methods failed
+    logger.error(f"Barcode search failed for {clean_barcode} (both Tavily and DuckDuckGo)")
+    if fallback_on_error:
+        logger.warning("Returning empty results due to all search methods failing")
+        return []
+    else:
+        raise WebsearchError(f"Barcode search failed: both Tavily and DuckDuckGo unavailable")
+
+
+def _parse_tavily_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Parse Tavily API response into standardized format.
+
+    Args:
+        response: Dictionary response from Tavily API
+
+    Returns:
+        List of standardized result dictionaries
+    """
+    results: List[Dict[str, Any]] = []
+
+    if not response or not isinstance(response, dict):
+        logger.warning("Invalid Tavily response structure")
+        return results
+
+    # Tavily returns results in "results" key
+    tavily_results = response.get("results", [])
+    
+    if not tavily_results:
+        logger.warning("No results in Tavily response")
+        return results
+
+    for idx, result in enumerate(tavily_results):
+        # Extract fields from Tavily result dict
+        parsed_result: Dict[str, Any] = {
+            "title": result.get("title", f"Result {idx + 1}"),
+            "url": result.get("url", ""),
+            "snippet": result.get("content", ""),
+            "relevance": _calculate_relevance(result.get("url", "")),
+        }
+        results.append(parsed_result)
+
+    return results
+
+
+def _duckduckgo_search(query: str, max_results: int = 7) -> List[Dict[str, Any]]:
+    """
+    Fallback web search using DuckDuckGo HTML search (no API key required).
+
+    Args:
+        query: Search query string
+        max_results: Maximum number of results to return
+
+    Returns:
+        List of search results in standard format
+    """
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        params = {
+            'q': query,
+            'kl': 'us-en',
+            'ia': 'web'
+        }
+
+        logger.info(f"DuckDuckGo fallback search for: {query}")
+        resp = requests.get('https://duckduckgo.com/html/', params=params, headers=headers, timeout=10)
+        resp.raise_for_status()
+
+        try:
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            results: List[Dict[str, Any]] = []
+
+            for result in soup.select('.result__body')[:max_results]:
+                link = result.select_one('a.result__a')
+                snippet_elem = result.select_one('.result__snippet')
+                if not link:
+                    continue
+
+                href = link.get('href')
+                title = link.get_text(strip=True)
+                snippet = snippet_elem.get_text(strip=True) if snippet_elem else ''
+
+                parsed_result: Dict[str, Any] = {
+                    "title": title,
+                    "url": href,
+                    "snippet": snippet,
+                    "relevance": _calculate_relevance(href),
+                }
+                results.append(parsed_result)
+
+            logger.info(f"DuckDuckGo returned {len(results)} results")
+            return results
+        finally:
+            resp.close()
+
+    except Exception as e:
+        logger.error(f"DuckDuckGo fallback search failed: {e}")
+        return []
 
 
 def _parse_tavily_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -296,7 +441,7 @@ def search_spotify_album(
     fallback_on_error: bool = True,
 ) -> Optional[Dict[str, Any]]:
     """
-    Search for Spotify album link using Tavily websearch.
+    Search for Spotify album link using Tavily websearch with DuckDuckGo fallback.
 
     Args:
         artist: Artist or group name
@@ -317,13 +462,11 @@ def search_spotify_album(
         logger.warning("Artist and title are required for Spotify search")
         return None
 
-    client = TavilyClient()
-
-    # Construct specific Spotify search query
-    search_query = f"{artist} {title} album site:spotify.com"
-
+    # Try Tavily first with site restriction
     try:
-        logger.info(f"Searching Spotify for: {artist} - {title}")
+        logger.info(f"Searching Spotify (Tavily) for: {artist} - {title}")
+        client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
+        search_query = f"{artist} {title} album site:spotify.com"
 
         response: Dict[str, Any] = client.search(
             query=search_query,
@@ -336,7 +479,7 @@ def search_spotify_album(
             for result in response["results"]:
                 url = result.get("url", "")
                 if "spotify.com/album/" in url:
-                    logger.info(f"Found Spotify album: {url}")
+                    logger.info(f"Found Spotify album (Tavily): {url}")
                     return {
                         "spotify_url": url,
                         "artist": artist,
@@ -344,32 +487,32 @@ def search_spotify_album(
                         "source": "spotify",
                     }
 
-        # If no direct Spotify link found, try without site restriction
-        logger.info(f"No Spotify link found with site restriction, trying broader search")
+        logger.info("No site-restricted Spotify result found, trying broader Tavily search")
+
+    except Exception as e:
+        logger.warning(f"Tavily Spotify search failed: {e}, trying DuckDuckGo fallback")
+
+    # Try DuckDuckGo as fallback
+    try:
         search_query = f"{artist} {title} spotify album"
-        response = client.search(
-            query=search_query,
-            include_images=False,
-            max_results=7,
-        )
+        ddg_results = _duckduckgo_search(search_query, max_results=7)
+        
+        for result in ddg_results:
+            url = result.get("url", "")
+            if "spotify.com/album/" in url:
+                logger.info(f"Found Spotify album (DuckDuckGo): {url}")
+                return {
+                    "spotify_url": url,
+                    "artist": artist,
+                    "title": title,
+                    "source": "spotify",
+                }
 
-        if response.get("results"):
-            for result in response["results"]:
-                url = result.get("url", "")
-                if "spotify.com/album/" in url:
-                    logger.info(f"Found Spotify album (broader search): {url}")
-                    return {
-                        "spotify_url": url,
-                        "artist": artist,
-                        "title": title,
-                        "source": "spotify",
-                    }
-
-        logger.warning(f"No Spotify album found for {artist} - {title}")
+        logger.warning(f"No Spotify album found via Tavily or DuckDuckGo for {artist} - {title}")
         return None
 
     except Exception as e:
-        logger.error(f"Spotify search failed: {e}")
+        logger.error(f"Spotify search failed (both Tavily and DuckDuckGo): {e}")
         if fallback_on_error:
             return None
         else:
