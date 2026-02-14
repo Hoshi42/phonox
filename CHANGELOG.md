@@ -1,6 +1,25 @@
 # Changelog
 
-## Unreleased - Websearch Stability Improvements
+## Unreleased - Websearch Fallback Reliability
+
+### Bug Fixes
+- **Fixed DuckDuckGo Fallback Robustness**
+  - Replaced fragile HTML scraping with `duckduckgo-search` library
+  - DuckDuckGo now properly bypasses anti-bot measures and rate limiting
+  - Library handles HTTP headers and timeouts gracefully
+  - Fallback now works reliably when Tavily fails
+  
+- **Improved Websearch Error Handling**
+  - Better logging for debugging search failures
+  - Timeouts and connection errors handled gracefully
+  - Functions return empty results instead of crashing
+  - Proper fallback chain: Tavily → DuckDuckGo → return empty results
+
+### Dependencies
+- Added `duckduckgo-search>=3.9.0` to requirements.txt
+- Library provides robust web search without API keys
+
+## Unreleased - Previous Websearch Improvements
 
 ### Bug Fixes
 - **Fixed Tavily API Key Not Being Passed to Client**
