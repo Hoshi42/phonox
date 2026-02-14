@@ -1,6 +1,40 @@
 # Changelog
 
+## 1.7.0 - Mobile-First User Onboarding
+
+### Features
+- **Full-Screen User Selection Modal**
+  - Complete redesign of first-time user experience
+  - Full-screen responsive layout on mobile devices
+  - Significantly improved readability on all screen sizes
+  
+- **Enhanced Mobile Responsiveness**
+  - Larger touch targets: 70px button height for better usability
+  - Improved typography: 2.5rem title, 1.3rem sections, 1.15rem text
+  - Better visual hierarchy and spacing between elements
+  - Optimized padding and margins for mobile (1.5rem-2rem)
+  
+- **Proper Modal Layering**
+  - Use React Portals to render modals to document.body
+  - Guaranteed z-index positioning above all application overlays
+  - Fixes issues with chat panel blocking user selection on first visit
+  - modals now: 99999 z-index for guaranteed top layer
+  
+- **Improved First-Time User Flow**
+  - Clear "Your Profiles" section with existing users
+  - Intuitive "or" divider between existing and new profiles
+  - Better visual feedback with smooth transitions
+  - Touch-friendly interface with larger buttons and spacing
+
+### UI/UX Improvements
+- Better contrast and readability on mobile devices
+- Smooth transitions and hover effects optimized for touch (no hover on mobile)
+- Focused input states with glow effect
+- Proper button disabled states and styling
+- Cleaner mobile viewport usage with full-screen approach
+
 ## 1.6.1 - Re-Analysis & Image Management Fixes
+
 
 ### Bug Fixes
 - **Fixed Image Duplication on Record Load**
