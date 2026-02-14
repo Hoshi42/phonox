@@ -15,6 +15,7 @@ from typing import Optional, Dict, List, Any
 from tavily import TavilyClient
 import requests
 from bs4 import BeautifulSoup
+from duckduckgo_search import DDGS
 
 logger = logging.getLogger(__name__)
 
@@ -263,58 +264,42 @@ def _parse_tavily_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 def _duckduckgo_search(query: str, max_results: int = 7) -> List[Dict[str, Any]]:
     """
-    Fallback web search using DuckDuckGo HTML search (no API key required).
+    Fallback web search using DuckDuckGo Search API (via duckduckgo-search library).
+    
+    This library handles DuckDuckGo's anti-bot measures and rate limiting gracefully.
 
     Args:
         query: Search query string
         max_results: Maximum number of results to return
 
     Returns:
-        List of search results in standard format
+        List of search results in standard format or empty list if search fails
     """
     try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-        params = {
-            'q': query,
-            'kl': 'us-en',
-            'ia': 'web'
-        }
-
         logger.info(f"DuckDuckGo fallback search for: {query}")
-        resp = requests.get('https://duckduckgo.com/html/', params=params, headers=headers, timeout=10)
-        resp.raise_for_status()
+        
+        ddgs = DDGS(timeout=10)
+        ddg_results = list(ddgs.text(query, max_results=max_results))
+        
+        if not ddg_results:
+            logger.warning("DuckDuckGo returned no results")
+            return []
+        
+        results: List[Dict[str, Any]] = []
+        for result in ddg_results:
+            parsed_result: Dict[str, Any] = {
+                "title": result.get("title", ""),
+                "url": result.get("href", ""),
+                "snippet": result.get("body", ""),
+                "relevance": _calculate_relevance(result.get("href", "")),
+            }
+            results.append(parsed_result)
 
-        try:
-            soup = BeautifulSoup(resp.text, 'html.parser')
-            results: List[Dict[str, Any]] = []
-
-            for result in soup.select('.result__body')[:max_results]:
-                link = result.select_one('a.result__a')
-                snippet_elem = result.select_one('.result__snippet')
-                if not link:
-                    continue
-
-                href = link.get('href')
-                title = link.get_text(strip=True)
-                snippet = snippet_elem.get_text(strip=True) if snippet_elem else ''
-
-                parsed_result: Dict[str, Any] = {
-                    "title": title,
-                    "url": href,
-                    "snippet": snippet,
-                    "relevance": _calculate_relevance(href),
-                }
-                results.append(parsed_result)
-
-            logger.info(f"DuckDuckGo returned {len(results)} results")
-            return results
-        finally:
-            resp.close()
+        logger.info(f"DuckDuckGo returned {len(results)} results")
+        return results
 
     except Exception as e:
-        logger.error(f"DuckDuckGo fallback search failed: {e}")
+        logger.warning(f"DuckDuckGo fallback search failed: {type(e).__name__}: {e}")
         return []
 
 
