@@ -1,6 +1,29 @@
 # Changelog
 
+## Unreleased - Websearch Stability Improvements
+
+### Bug Fixes
+- **Fixed Tavily API Key Not Being Passed to Client**
+  - websearch.py was creating TavilyClient() without api_key parameter
+  - Environment variable TAVILY_API_KEY is now properly passed to all TavilyClient instances
+  - Fixes "websearch failed" errors that occurred during vinyl identification
+
+- **Added DuckDuckGo Fallback to Agent Websearch**
+  - All search functions now fallback to DuckDuckGo if Tavily fails or is unavailable
+  - search_vinyl_metadata: Tavily → DuckDuckGo fallback
+  - search_vinyl_by_barcode: Tavily barcode search → DuckDuckGo fallback
+  - search_spotify_album: Tries both Tavily and DuckDuckGo for album links
+  - Deduplicates results from both sources by URL to avoid duplicates
+  - DuckDuckGo fallback works even without Tavily API key configured
+
+### Improvements
+- Robust websearch with dual-source approach (Tavily primary, DuckDuckGo secondary)
+- Better error handling and logging for troubleshooting search failures
+- Added imports for BeautifulSoup and requests to support DuckDuckGo HTML parsing
+- Search functions now continue gracefully if one method fails, trying alternatives
+
 ## 1.7.0 - Mobile-First User Onboarding
+
 
 ### Features
 - **Full-Screen User Selection Modal**
