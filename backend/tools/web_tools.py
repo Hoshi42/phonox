@@ -8,6 +8,7 @@ from urllib.parse import urljoin, urlparse
 import requests
 from bs4 import BeautifulSoup
 from tavily import TavilyClient
+from ddgs import DDGS
 
 logger = logging.getLogger(__name__)
 
@@ -28,21 +29,40 @@ class WebSearchTool:
         else:
             self.client = TavilyClient(api_key=self.tavily_api_key)
     
+    def _clean_query_for_fallback(self, query: str) -> str:
+        """Clean query for fallback search - remove special chars and extra terms."""
+        # Remove special characters like "/" but keep spaces and basic words
+        import re
+        cleaned = re.sub(r'[/\-_]+', ' ', query)
+        # Remove extra whitespace
+        cleaned = re.sub(r'\s+', ' ', cleaned)
+        # Keep only essential terms: artist, title, and "vinyl record"
+        # This makes the query more readable for DuckDuckGo
+        terms = cleaned.split()
+        # Filter out years (4-digit numbers) and catalog numbers (all uppercase short codes) from start
+        essential_terms = []
+        for term in terms:
+            # Skip pure years or catalog numbers (all caps, short)
+            if len(term) == 4 and term.isdigit():
+                continue
+            if term.isupper() and len(term) <= 5 and any(c.isdigit() for c in term):
+                continue
+            essential_terms.append(term)
+        return ' '.join(essential_terms[:6])  # Limit to first 6 terms
+
     def search(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
-        """Search the web using Tavily API."""
+        """Search the web using Tavily API with smart fallback strategy."""
         results: List[Dict[str, Any]] = []
 
-        # Primary: Tavily (if configured)
+        # Primary: Tavily with domain restrictions (if configured)
         if self.client:
             try:
-                logger.info(f"Searching web via Tavily for: {query}")
-                # Tavily search with a safety mechanism for slow responses
+                logger.info(f"Searching Tavily (domain-restricted) for: {query}")
                 response = self.client.search(
                     query=query,
                     search_depth="basic",
                     max_results=max_results,
-                    include_domains=["discogs.com", "musicbrainz.org", "allmusic.com", "wikipedia.org"],
-                    exclude_domains=["ebay.com", "amazon.com"]  # Exclude marketplaces for cleaner results
+                    include_domains=["discogs.com", "musicbrainz.org", "allmusic.com"],
                 )
 
                 for result in response.get("results", []):
@@ -53,21 +73,50 @@ class WebSearchTool:
                         "score": result.get("score", 0.0)
                     })
                 
-                # If we got results, log and return early
                 if results:
-                    logger.info(f"Tavily search returned {len(results)} results")
+                    logger.info(f"Tavily (domain-restricted) returned {len(results)} results")
+                    return results
+                else:
+                    logger.info("Tavily domain-restricted search returned 0 results, trying broader search")
+
+            except Exception as e:
+                logger.error(f"Tavily domain-restricted search failed: {e}")
+
+        # Secondary: Tavily without domain restrictions (fallback within Tavily)
+        if self.client:
+            try:
+                logger.info(f"Searching Tavily (unrestricted) for: {query}")
+                response = self.client.search(
+                    query=query,
+                    search_depth="basic",
+                    max_results=max_results,
+                )
+
+                for result in response.get("results", []):
+                    results.append({
+                        "title": result.get("title", ""),
+                        "url": result.get("url", ""),
+                        "content": result.get("content", ""),
+                        "score": result.get("score", 0.0)
+                    })
+                
+                if results:
+                    logger.info(f"Tavily (unrestricted) returned {len(results)} results")
                     return results
 
             except Exception as e:
-                logger.error(f"Error searching Tavily (will try DuckDuckGo): {e}")
+                logger.error(f"Tavily unrestricted search failed: {e}")
 
-        # Secondary: DuckDuckGo HTML search (no API key required, faster fallback)
+        # Tertiary: DuckDuckGo fallback with cleaned query
         try:
-            logger.info(f"Searching via DuckDuckGo for: {query}")
-            ddg_results = self._duckduckgo_search(query, max_results=max_results)
+            # Clean up the query for DuckDuckGo - remove special chars and catalog nums
+            clean_query = self._clean_query_for_fallback(query)
+            logger.info(f"Tavily failed, using DuckDuckGo fallback with cleaned query: {clean_query}")
+            ddg_results = self._duckduckgo_search(clean_query, max_results=max_results)
             results.extend(ddg_results)
             if results:
-                logger.info(f"DuckDuckGo search returned {len(ddg_results)} results")
+                logger.info(f"DuckDuckGo returned {len(ddg_results)} results")
+                return results
         except Exception as e:
             logger.error(f"Error searching DuckDuckGo: {e}")
 
@@ -104,45 +153,25 @@ class WebSearchTool:
         return self.search(query, max_results=4)
 
     def _duckduckgo_search(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
-        """Lightweight DuckDuckGo HTML search (no API key)."""
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        params = {
-            'q': query,
-            'kl': 'us-en',
-            'ia': 'web'
-        }
-
-        resp = requests.get('https://duckduckgo.com/html/', params=params, headers=headers, timeout=10)
-        resp.raise_for_status()
-
+        """DuckDuckGo search using the DDGS library (no API key required)."""
         try:
-            soup = BeautifulSoup(resp.text, 'html.parser')
+            ddgs = DDGS(timeout=10)
+            ddg_results = list(ddgs.text(query, max_results=max_results))
+            
             results: List[Dict[str, Any]] = []
-
-            for result in soup.select('.result__body')[:max_results]:
-                link = result.select_one('a.result__a')
-                snippet_elem = result.select_one('.result__snippet')
-                if not link:
-                    continue
-
-                href = link.get('href')
-                title = link.get_text(strip=True)
-                snippet = snippet_elem.get_text(strip=True) if snippet_elem else ''
-
+            for result in ddg_results:
                 results.append({
-                    "title": title,
-                    "url": href,
-                    "content": snippet,
-                    "score": 0.0  # DuckDuckGo HTML does not provide score
+                    "title": result.get("title", ""),
+                    "url": result.get("href", ""),
+                    "content": result.get("body", ""),
+                    "score": 0.0  # DuckDuckGo API does not provide score
                 })
 
             logger.info(f"DuckDuckGo returned {len(results)} results for: {query}")
             return results
-        finally:
-            # Always close connection to free resources
-            resp.close()
+        except Exception as e:
+            logger.error(f"DuckDuckGo search failed: {e}")
+            return []
 
 
 class WebScrapingTool:

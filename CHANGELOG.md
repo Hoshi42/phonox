@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased - Web Search Query Optimization
+
+### Improvements
+- **Optimized Web Search Query Strategy**
+  - Tavily now attempts restricted domain search first (discogs.com, musicbrainz.org, allmusic.com)
+  - If restricted search returns 0 results, Tavily retries without domain restrictions
+  - DuckDuckGo fallback uses cleaned query (removes special characters, catalog numbers)
+  - Eliminates inappropriate DuckDuckGo results by filtering catalog numbers and years
+  - Smarter fallback prevents irrelevant content when specific queries fail
+  
+- **Upgraded DuckDuckGo Library**
+  - Migrated from deprecated `duckduckgo-search` to `ddgs>=4.0.0`
+  - Eliminates deprecation warnings in logs
+  - ddgs package is newer and more reliable
+  - Updated imports in websearch.py and web_tools.py
+
+### Bug Fixes
+- **Fixed Inappropriate DuckDuckGo Query Results**
+  - DuckDuckGo was returning irrelevant results (dictionary entries, unrelated sites)
+  - Root cause: Query contained special characters and non-essential terms
+  - Solution: Added `_clean_query_for_fallback()` that sanitizes queries
+  - Removes forward slashes, catalog numbers, years from fallback queries
+  - DuckDuckGo now receives focused queries: "artist title vinyl record"
+
 ## Unreleased - Websearch Fallback Reliability
 
 ### Bug Fixes

@@ -15,7 +15,7 @@ from typing import Optional, Dict, List, Any
 from tavily import TavilyClient
 import requests
 from bs4 import BeautifulSoup
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 
 logger = logging.getLogger(__name__)
 
