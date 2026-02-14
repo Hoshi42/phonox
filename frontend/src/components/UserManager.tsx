@@ -16,6 +16,7 @@
  */
 
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 interface UserManagerProps {
   onUserChange: (username: string) => void
@@ -131,61 +132,84 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
   const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)
 
   if (showModal) {
-    
-    return (
+    const modalContent = (
       <div style={{
         position: 'fixed',
         top: 0,
         left: 0,
         width: '100%',
         height: '100%',
-        background: 'rgba(0, 0, 0, 0.8)',
-        backdropFilter: 'blur(4px)',
+        background: 'rgba(0, 0, 0, 0.9)',
+        backdropFilter: 'blur(8px)',
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 9999
+        justifyContent: 'space-between',
+        padding: isMobile ? '2rem 1.5rem' : '2rem',
+        overflowY: 'auto',
+        zIndex: 99999,
+        boxSizing: 'border-box',
+        minHeight: '100vh'
       }}>
+        {/* Top section with title and spacing */}
         <div style={{
-          background: 'linear-gradient(135deg, #1a1a2e 0%, #0f0f1e 50%, #16213e 100%)',
-          border: '1px solid rgba(102, 126, 234, 0.3)',
-          padding: isMobile ? '1.5rem 1rem' : '2rem',
-          borderRadius: '16px',
-          minWidth: isMobile ? '90vw' : '400px',
-          maxWidth: isMobile ? '90vw' : '500px',
-          maxHeight: isMobile ? '90vh' : 'auto',
-          overflow: 'auto',
-          textAlign: 'center',
-          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5)'
+          flex: '0 0 auto',
+          width: '100%',
+          maxWidth: isMobile ? '100%' : '500px'
         }}>
-          <h2 style={{ 
-            margin: '0 0 1.5rem 0',
+          <h1 style={{ 
+            margin: '3rem 0 1rem 0',
             color: '#e0e7ff',
-            fontSize: isMobile ? '1.3rem' : '1.8rem',
+            fontSize: isMobile ? '2.5rem' : '2.5rem',
             fontWeight: 700,
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text'
+            backgroundClip: 'text',
+            lineHeight: '1.2',
+            textAlign: 'center'
           }}>
             🎵 Phonox
-          </h2>
+          </h1>
           
+          <p style={{
+            margin: '0 0 2rem 0',
+            color: 'rgba(255, 255, 255, 0.7)',
+            fontSize: isMobile ? '1.1rem' : '1rem',
+            lineHeight: '1.6',
+            textAlign: 'center'
+          }}>
+            AI-Powered Vinyl Collection Manager
+          </p>
+        </div>
+
+        {/* Main content section */}
+        <div style={{
+          flex: '1 1 auto',
+          width: '100%',
+          maxWidth: isMobile ? '100%' : '500px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          gap: '2rem'
+        }}>
           {/* Show existing users first - mobile-friendly */}
           {existingUsers.length > 0 && (
-            <div>
-              <p style={{ 
-                margin: '0 0 1rem 0', 
-                color: 'rgba(255, 255, 255, 0.7)',
-                fontSize: isMobile ? '0.95rem' : '1rem'
+            <div style={{ width: '100%' }}>
+              <h2 style={{ 
+                margin: '0 0 1.5rem 0', 
+                color: 'rgba(255, 255, 255, 0.9)',
+                fontSize: isMobile ? '1.3rem' : '1.2rem',
+                fontWeight: 600,
+                textAlign: 'center'
               }}>
-                Select your name:
-              </p>
+                Your Profiles
+              </h2>
               <div style={{
-                display: 'grid',
-                gridTemplateColumns: isMobile ? 'repeat(auto-fit, minmax(100px, 1fr))' : 'repeat(auto-fit, minmax(120px, 1fr))',
-                gap: isMobile ? '8px' : '10px',
-                margin: '0 0 1.5rem 0'
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1rem',
+                width: '100%'
               }}>
                 {existingUsers.map(user => (
                   <button
@@ -199,112 +223,148 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
                       background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                       color: 'white',
                       border: 'none',
-                      padding: isMobile ? '0.75rem' : '1rem',
-                      borderRadius: '10px',
-                      fontSize: isMobile ? '0.85rem' : '1rem',
+                      padding: '1.2rem 1.5rem',
+                      borderRadius: '12px',
+                      fontSize: '1.1rem',
                       cursor: 'pointer',
-                      minHeight: isMobile ? '48px' : '60px',
+                      minHeight: '70px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      transition: 'all 0.2s',
+                      gap: '0.8rem',
+                      transition: 'all 0.3s',
                       fontWeight: 600,
-                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
+                      boxShadow: '0 4px 15px rgba(16, 185, 129, 0.25)',
+                      lineHeight: '1.4',
+                      fontSize: isMobile ? '1.15rem' : '1.1rem',
+                      width: '100%',
+                      textAlign: 'center',
+                      wordBreak: 'break-word'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)'
-                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.3)'
+                      if (!isMobile) {
+                        e.currentTarget.style.transform = 'translateY(-4px)'
+                        e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.35)'
+                      }
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)'
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.2)'
+                      if (!isMobile) {
+                        e.currentTarget.style.transform = 'translateY(0)'
+                        e.currentTarget.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.25)'
+                      }
                     }}
                   >
                     👤 {user}
                   </button>
                 ))}
               </div>
-              
-              <div style={{ 
-                borderTop: '1px solid rgba(255, 255, 255, 0.1)', 
-                paddingTop: '1rem',
-                margin: '1rem 0'
-              }}>
-                <p style={{ 
-                  margin: '0 0 1rem 0', 
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  fontSize: isMobile ? '0.85rem' : '0.9rem'
-                }}>
-                  Or create a new user:
-                </p>
-              </div>
             </div>
           )}
-          
-          {/* Input for new user */}
-          <input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder={existingUsers.length > 0 ? "New username" : "Your name"}
-            style={{
-              width: '100%',
-              padding: isMobile ? '0.75rem' : '0.75rem',
-              border: '1px solid rgba(102, 126, 234, 0.3)',
-              borderRadius: '10px',
-              marginBottom: '1rem',
-              fontSize: isMobile ? '1rem' : '1rem',
-              boxSizing: 'border-box',
-              background: 'rgba(255, 255, 255, 0.05)',
-              color: '#e0e7ff',
-              transition: 'all 0.2s'
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.6)'
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.3)'
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-            }}
-            onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-            autoFocus={existingUsers.length === 0}
-          />
-          <button
-            onClick={handleSave}
-            disabled={!username.trim()}
-            style={{
-              background: username.trim() ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'rgba(255, 255, 255, 0.1)',
-              color: 'white',
-              border: username.trim() ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
-              padding: isMobile ? '0.85rem 1.25rem' : '0.85rem 2rem',
-              borderRadius: '10px',
-              fontSize: isMobile ? '0.95rem' : '1rem',
-              cursor: username.trim() ? 'pointer' : 'not-allowed',
-              minHeight: isMobile ? '48px' : '50px',
-              width: isMobile ? '100%' : 'auto',
+
+          {/* New user section */}
+          <div style={{ width: '100%' }}>
+            {existingUsers.length > 0 && (
+              <div style={{
+                textAlign: 'center',
+                margin: '1.5rem 0',
+                padding: '1.5rem 0',
+                borderTop: '1px solid rgba(255, 255, 255, 0.15)',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.15)'
+              }}>
+                <p style={{
+                  margin: 0,
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  fontSize: '1rem'
+                }}>
+                  or
+                </p>
+              </div>
+            )}
+            
+            <h2 style={{ 
+              margin: existingUsers.length > 0 ? '0 0 1.5rem 0' : '0 0 1.5rem 0', 
+              color: 'rgba(255, 255, 255, 0.9)',
+              fontSize: isMobile ? '1.3rem' : '1.2rem',
               fontWeight: 600,
-              transition: 'all 0.2s',
-              boxShadow: username.trim() ? '0 4px 16px rgba(102, 126, 234, 0.3)' : 'none'
-            }}
-            onMouseEnter={(e) => {
-              if (username.trim()) {
-                e.currentTarget.style.transform = 'translateY(-2px)'
-                e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.4)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (username.trim()) {
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = '0 4px 16px rgba(102, 126, 234, 0.3)'
-              }
-            }}
-          >
-            {existingUsers.length > 0 ? 'Create New User' : 'Continue'}
-          </button>
+              textAlign: 'center'
+            }}>
+              {existingUsers.length > 0 ? 'Create New Profile' : 'Get Started'}
+            </h2>
+            
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder={existingUsers.length > 0 ? "Enter profile name" : "Your name"}
+              style={{
+                width: '100%',
+                padding: '1rem 1.2rem',
+                border: '2px solid rgba(102, 126, 234, 0.3)',
+                borderRadius: '12px',
+                marginBottom: '1.5rem',
+                fontSize: '1.15rem',
+                boxSizing: 'border-box',
+                background: 'rgba(255, 255, 255, 0.05)',
+                color: '#e0e7ff',
+                transition: 'all 0.3s',
+                lineHeight: '1.5'
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.8)'
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'
+                e.currentTarget.style.boxShadow = '0 0 20px rgba(102, 126, 234, 0.2)'
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.3)'
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+                e.currentTarget.style.boxShadow = 'none'
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+              autoFocus={existingUsers.length === 0}
+            />
+            
+            <button
+              onClick={handleSave}
+              disabled={!username.trim()}
+              style={{
+                background: username.trim() ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'rgba(255, 255, 255, 0.1)',
+                color: 'white',
+                border: username.trim() ? 'none' : '2px solid rgba(255, 255, 255, 0.2)',
+                padding: '1.2rem 2rem',
+                borderRadius: '12px',
+                fontSize: '1.15rem',
+                cursor: username.trim() ? 'pointer' : 'not-allowed',
+                minHeight: '70px',
+                width: '100%',
+                fontWeight: 600,
+                transition: 'all 0.3s',
+                boxShadow: username.trim() ? '0 4px 20px rgba(102, 126, 234, 0.3)' : 'none',
+                lineHeight: '1.4'
+              }}
+              onMouseEnter={(e) => {
+                if (username.trim()) {
+                  e.currentTarget.style.transform = 'translateY(-4px)'
+                  e.currentTarget.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.4)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (username.trim()) {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(102, 126, 234, 0.3)'
+                }
+              }}
+            >
+              {existingUsers.length > 0 ? 'Create Profile' : 'Continue'}
+            </button>
+          </div>
         </div>
+
+        {/* Bottom spacer */}
+        <div style={{ flex: '0 0 auto', minHeight: '2rem' }} />
       </div>
     )
+    
+    return createPortal(modalContent, document.body)
   }
 
   return (
@@ -382,7 +442,7 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
         + New
       </button>
 
-      {showNewUserForm && (
+      {showNewUserForm && createPortal(
         <div style={{
           position: 'fixed',
           top: 0,
@@ -393,7 +453,7 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 9999
+          zIndex: 99999
         }}>
           <div style={{
             background: 'white',
@@ -451,7 +511,8 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
