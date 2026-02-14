@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased - Web Search Query Optimization
+## [1.8.0] - 2026-02-14 - Web Search Query Optimization
 
 ### Improvements
 - **Optimized Web Search Query Strategy**
@@ -17,12 +17,16 @@
   - Updated imports in websearch.py and web_tools.py
 
 ### Bug Fixes
-- **Fixed Inappropriate DuckDuckGo Query Results**
+- **Fixed Inappropriate DuckDuckGo Query Results** (#websearch-fallback-quality)
   - DuckDuckGo was returning irrelevant results (dictionary entries, unrelated sites)
   - Root cause: Query contained special characters and non-essential terms
   - Solution: Added `_clean_query_for_fallback()` that sanitizes queries
   - Removes forward slashes, catalog numbers, years from fallback queries
   - DuckDuckGo now receives focused queries: "artist title vinyl record"
+  
+- **Fixed Tavily Domain Restriction Returning Zero Results** (#tavily-domain-filter)
+  - Implemented fallback strategy: restricted search → unrestricted search
+  - Prevents search failures when domain filter is too narrow
 
 ## Unreleased - Websearch Fallback Reliability
 
