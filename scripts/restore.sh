@@ -8,7 +8,7 @@
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Progress bar function
@@ -20,17 +20,17 @@ show_progress() {
     local percentage=$((current * 100 / total))
     local filled=$((width * current / total))
     
-    printf "\r${BLUE}%-30s${NC} [" "$label"
+    printf "\r${CYAN}%-30s${NC} [" "$label"
     printf "%${filled}s" | tr ' ' '='
     printf "%$((width - filled))s" | tr ' ' '-'
-    printf "] ${BLUE}%3d%%${NC}" "$percentage"
+    printf "] ${CYAN}%3d%%${NC}" "$percentage"
 }
 
 print_header() {
     echo ""
-    echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
-    echo -e "${BLUE}  $1${NC}"
-    echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}  $1${NC}"
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
     echo ""
 }
 
@@ -47,7 +47,7 @@ print_warning() {
 }
 
 print_info() {
-    echo -e "${BLUE}→ $1${NC}"
+    echo -e "${CYAN}→ $1${NC}"
 }
 
 if [ -z "$1" ]; then
@@ -121,7 +121,7 @@ print_success "Backup file processed"
 
 # Restore database with progress
 print_info "Restoring database from backup..."
-if docker compose exec -T db psql -U phonox -d phonox < "${TEMP_SQL}"; then
+if docker compose exec -T db psql -q -U phonox -d phonox < "${TEMP_SQL}" 2>/dev/null; then
     print_success "Database restored successfully!"
 else
     print_error "Database restore failed"
@@ -165,15 +165,30 @@ if [ -f "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" ]; then
         print_warning "Backend did not start within 60 seconds, but continuing..."
     fi
     
-    # Copy uploads into the container's volume
+    # Copy uploads into the container's volume with progress
     if [ -d "${TEMP_UPLOADS}/uploads" ]; then
         IMAGE_COUNT=$(find "${TEMP_UPLOADS}/uploads" -type f | wc -l)
-        print_info "Copying $IMAGE_COUNT image files to container..."
+        UPLOAD_SIZE=$(du -sh "${TEMP_UPLOADS}/uploads" 2>/dev/null | cut -f1)
+        print_info "Copying $IMAGE_COUNT image files ($UPLOAD_SIZE) to container..."
         
-        if docker cp "${TEMP_UPLOADS}/uploads/." "phonox_backend:/app/uploads/"; then
-            print_success "Image uploads restored successfully!"
+        # Use tar to copy files efficiently
+        if tar -C "${TEMP_UPLOADS}" -cf - uploads/ 2>/dev/null | \
+           docker exec -i phonox_backend tar -xf - -C / 2>/dev/null; then
+            
+            # Verify copy was successful
+            CONTAINER_FILE_COUNT=$(docker exec -T phonox_backend find /app/uploads -type f 2>/dev/null | wc -l)
+            
+            # Show progress completion
+            show_progress "$IMAGE_COUNT" "$IMAGE_COUNT" "Copying images"
+            echo ""
+            
+            if [ "$CONTAINER_FILE_COUNT" -eq "$IMAGE_COUNT" ]; then
+                print_success "Image uploads restored successfully! ($CONTAINER_FILE_COUNT files)"
+            else
+                print_warning "$CONTAINER_FILE_COUNT of $IMAGE_COUNT image files were copied"
+            fi
         else
-            print_error "Failed to copy image files"
+            print_error "Failed to copy image files to container"
         fi
     else
         print_warning "No uploads directory found in backup"

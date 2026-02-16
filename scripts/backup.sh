@@ -7,7 +7,7 @@
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Progress bar function
@@ -19,17 +19,17 @@ show_progress() {
     local percentage=$((current * 100 / total))
     local filled=$((width * current / total))
     
-    printf "\r${BLUE}%-30s${NC} [" "$label"
+    printf "\r${CYAN}%-30s${NC} [" "$label"
     printf "%${filled}s" | tr ' ' '='
     printf "%$((width - filled))s" | tr ' ' '-'
-    printf "] ${BLUE}%3d%%${NC}" "$percentage"
+    printf "] ${CYAN}%3d%%${NC}" "$percentage"
 }
 
 print_header() {
     echo ""
-    echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
-    echo -e "${BLUE}  $1${NC}"
-    echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}  $1${NC}"
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
     echo ""
 }
 
@@ -46,7 +46,7 @@ print_warning() {
 }
 
 print_info() {
-    echo -e "${BLUE}→ $1${NC}"
+    echo -e "${CYAN}→ $1${NC}"
 }
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -62,7 +62,7 @@ mkdir -p "${BACKUP_DIR}"
 
 # Backup database
 print_info "Backing up PostgreSQL database..."
-if docker compose exec -T db pg_dump -U phonox --no-comments phonox > "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql"; then
+if docker compose exec -T db pg_dump -U phonox --no-comments phonox > "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql" 2>/dev/null; then
     DB_SIZE=$(du -h "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql" | cut -f1)
     print_success "Database backup completed"
     print_info "  File: phonox_db_${TIMESTAMP}.sql"
