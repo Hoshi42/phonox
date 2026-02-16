@@ -15,11 +15,29 @@ docker compose exec -T db pg_dump -U phonox --no-comments phonox > "${BACKUP_DIR
 
 # Backup image uploads
 echo "Backing up image uploads..."
-if [ -d "${ROOT_DIR}/data/uploads" ]; then
-    tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${ROOT_DIR}/data" uploads/
-    echo "Image backup: ${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz"
+if docker compose exec -T backend test -d /app/uploads > /dev/null 2>&1; then
+    # Create temporary directory for uploads
+    TEMP_UPLOADS=$(mktemp -d)
+    
+    # Copy uploads from container to temp location
+    docker cp "phonox_backend:/app/uploads/." "${TEMP_UPLOADS}/uploads/" 2>/dev/null || mkdir -p "${TEMP_UPLOADS}/uploads"
+    
+    # Create tar archive from temp location
+    if [ "$(ls -A ${TEMP_UPLOADS}/uploads 2>/dev/null)" ]; then
+        tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_UPLOADS}" uploads/
+        echo "Image backup: ${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz"
+    else
+        echo "⚠️  No image files to backup (uploads directory is empty)"
+        tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_UPLOADS}" uploads/
+    fi
+    
+    rm -rf "${TEMP_UPLOADS}"
 else
-    echo "⚠️  No uploads directory found"
+    echo "⚠️  Backend container not running, creating empty uploads backup"
+    TEMP_UPLOADS=$(mktemp -d)
+    mkdir -p "${TEMP_UPLOADS}/uploads"
+    tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_UPLOADS}" uploads/
+    rm -rf "${TEMP_UPLOADS}"
 fi
 
 echo "Backup completed!"
