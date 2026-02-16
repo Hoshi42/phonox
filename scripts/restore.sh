@@ -26,8 +26,19 @@ if [ -f "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql" ]; then
     docker compose up -d db
     sleep 10
     
+    # Drop existing database and recreate it fresh
+    echo "Preparing database..."
+    docker compose exec -T db dropdb -U phonox phonox 2>/dev/null || true
+    docker compose exec -T db createdb -U phonox phonox
+    
+    # Create a temp SQL file with \restrict line removed to avoid restricted mode
+    TEMP_SQL=$(mktemp)
+    sed '/^\\restrict/d' "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql" > "${TEMP_SQL}"
+    
     # Restore database
-    docker compose exec -T db psql -U phonox -d phonox < "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql"
+    docker compose exec -T db psql -U phonox -d phonox < "${TEMP_SQL}"
+    rm "${TEMP_SQL}"
+    
     echo "✅ Database restored successfully!"
 else
     echo "❌ Database backup file not found: ${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql"

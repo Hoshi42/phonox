@@ -11,7 +11,7 @@ mkdir -p "${BACKUP_DIR}"
 
 # Backup database
 echo "Backing up PostgreSQL database..."
-docker compose exec -T db pg_dump -U phonox phonox > "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql"
+docker compose exec -T db pg_dump -U phonox --no-comments phonox > "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql"
 
 # Backup image uploads
 echo "Backing up image uploads..."
