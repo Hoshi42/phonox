@@ -12,7 +12,20 @@ Phonox uses semantic versioning: `MAJOR.MINOR.PATCH`
 
 ## Versions
 
-### v1.8.0 (Current) - 2026-02-14
+### v1.8.1 (Current) - 2026-02-17
+
+**Backup & Restore Improvements**
+- Enhanced backup and restore scripts with colored output (cyan)
+- Added progress bars for database restoration and container startup
+- Real-time progress indication during image file copying
+- Shows backup/restore file sizes and timestamps
+- Improved error handling with better feedback messages
+- Fixed image restore on Raspberry Pi (increased PostgreSQL startup timeout)
+- Suppressed Docker warnings about deprecated `version` attribute
+- Optimized image restoration using efficient tar piping
+- Verifies file count after copying to ensure completeness
+
+### v1.8.0 - 2026-02-14
 
 **Web Search Query Optimization**
 - Optimized Tavily search strategy: tries restricted domain search first, then unrestricted fallback

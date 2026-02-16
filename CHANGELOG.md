@@ -1,5 +1,46 @@
 # Changelog
 
+## [1.8.1] - 2026-02-17 - Backup & Restore Improvements
+
+### Improvements
+- **Enhanced Backup & Restore Scripts**
+  - Added colored output (cyan) for better readability
+  - Progress bars for database restoration and container startup
+  - Real-time progress indication during image file copying
+  - Shows backup/restore file sizes and timestamps
+  - Improved error handling with better feedback messages
+  
+- **Cleaned Up Script Output**
+  - Suppressed Docker warnings about deprecated `version` attribute
+  - Hidden PostgreSQL debug messages (SET, CREATE TABLE, etc.)
+  - Only relevant status messages displayed
+  - Professional, user-friendly output
+
+- **Optimized Image Restoration**
+  - Uses efficient tar piping for faster image transfers
+  - Verifies file count after copying to ensure completeness
+  - Displays total files and size before transfer begins
+  - Progress bar completion indication
+
+### Bug Fixes
+- **Fixed Image Restore on Raspberry Pi**
+  - Images were not being restored due to container timing issues
+  - Increased PostgreSQL startup timeout to 60 seconds
+  - Containers now fully started before image restoration begins
+  - Added proper health checks for backend container
+
+- **Fixed Docker Compose Warnings**
+  - Suppressed WARN messages about `version` attribute (no action needed)
+  - Cleaner terminal output during backup/restore operations
+
+### Technical Details
+- Backup script now extracts images from container volume directly
+- Restore script uses tar-to-docker pipeline for efficient 1.5GB+ transfers
+- Proper error handling for missing files and failed operations
+- Better logging with progress indicators for long operations
+
+---
+
 ## [1.8.0] - 2026-02-14 - Web Search Query Optimization
 
 ### Improvements
