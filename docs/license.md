@@ -1,6 +1,6 @@
 # License
 
-Phonox is released under the MIT License. See [LICENSE](../../LICENSE) file for full details.
+Phonox is released under the MIT License.
 
 ## MIT License Summary
 
@@ -38,5 +38,3 @@ Phonox uses these open source projects:
 | Claude API | Proprietary | AI models |
 
 ---
-
-[View full license text →](../../LICENSE)

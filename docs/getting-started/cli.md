@@ -1,17 +1,40 @@
 # Command Line Interface (CLI)
 
-Phonox includes a command-line tool for managing the application, database backups, and configuration.
+Phonox includes two command-line tools for managing the application.
 
-## Getting Started
+## Quick Start: start-cli.sh
+
+The simplest way to install and start Phonox:
+
+```bash
+chmod +x start-cli.sh
+./start-cli.sh
+```
+
+**What it does:**
+- Builds all Docker images
+- Starts database, backend, and frontend services
+- Initializes the database
+- Runs health checks
+
+**Use this for:** First-time installation and quick startup.
+
+---
+
+## Advanced: phonox-cli
+
+For configuration and management tasks:
+
+```bash
+./phonox-cli [command] [options]
+```
 
 ### Interactive Mode
 
-Run the CLI without arguments for an interactive menu:
+Run without arguments for an interactive menu:
 
 ```bash
 ./phonox-cli
-# or
-./start-cli.sh
 ```
 
 The interactive menu displays:
@@ -20,13 +43,7 @@ The interactive menu displays:
 - Backup information
 - Numbered menu options
 
-### Command Mode
-
-Run specific commands directly:
-
-```bash
-./phonox-cli [command] [options]
-```
+---
 
 ## Available Commands
 
@@ -61,6 +78,12 @@ Build Docker images and prepare directories.
 
 Set API keys and model configuration in `.env` file.
 
+**Prerequisites:** You must first create `.env` from the template:
+```bash
+cp .env.example .env
+```
+
+**Usage:**
 ```bash
 # Configure Anthropic API key
 ./phonox-cli configure --anthropic sk-ant-xxxxx
@@ -68,16 +91,15 @@ Set API keys and model configuration in `.env` file.
 # Configure Tavily web search key
 ./phonox-cli configure --tavily tvly-xxxxx
 
-# Set AI models
-./phonox-cli configure --vision-model claude-sonnet-4-5-20250929
-./phonox-cli configure --chat-model claude-haiku-4-5-20251001
-
 # Configure multiple at once
 ./phonox-cli configure \
   --anthropic sk-ant-xxxxx \
-  --tavily tvly-xxxxx \
-  --vision-model claude-sonnet-4-5-20250929 \
-  --chat-model claude-haiku-4-5-20251001
+  --tavily tvly-xxxxx
+```
+
+**After configuring, restart services:**
+```bash
+./phonox-cli restart
 ```
 
 **Configuration Keys:**
@@ -85,9 +107,6 @@ Set API keys and model configuration in `.env` file.
 - `--tavily` - Tavily API key (optional, for web search)
 - `--vision-model` - Model for image analysis (default: claude-sonnet-4-5-20250929)
 - `--chat-model` - Model for chat (default: claude-haiku-4-5-20251001)
-
-**Interactive mode:**
-In the menu, select option 3 to be prompted for each key.
 
 ---
 
@@ -484,5 +503,4 @@ docker compose ps
 
 - [Installation Guide](installation.md) - Full setup instructions
 - [Configuration Guide](configuration.md) - Detailed config options
-- [Docker Setup](../DOCKER_SETUP.md) - Docker architecture details
 - [Database Retry](../database-retry.md) - Database troubleshooting

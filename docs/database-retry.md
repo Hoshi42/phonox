@@ -256,6 +256,5 @@ Failed health checks return HTTP 503 (Service Unavailable).
 
 ## References
 
-- [Database Retry Implementation](../DATABASE_RETRY.md) - Technical details
 - [Installation Guide](getting-started/installation.md) - Environment configuration
-- [Troubleshooting Guide](README.md#troubleshooting--maintenance) - General troubleshooting
+- [Configuration Guide](getting-started/configuration.md) - All environment variables

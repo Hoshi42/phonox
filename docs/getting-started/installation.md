@@ -117,7 +117,7 @@ VITE_API_URL=http://localhost:8000
 VITE_POLL_INTERVAL=2000
 ```
 
-For all available options, see [`.env.example`](../../.env.example)
+For all available options, see the `.env.example` file in the project root.
 
 ## Verification
 

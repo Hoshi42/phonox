@@ -106,4 +106,4 @@ async def identify(request: Request, ...):
 
 ## Next Steps
 
-For now, start with API Key authentication. See [Development Guide](../development/backend.md) for implementation details.
+For now, start with API Key authentication. See [API Introduction](introduction.md) for implementation details.

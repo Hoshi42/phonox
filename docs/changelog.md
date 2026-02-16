@@ -1,7 +1,5 @@
 # Changelog
 
-See [CHANGELOG.md](../../CHANGELOG.md) for detailed version history.
-
 All notable changes to Phonox are documented here.
 
 ## Versioning
@@ -89,7 +87,3 @@ Phonox uses semantic versioning: `MAJOR.MINOR.PATCH`
 - DuckDuckGo fallback
 - Collection management
 - Chat interface
-
----
-
-[View full changelog →](../../CHANGELOG.md)

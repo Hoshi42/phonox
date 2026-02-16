@@ -181,5 +181,5 @@ A: Locally in `./uploads/` directory with references in PostgreSQL database.
 - Try refreshing page
 
 **Still stuck?**
-- Check [Troubleshooting Guide](../development/setup.md#troubleshooting)
+- Check [Database Connection Guide](../database-retry.md) for connection issues
 - Search [GitHub Issues](https://github.com/your-username/phonox/issues)

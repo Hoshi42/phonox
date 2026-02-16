@@ -114,7 +114,7 @@ By contributing to Phonox, you agree that your contributions will be licensed un
 
 ## Questions?
 
-- Check [Documentation](../index.md)
+- Check the main [Documentation](index.md)
 - Search [GitHub Issues](https://github.com/your-username/phonox/issues)
 - Ask in [GitHub Discussions](https://github.com/your-username/phonox/discussions)
 

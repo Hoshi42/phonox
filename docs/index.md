@@ -44,36 +44,45 @@ Phonox is an AI-powered application that helps you:
 
 ## 🚀 Quick Start
 
-### For Users
+### 3 Simple Steps
 
+**Step 1: Clone the Repository**
 ```bash
-# 1. Start the application
-docker-compose up -d
-
-# 2. Open in your browser
-# Frontend: http://localhost:5173
-# API Docs: http://localhost:8000/docs
-```
-
-### For Developers
-
-```bash
-# 1. Clone the repository
 git clone https://github.com/your-username/phonox.git
 cd phonox
+```
 
-# 2. Set up environment
+**Step 2: Setup Environment with API Key**
+```bash
+# Copy the environment template
+cp .env.example .env
+
+# Add your Anthropic API key
+./phonox-cli configure --anthropic YOUR_ANTHROPIC_KEY
+```
+
+Get your API key: [console.anthropic.com](https://console.anthropic.com)
+
+**Step 3: Install and Start**
+```bash
+# Make executable and run (installs + starts everything)
+chmod +x start-cli.sh
+./start-cli.sh
+```
+
+**Done!** Open your browser:
+- Frontend: http://localhost:5173
+- API Docs: http://localhost:8000/docs
+
+### Alternative: Manual Docker
+
+```bash
+# Setup environment
 cp .env.example .env
 # Edit .env with your API keys
 
-# 3. Use CLI for management
-./phonox-cli install --up  # Install and start
-
-# Or start services manually
-docker-compose up -d
-
-# 4. View logs
-docker-compose logs -f
+# Start with Docker Compose
+docker compose up -d --build
 ```
 
 ## 📚 Documentation
@@ -87,17 +96,23 @@ docker-compose logs -f
 
 ## 💻 CLI Tools
 
-Phonox includes a management CLI for common tasks:
+Phonox includes convenient management scripts:
 
+**start-cli.sh** - Quick installation and startup:
 ```bash
-# Interactive menu
-./phonox-cli
+chmod +x start-cli.sh
+./start-cli.sh
+```
 
-# Or specific commands
-./phonox-cli install --up       # Install and start
-./phonox-cli configure          # Configure API keys
-./phonox-cli start              # Start containers
-./phonox-cli stop               # Stop containers
+**phonox-cli** - Management commands:
+```bash
+./phonox-cli configure      # Configure API keys
+./phonox-cli start          # Start containers
+./phonox-cli stop           # Stop containers
+./phonox-cli restart        # Restart services
+./phonox-cli backup         # Backup database
+./phonox-cli status         # Check status
+```
 ./phonox-cli restart            # Restart containers
 ./phonox-cli backup             # Backup database
 ./phonox-cli restore <timestamp> # Restore from backup
@@ -225,7 +240,7 @@ Copyright © 2026 Phonox Contributors
 
 - **GitHub Issues**: [Report bugs or request features](https://github.com/your-username/phonox/issues)
 - **Discussions**: [Ask questions and share ideas](https://github.com/your-username/phonox/discussions)
-- **Documentation**: [Detailed guides and references](.)
+- **Documentation**: Detailed guides and references
 
 ## 🎵 Project Status
 

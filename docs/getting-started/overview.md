@@ -28,55 +28,56 @@ Before you begin, make sure you have:
 
 ## Installation Steps
 
-### 1. Clone the Repository
+### Step 1: Clone the Repository
 
 ```bash
 git clone https://github.com/your-username/phonox.git
 cd phonox
 ```
 
-### 2. Set Up Environment Variables
+### Step 2: Setup Environment with API Key
 
 ```bash
-# Copy the example environment file
+# Copy the environment template
 cp .env.example .env
 
-# Edit with your API keys
-nano .env  # or use your preferred editor
+# Add your Anthropic API key
+./phonox-cli configure --anthropic YOUR_ANTHROPIC_KEY
+
+# Optional: Add Tavily for enhanced web search
+./phonox-cli configure --tavily YOUR_TAVILY_KEY
 ```
+
+**Get your API keys:**
+- Anthropic (required): [console.anthropic.com](https://console.anthropic.com/account/keys)
+- Tavily (optional): [tavily.com](https://tavily.com)
 
 **Required environment variables:**
 ```env
 ANTHROPIC_API_KEY=sk-ant-...
-TAVILY_API_KEY=tvly-...
-DATABASE_URL=postgresql://phonox:phonox123@db:5432/phonox
+TAVILY_API_KEY=tvly-...  # optional
+DATABASE_URL=postgresql://phonox:phonox123@db:5432/phonox  # pre-configured
 ```
 
-**Optional database retry configuration:**
-```env
-DB_MAX_RETRIES=5
-DB_RETRY_DELAY=2
-DB_MAX_RETRY_DELAY=30
-```
+See the `.env.example` file in the project root for all available configuration options.
 
-See [`.env.example`](../../.env.example) for all available configuration options.
-
-### 3. Start Services
+### Step 3: Install and Start
 
 ```bash
-# Build and start all services
-docker-compose up -d --build
-
-# Check status
-docker-compose ps
+# Make executable and run (installs + starts everything)
+chmod +x start-cli.sh
+./start-cli.sh
 ```
 
-You should see:
-- `phonox_backend` - Running on http://localhost:8000
-- `phonox_frontend` - Running on http://localhost:5173
-- `phonox_db` - PostgreSQL database
+The `start-cli.sh` script automatically:
+- ✅ Builds Docker images
+- ✅ Starts all services (database, backend, frontend)
+- ✅ Initializes the database
+- ✅ Runs health checks
 
-### 4. Access the Application
+### Step 4: Access the Application
+
+**You're done!** Open your browser:
 
 | Component | URL |
 |-----------|-----|
@@ -85,15 +86,30 @@ You should see:
 | **API Documentation** | http://localhost:8000/docs |
 | **ReDoc** | http://localhost:8000/redoc |
 
-### 5. Verify Installation
+### Step 5: Verify Installation
 
-Open your browser and go to: **http://localhost:5173**
-
-You should see the Phonox interface with:
-- Chat panel on the left
+Open **http://localhost:5173** - you should see the Phonox interface with:
 - Upload area with drag-and-drop in the center
-- VinylCard display area on the right
-- "My Collection" button (top right) to open collection modal
+- Chat panel on the right
+- "My Collection" button (top right)
+
+---
+
+## Alternative: Manual Docker Installation
+
+If you prefer manual control:
+
+```bash
+# Setup environment
+cp .env.example .env
+# Edit .env with your API keys
+
+# Build and start
+docker compose up -d --build
+
+# Check status
+docker compose ps
+```
 
 ## Common Issues
 
@@ -152,6 +168,6 @@ docker-compose up -d --build
 
 ## Getting Help
 
-- Check [Troubleshooting](../development/setup.md#troubleshooting)
+- Check [Database Connection Guide](../database-retry.md) for connection issues
 - Search [GitHub Issues](https://github.com/your-username/phonox/issues)
 - Ask in [GitHub Discussions](https://github.com/your-username/phonox/discussions)

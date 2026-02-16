@@ -264,6 +264,6 @@ PYTHONUNBUFFERED=1
 
 ## Further Help
 
-- See [`.env.example`](../../.env.example) for all available options
+- See `.env.example` file in the project root for all available options
 - Check [Installation Guide](installation.md) for setup help
 - See [Database Troubleshooting](../database-retry.md) for connection issues
