@@ -472,13 +472,13 @@ A: Currently manual. We're working on CSV import (see roadmap). For now, use the
 
 ---
 
-## What's New (Latest Version: 1.5.2)
+## What's New (Latest Version: 1.8.0)
 
-✨ **Version 1.5.2** (February 1, 2026)
-- Fixed CORS headers blocking frontend-backend communication
-- Fixed 500 error on chat endpoint 
-- Optimized web search performance
-- All endpoints verified and working
+✨ **Version 1.8.0** (February 14, 2026)
+- Optimized web search query strategy with domain restrictions and fallback
+- Upgraded to ddgs>=4.0.0 library for better DuckDuckGo integration
+- Fixed inappropriate search results with query sanitization
+- Eliminated deprecation warnings
 
 See [CHANGELOG.md](CHANGELOG.md) for complete history.
 
@@ -486,8 +486,8 @@ See [CHANGELOG.md](CHANGELOG.md) for complete history.
 
 ## Status & Roadmap
 
-**Last Updated**: 2026-02-01  
-**Current Version**: 1.5.2  
+**Last Updated**: 2026-02-16  
+**Current Version**: 1.8.0  
 **Status**: Production Ready ✅
 
 ### Completed Features

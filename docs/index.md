@@ -244,9 +244,9 @@ Copyright © 2026 Phonox Contributors
 
 ## 🎵 Project Status
 
-**Version**: 1.5.3  
+**Version**: 1.8.0  
 **Status**: Active Development  
-**Last Updated**: February 6, 2026
+**Last Updated**: February 16, 2026
 
 See [Changelog](changelog.md) for version history.
 

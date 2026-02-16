@@ -12,7 +12,44 @@ Phonox uses semantic versioning: `MAJOR.MINOR.PATCH`
 
 ## Versions
 
-### v1.5.3 (Current)
+### v1.8.0 (Current) - 2026-02-14
+
+**Web Search Query Optimization**
+- Optimized Tavily search strategy: tries restricted domain search first, then unrestricted fallback
+- Upgraded to ddgs>=4.0.0 (from deprecated duckduckgo-search)
+- Fixed inappropriate DuckDuckGo results by sanitizing queries (removes special chars, catalog numbers)
+- Smarter fallback prevents irrelevant content when specific queries fail
+- Eliminated deprecation warnings in logs
+
+### v1.7.0
+
+**Mobile-First User Onboarding**
+- Full-screen user selection modal with improved mobile responsiveness
+- Larger touch targets (70px buttons) for better usability
+- Proper modal layering with React Portals (z-index 99999)
+- Fixed issues with chat panel blocking user selection on first visit
+- Better visual hierarchy and spacing optimized for mobile devices
+
+### v1.6.1
+
+**Re-Analysis & Image Management Fixes**
+- Fixed image duplication when loading registered records
+- Fixed re-analysis status polling (now returns immediate response)
+- Fixed Spotify URL deletion on re-analysis
+- Re-analysis now mirrors upload flow with full web search
+- Memory-first architecture: images stay in browser until explicit update
+- Simplified image management with single source of truth
+
+### v1.6.0
+
+**Multi-Image Intelligence & Condition Detection**
+- LLM-based metadata aggregation replaces rule-based system (~75% code reduction)
+- Automatic vinyl condition detection using Goldmine grading scale
+- Advanced retry logic with exponential backoff (up to 3 attempts)
+- Image-context aware prompts optimized per image position
+- Condition multiplier affects value calculations
+
+### v1.5.3
 
 **Critical Bug Fixes**
 - Fixed Image Upload UnicodeDecodeError when uploading PNG/JPEG files
