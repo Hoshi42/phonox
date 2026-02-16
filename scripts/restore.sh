@@ -24,9 +24,29 @@ echo "Restoring PostgreSQL database..."
 if [ -f "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql" ]; then
     # Start only the database
     docker compose up -d db
-    sleep 10
+    
+    # Wait for database to be ready (health check)
+    echo "Waiting for PostgreSQL to be ready..."
+    MAX_ATTEMPTS=60
+    ATTEMPT=0
+    while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+        if docker compose exec -T db pg_isready -U phonox -h localhost > /dev/null 2>&1; then
+            echo "PostgreSQL is ready!"
+            break
+        fi
+        echo -n "."
+        sleep 1
+        ATTEMPT=$((ATTEMPT + 1))
+    done
+    
+    if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+        echo ""
+        echo "❌ PostgreSQL did not start within 60 seconds"
+        exit 1
+    fi
     
     # Drop existing database and recreate it fresh
+    echo ""
     echo "Preparing database..."
     docker compose exec -T db dropdb -U phonox phonox 2>/dev/null || true
     docker compose exec -T db createdb -U phonox phonox
@@ -35,11 +55,16 @@ if [ -f "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql" ]; then
     TEMP_SQL=$(mktemp)
     sed '/^\\restrict/d' "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql" > "${TEMP_SQL}"
     
-    # Restore database
-    docker compose exec -T db psql -U phonox -d phonox < "${TEMP_SQL}"
+    # Restore database with error checking
+    echo "Restoring database from backup..."
+    if docker compose exec -T db psql -U phonox -d phonox < "${TEMP_SQL}"; then
+        echo "✅ Database restored successfully!"
+    else
+        echo "❌ Database restore failed"
+        rm "${TEMP_SQL}"
+        exit 1
+    fi
     rm "${TEMP_SQL}"
-    
-    echo "✅ Database restored successfully!"
 else
     echo "❌ Database backup file not found: ${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql"
     exit 1
