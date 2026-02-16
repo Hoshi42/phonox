@@ -70,6 +70,9 @@ else
     exit 1
 fi
 
+echo "Starting all containers..."
+docker compose up -d
+
 # Restore image uploads if available
 if [ -f "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" ]; then
     echo "Restoring image uploads..."
@@ -77,9 +80,9 @@ if [ -f "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" ]; then
     TEMP_UPLOADS=$(mktemp -d)
     tar -xzf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_UPLOADS}"
     
-    # Wait for backend to be ready
-    echo "Waiting for backend to be ready..."
-    MAX_ATTEMPTS=30
+    # Wait for backend to be ready (container must be running)
+    echo "Waiting for backend container to be ready..."
+    MAX_ATTEMPTS=60
     ATTEMPT=0
     while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
         if docker compose exec -T backend test -d /app/uploads > /dev/null 2>&1; then
@@ -91,12 +94,20 @@ if [ -f "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" ]; then
         ATTEMPT=$((ATTEMPT + 1))
     done
     
+    if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+        echo ""
+        echo "⚠️  Backend did not start within 60 seconds"
+    fi
+    
     # Copy uploads into the container's volume
     if [ -d "${TEMP_UPLOADS}/uploads" ]; then
         echo ""
         echo "Copying image files to container..."
-        docker cp "${TEMP_UPLOADS}/uploads/." "phonox_backend:/app/uploads/"
-        echo "✅ Image uploads restored successfully!"
+        if docker cp "${TEMP_UPLOADS}/uploads/." "phonox_backend:/app/uploads/"; then
+            echo "✅ Image uploads restored successfully!"
+        else
+            echo "❌ Failed to copy image files"
+        fi
     else
         echo "⚠️  No uploads directory found in backup"
     fi
@@ -106,8 +117,5 @@ else
     echo "⚠️  Image backup not found: ${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz"
     echo "   (This is OK if no images were uploaded in that backup)"
 fi
-
-echo "Starting all containers..."
-docker compose up -d
 
 echo "✅ Restore completed!"
