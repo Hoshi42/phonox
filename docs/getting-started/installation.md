@@ -2,7 +2,54 @@
 
 Detailed step-by-step installation instructions for Phonox.
 
-## Quick Install (5 minutes)
+## Quick Install (Recommended)
+
+### Step 1: Clone the Repository
+
+```bash
+git clone https://github.com/your-username/phonox.git
+cd phonox
+```
+
+### Step 2: Setup Environment with API Key
+
+```bash
+# Copy the environment template
+cp .env.example .env
+
+# Add your Anthropic API key
+./phonox-cli configure --anthropic YOUR_ANTHROPIC_KEY
+
+# Optional: Add Tavily for enhanced web search
+./phonox-cli configure --tavily YOUR_TAVILY_KEY
+```
+
+**Get your API keys:**
+- Anthropic: [console.anthropic.com](https://console.anthropic.com)
+- Tavily (optional): [tavily.com](https://tavily.com)
+
+### Step 3: Install and Start
+
+```bash
+# Make executable and run
+chmod +x start-cli.sh
+./start-cli.sh
+```
+
+**What `start-cli.sh` does:**
+- ✅ Automatically builds all Docker images
+- ✅ Starts database, backend, and frontend services
+- ✅ Initializes the database with proper schema
+- ✅ Creates necessary directories and permissions
+- ✅ Runs health checks to verify everything works
+
+**You're done!** Open http://localhost:5173 to start using Phonox.
+
+---
+
+## Alternative: Manual Docker Installation
+
+If you prefer manual control or need to customize the installation:
 
 ```bash
 # Clone
@@ -13,11 +60,13 @@ cp .env.example .env
 # Edit .env with your API keys
 
 # Run
-docker-compose up -d --build
+docker compose up -d --build
 
 # Open
 # http://localhost:5173
 ```
+
+---
 
 ## Detailed Installation
 

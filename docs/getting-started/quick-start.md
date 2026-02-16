@@ -1,8 +1,51 @@
 # Quick Start Guide
 
-Get your first vinyl record identified in 5 minutes.
+Get Phonox up and running in 3 simple steps, then identify your first vinyl record.
 
-## Step 1: Prepare Images
+## Installation (3 Steps)
+
+### Step 1: Clone the Repository
+
+```bash
+git clone https://github.com/yourusername/phonox.git
+cd phonox
+```
+
+### Step 2: Setup Environment with API Key
+
+```bash
+# Copy the environment template
+cp .env.example .env
+
+# Add your Anthropic API key
+./phonox-cli configure --anthropic YOUR_ANTHROPIC_KEY
+```
+
+**Get your API key:** [console.anthropic.com](https://console.anthropic.com)
+
+### Step 3: Install and Start
+
+```bash
+# Make executable and run (installs + starts everything)
+chmod +x start-cli.sh
+./start-cli.sh
+```
+
+The `start-cli.sh` script automatically:
+- ✅ Builds Docker images
+- ✅ Starts all services (database, backend, frontend)
+- ✅ Initializes the database
+
+**Done!** Services will be available at:
+- Frontend: http://localhost:5173
+- API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
+
+---
+
+## Using Phonox
+
+### Step 1: Prepare Images
 
 Get 1-5 clear photos of your vinyl record. Best results with:
 - Front cover (album artwork)
@@ -11,7 +54,7 @@ Get 1-5 clear photos of your vinyl record. Best results with:
 - Good lighting, straight angle
 - At least 300x300 pixels, max 10MB each
 
-## Step 2: Upload & Analyze
+### Step 2: Upload & Analyze
 
 1. Open **http://localhost:5173** in your browser
 2. Drag images onto the upload zone (or click to select)
@@ -25,7 +68,7 @@ System automatically:
 - Searches Discogs and MusicBrainz
 - Shows results in 5-10 seconds
 
-## Step 3: Review Results
+### Step 3: Review Results
 
 VinylCard displays identified metadata:
 
@@ -39,7 +82,7 @@ Barcode: 5099969945724
 Genres: Rock, Pop
 ```
 
-## Step 4: Optional Actions
+### Step 4: Optional Actions
 
 **Edit Metadata**
 - Click any field to edit
@@ -56,7 +99,7 @@ Genres: Rock, Pop
 - AI has record context
 - Get pressing information
 
-## Step 5: Save to Collection
+### Step 5: Save to Collection
 
 1. Select your username from dropdown (or type new name)
 2. Click **"Add to Register"** button

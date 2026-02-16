@@ -42,70 +42,58 @@ Before you start, make sure you have:
 
 ---
 
-## Quick Start (Docker)
+## Quick Start (3 Simple Steps)
 
-### 1. Clone and Install
+### 1. Clone the Repository
 
 ```bash
-# Clone the repository
 git clone https://github.com/yourusername/phonox.git
 cd phonox
-
-# Install and start (builds Docker images + starts services)
-./phonox-cli install --up
 ```
 
-If you don't have the CLI, use Docker directly:
-```bash
-docker compose up -d
-```
-
-### 2. Configure API Keys (Optional)
+### 2. Setup Environment with API Key
 
 ```bash
-# Set your API keys
-./phonox-cli configure --anthropic YOUR_ANTHROPIC_KEY
-
-# Optional: Add Tavily for enhanced search
-./phonox-cli configure --tavily YOUR_TAVILY_KEY
-
-# Optional: Configure Anthropic models (for advanced users)
-./phonox-cli configure --vision-model claude-sonnet-4-5-20250929 --chat-model claude-haiku-4-5-20251001
-```
-
-Or edit `.env` file directly. Use `.env.example` as a reference:
-
-```bash
-# Copy the template
+# Copy the environment template
 cp .env.example .env
 
-# Edit with your values
-nano .env
+# Add your Anthropic API key
+./phonox-cli configure --anthropic YOUR_ANTHROPIC_KEY
 ```
 
-**Key Environment Variables:**
+**Get your API key:** [console.anthropic.com](https://console.anthropic.com)
+
+### 3. Install and Start
+
+```bash
+# Make executable and run (installs + starts everything)
+chmod +x start-cli.sh
+./start-cli.sh
+```
+
+The `start-cli.sh` script will:
+- ✅ Build Docker images
+- ✅ Start all services (database, backend, frontend)
+- ✅ Initialize the database
+
+**Done!** Open your browser:
+- **Frontend (UI)**: http://localhost:5173
+- **API Docs**: http://localhost:8000/docs
+- **Backend Health**: http://localhost:8000/health
+
+---
+
+## Key Environment Variables
+
+The `.env` file contains all configuration. Key variables:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `ANTHROPIC_API_KEY` | ✅ Yes | Claude AI API key from [console.anthropic.com](https://console.anthropic.com) |
 | `TAVILY_API_KEY` | ⚠️ Optional | Web search API key from [tavily.com](https://tavily.com) |
 | `DATABASE_URL` | ✅ Pre-configured | PostgreSQL connection (auto-configured for Docker) |
-| `VITE_API_URL` | ⚠️ Optional | Backend API URL (auto-detected if not set) |
-| `DB_MAX_RETRIES` | ⚠️ Optional | Database connection retry attempts (default: 5) |
-| `DB_RETRY_DELAY` | ⚠️ Optional | Initial retry delay in seconds (default: 2) |
-| `WEB_SCRAPING_TIMEOUT` | ⚠️ Optional | Web scraping timeout in seconds (default: 10) |
-| `WEB_SCRAPING_MAX_URLS` | ⚠️ Optional | Maximum URLs to scrape per search (default: 3) |
 
 For all configuration options, see [`.env.example`](./.env.example)
-
-### 3. Access the Application
-
-Open your browser and visit:
-- **Frontend** (UI): http://localhost:5173
-- **API Docs**: http://localhost:8000/docs
-- **Backend Health**: http://localhost:8000/health
-
-You should see Phonox ready to use!
 
 ---
 
