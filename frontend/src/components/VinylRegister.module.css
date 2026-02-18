@@ -1,9 +1,9 @@
 .registerOverlay {
   position: fixed;
-  top: 0;
-  left: 0;
+  inset: 0;
   width: 100%;
   height: 100%;
+  height: 100dvh;
   background: rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
@@ -27,8 +27,11 @@
 
 @media (max-width: 768px) {
   .registerModal {
-    width: 95%;
-    height: 95%;
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
+    max-width: 100%;
+    border-radius: 0;
   }
 }
 
@@ -705,6 +708,100 @@
   
   .recordsGrid.grid {
     grid-template-columns: 1fr;
+  }
+
+  /* List mode: ultra-compact single row on mobile */
+  .recordsGrid.list .recordCard {
+    padding: 8px 10px;
+    gap: 10px;
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  .recordsGrid.list .recordCard .recordThumbnail {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+  }
+
+  .recordsGrid.list .recordHeader {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .recordsGrid.list .recordTitle {
+    font-size: 0.85rem;
+  }
+
+  .recordsGrid.list .recordArtist {
+    font-size: 0.75rem;
+  }
+
+  .recordsGrid.list .spotifyBtn {
+    width: 22px;
+    height: 22px;
+    font-size: 0.7rem;
+  }
+
+  .recordsGrid.list .deleteBtn {
+    padding: 2px 4px;
+    font-size: 0.8rem;
+  }
+
+  .recordsGrid.list .recordDetails {
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-end;
+    min-width: 0;
+  }
+
+  .recordsGrid.list .recordMeta {
+    gap: 4px;
+    flex-wrap: nowrap;
+  }
+
+  .recordsGrid.list .year,
+  .recordsGrid.list .label {
+    font-size: 0.7rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 80px;
+  }
+
+  /* Hide label on mobile — too long */
+  .recordsGrid.list .label {
+    display: none;
+  }
+
+  .recordsGrid.list .genres {
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+
+  .recordsGrid.list .genreTag {
+    font-size: 0.65rem;
+    padding: 1px 5px;
+  }
+
+  /* Show max 1 genre on mobile */
+  .recordsGrid.list .genres .genreTag:nth-child(n+2) {
+    display: none;
+  }
+
+  .recordsGrid.list .recordValue {
+    margin-left: 0;
+    text-align: right;
+  }
+
+  .recordsGrid.list .valueAmount {
+    font-size: 0.8rem;
+  }
+
+  /* Hide confidence on mobile */
+  .recordsGrid.list .confidence {
+    display: none;
   }
 }
 
