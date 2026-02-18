@@ -83,7 +83,10 @@ function App() {
   const [registerLoading, setRegisterLoading] = useState(false)
   const [currentUser, setCurrentUser] = useState('')
   const [isCheckingValue, setIsCheckingValue] = useState(false)
+  const [chatExpanded, setChatExpanded] = useState(false) // Mobile panel expand/collapse
+  const [cardExpanded, setCardExpanded] = useState(false) // Mobile panel expand/collapse
   const metadataUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const chatInputRef = useRef<HTMLTextAreaElement | null>(null)
 
   const handleUpload = async (files: File[]) => {
     const previousRecord = record  // Preserve previous record for error recovery
@@ -511,6 +514,14 @@ function App() {
     }
   }, [])
 
+  // Keep focus on chat input when web search is triggered
+  useEffect(() => {
+    if (isCheckingValue && chatInputRef.current) {
+      // Don't steal focus, just ensure it's available for the user
+      // The loading overlay won't block chat interaction now
+    }
+  }, [isCheckingValue])
+
   const handleUserChange = (username: string) => {
     console.log('[DEBUG] App: User changed from', currentUser, 'to', username)
     console.log('[DEBUG] App: Mobile detection:', /Mobi|Android/i.test(navigator.userAgent))
@@ -624,17 +635,42 @@ function App() {
       </header>
 
       <main className={styles.main}>
-        <div className={styles.chatContainer}>
+        <div className={`${styles.chatContainer} ${chatExpanded ? styles.mobileExpanded : ''} ${cardExpanded ? styles.panelHidden : ''}`}>
+          <div className={styles.containerHeader}>
+            <button 
+              onClick={() => {
+                setChatExpanded(!chatExpanded)
+                setCardExpanded(false)
+              }}
+              className={styles.expandBtn}
+              title={chatExpanded ? "Collapse chat" : "Expand chat full width"}
+            >
+              {chatExpanded ? '✕' : '⇧'}
+            </button>
+          </div>
           <ChatPanel
             ref={chatPanelRef}
             record={record}
             onImageUpload={handleUpload}
             onAnalysisComplete={() => {}}
             onMetadataUpdate={handleMetadataUpdate}
+            chatInputRef={chatInputRef}
           />
         </div>
         
-        <div className={styles.cardContainer}>
+        <div className={`${styles.cardContainer} ${cardExpanded ? styles.mobileExpanded : ''} ${chatExpanded ? styles.panelHidden : ''}`}>
+          <div className={styles.containerHeader}>
+            <button 
+              onClick={() => {
+                setCardExpanded(!cardExpanded)
+                setChatExpanded(false)
+              }}
+              className={styles.expandBtn}
+              title={cardExpanded ? "Collapse vinyl card" : "Expand vinyl card full width"}
+            >
+              {cardExpanded ? '✕' : '⇧'}
+            </button>
+          </div>
           <VinylCard
             key={record?.record_id || 'empty'}
             record={record}
@@ -652,6 +688,16 @@ function App() {
             isCheckingValue={isCheckingValue}
             onSetIsCheckingValue={setIsCheckingValue}
           />
+          {isCheckingValue && (
+            <div className={styles.cardLoadingOverlay}>
+              <div className={styles.loadingContent}>
+                <VinylSpinner 
+                  message="Estimating Market Value..."
+                  subtext="Searching web for current prices"
+                />
+              </div>
+            </div>
+          )}
         </div>
       </main>
 
@@ -669,17 +715,6 @@ function App() {
         <div className={styles.loadingOverlay}>
           <div className={styles.loadingContent}>
             <VinylSpinner />
-          </div>
-        </div>
-      )}
-
-      {isCheckingValue && (
-        <div className={styles.loadingOverlay}>
-          <div className={styles.loadingContent}>
-            <VinylSpinner 
-              message="Estimating Market Value..."
-              subtext="Searching web for current prices"
-            />
           </div>
         </div>
       )}

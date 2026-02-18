@@ -12,7 +12,21 @@ Phonox uses semantic versioning: `MAJOR.MINOR.PATCH`
 
 ## Versions
 
-### v1.8.1 (Current) - 2026-02-17
+### v1.9.0 (Current) - 2026-02-18
+
+**Mobile UI Overhaul & Polish**
+
+- Full-screen expand/collapse panels for chat and vinyl card on mobile/intermediate views
+- Viewport locked to 100vh — no page scrolling, content fits within screen
+- Compact VinylCard metadata with inline label-value layout (80px fixed labels)
+- VinylRegister record cards now match dropdown width on mobile
+- Global scrollbar styling: consistent 10px rounded thumb, no arrow buttons, Firefox support
+- ChatPanel Upload button now visible on mobile
+- Removed Raw Data section from VinylCard
+- Edit mode fields properly separated (Artist, Est. Value as individual fields)
+- Overflow protection and word-break on long titles/artists in register
+
+### v1.8.1 - 2026-02-17
 
 **Backup & Restore Improvements**
 - Enhanced backup and restore scripts with colored output (cyan)

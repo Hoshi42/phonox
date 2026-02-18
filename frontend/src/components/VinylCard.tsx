@@ -73,7 +73,7 @@ export default function VinylCard({
     condition: 'Good',
     estimated_value_eur: '' // ADD estimated_value_eur
   })
-  const [showRawData, setShowRawData] = useState(false)
+
   const [webValue, setWebValue] = useState<string | null>(null)
   const [appliedWebValue, setAppliedWebValue] = useState<number | null>(null)
   const [searchIntermediateResults, setSearchIntermediateResults] = useState<any>(null)
@@ -681,13 +681,17 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
                 type="text" 
                 value={editData.artist}
                 onChange={(e) => setEditData(prev => ({...prev, artist: e.target.value}))}
-              />              <label>Estimated Value (EUR):</label>
+              />
+            </div>
+            <div className={styles.field}>
+              <label>Est. Value (EUR)</label>
               <input
                 type="number"
                 step="0.01"
                 value={editData.estimated_value_eur}
                 onChange={(e) => setEditData(prev => ({...prev, estimated_value_eur: e.target.value}))}
-              />            </div>
+              />
+            </div>
             <div className={styles.field}>
               <label>Title</label>
               <input 
@@ -865,21 +869,6 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
           </button>
         </div>
       )}
-
-      {/* Raw Data Toggle */}
-      <div className={styles.rawDataSection}>
-        <button 
-          onClick={() => setShowRawData(!showRawData)}
-          className={styles.rawDataToggle}
-        >
-          {showRawData ? '▼' : '▶'} Raw Data
-        </button>
-        {showRawData && (
-          <div className={styles.rawData}>
-            <pre>{JSON.stringify(record, null, 2)}</pre>
-          </div>
-        )}
-      </div>
 
       {/* Error Modal */}
       {errorMessage && (

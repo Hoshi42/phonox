@@ -3,11 +3,16 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   backdrop-filter: blur(10px);
-  padding: 20px;
+  padding: 16px;
   height: auto;
   max-height: calc(100vh - 120px);
   overflow-y: auto;
+  overflow-x: hidden;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  max-width: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .placeholder {
@@ -32,18 +37,28 @@
   font-size: 0.9rem;
 }
 
+@media (max-width: 768px) {
+  .header {
+    display: none;
+  }
+
+  .card {
+    padding: 12px;
+  }
+}
+
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .header h2 {
   margin: 0;
-  font-size: 1.4rem;
+  font-size: 1.2rem;
   color: #e0e7ff;
 }
 
@@ -117,17 +132,17 @@
 }
 
 .status {
-  margin-bottom: 20px;
+  margin-bottom: 10px;
 }
 
 .statusBadge {
   display: inline-block;
-  padding: 4px 8px;
+  padding: 3px 8px;
   border-radius: 4px;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
-  margin-bottom: 12px;
+  margin-bottom: 6px;
 }
 
 .statusBadge.completed {
@@ -157,16 +172,16 @@
 .confidence {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 0.9rem;
+  gap: 8px;
+  font-size: 0.8rem;
   color: rgba(255, 255, 255, 0.8);
 }
 
 .confidenceBar {
   flex: 1;
-  height: 6px;
+  height: 4px;
   background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
+  border-radius: 2px;
   overflow: hidden;
 }
 
@@ -177,12 +192,12 @@
 }
 
 .images {
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .images h4 {
-  margin: 0 0 12px 0;
-  font-size: 1rem;
+  margin: 0 0 8px 0;
+  font-size: 0.85rem;
   color: #e0e7ff;
 }
 
@@ -316,36 +331,52 @@
 }
 
 .metadata {
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .metadata h4 {
-  margin: 0 0 12px 0;
-  font-size: 1rem;
+  margin: 0 0 8px 0;
+  font-size: 0.85rem;
   color: #e0e7ff;
 }
 
-.metadataView, .metadataEdit {
+.metadataView {
   display: grid;
-  gap: 12px;
+  gap: 2px;
+}
+
+.metadataEdit {
+  display: grid;
+  gap: 6px;
+}
+
+.metadataEdit .field {
+  flex-direction: column;
+  align-items: stretch;
 }
 
 .field {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+  line-height: 1.3;
 }
 
 .field label {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  white-space: nowrap;
+  width: 80px;
+  min-width: 80px;
+  flex-shrink: 0;
 }
 
 .field span {
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   color: #e0e7ff;
   word-break: break-word;
 }
@@ -354,20 +385,26 @@
   color: #9ae6b4;
   text-decoration: none;
   font-weight: 600;
+  font-size: 0.85rem;
 }
 
 .link:hover {
   text-decoration: underline;
 }
 
+.fieldWide {
+  grid-column: 1 / -1;
+}
+
 .field input {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 8px 12px;
+  border-radius: 4px;
+  padding: 5px 8px;
   color: #e0e7ff;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   transition: all 0.2s;
+  width: 100%;
 }
 
 .field input:focus {
@@ -383,10 +420,10 @@
 .conditionSelect {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 8px 12px;
+  border-radius: 4px;
+  padding: 5px 8px;
   color: #e0e7ff;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   transition: all 0.2s;
   width: 100%;
   cursor: pointer;
@@ -405,16 +442,16 @@
 }
 
 .valueSection {
-  margin-bottom: 20px;
-  padding: 16px;
+  margin-bottom: 12px;
+  padding: 12px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
 }
 
 .valueSection h4 {
-  margin: 0 0 16px 0;
-  font-size: 1rem;
+  margin: 0 0 8px 0;
+  font-size: 0.85rem;
   color: #e0e7ff;
   display: flex;
   align-items: center;
@@ -663,50 +700,6 @@
   }
 }
 
-.rawDataSection {
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  padding-top: 16px;
-}
-
-.rawDataToggle {
-  width: 100%;
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.7);
-  text-align: left;
-  padding: 8px 0;
-  cursor: pointer;
-  font-size: 0.9rem;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: color 0.2s;
-}
-
-.rawDataToggle:hover {
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.rawData {
-  margin-top: 12px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 12px;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.rawData pre {
-  margin: 0;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 0.8rem;
-  line-height: 1.4;
-  color: #e0e7ff;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
-
 /* Mobile responsive styles for VinylCard */
 @media (max-width: 768px) {
   .card {
@@ -731,31 +724,31 @@
   }
   
   .metadata {
-    margin-bottom: 16px;
+    margin-bottom: 12px;
   }
   
   .metadata h4 {
-    font-size: 1rem;
-    margin-bottom: 12px;
+    font-size: 0.85rem;
+    margin-bottom: 8px;
   }
   
   .metadataView,
   .metadataEdit {
-    gap: 12px;
+    gap: 2px;
   }
   
   .field {
-    margin-bottom: 12px;
+    margin-bottom: 0;
   }
   
   .field label {
-    font-size: 0.85rem;
+    font-size: 0.72rem;
   }
   
   .field input,
   .field select {
     font-size: 16px;
-    padding: 10px;
+    padding: 6px 8px;
   }
 }
 

@@ -1,11 +1,12 @@
 .container {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
   background: linear-gradient(135deg, #0f0f1e 0%, #1a1a2e 50%, #16213e 100%);
   color: #e0e7ff;
   position: relative;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 .container::before {
@@ -193,21 +194,98 @@
 .main {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 400px;
-  gap: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 24px;
+  grid-template-columns: 1fr 360px;
+  gap: 12px;
+  width: 100%;
+  max-width: 100%;
+  padding: 12px;
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.panelHidden {
+  display: none !important;
 }
 
 .chatContainer {
   min-height: 600px;
-  height: calc(100vh - 200px);
+  height: calc(100vh - 176px);
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+  z-index: 2;
 }
 
 .cardContainer {
-  height: calc(100vh - 200px);
+  height: calc(100vh - 176px);
+  position: relative;
+  width: 360px;
+  min-width: 360px;
+  max-width: 360px;
+  flex-shrink: 0;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.containerHeader {
+  display: none;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px 12px 0 0;
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.containerTitle {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e0e7ff;
+  display: none;
+}
+
+.expandBtn {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.7);
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.expandBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.mobileExpanded {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100% !important;
+  height: 100vh !important;
+  min-width: auto !important;
+  max-height: none !important;
+  max-width: 100% !important;
+  z-index: 200;
+  border-radius: 0;
+  background: #0f0f1e;
 }
 
 .loadingOverlay {
@@ -222,6 +300,22 @@
   justify-content: center;
   z-index: 1000;
   backdrop-filter: blur(4px);
+}
+
+.cardLoadingOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(2px);
+  border-radius: 12px;
+  pointer-events: none;
 }
 
 .loadingContent {
@@ -305,43 +399,47 @@
 @media (max-width: 1200px) {
   .main {
     grid-template-columns: 1fr;
-    grid-template-rows: auto auto;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+    padding: 12px;
+    height: calc(100vh - 80px);
+    overflow: hidden;
   }
   
-  .cardContainer {
-    height: auto;
-    max-height: none;
-    min-height: 400px;
+  .containerHeader {
+    display: flex !important;
+    min-height: 36px;
   }
   
-  .chatContainer {
-    height: 500px;
-    min-height: 400px;
-  }
-}
-
-@media (max-width: 768px) {
-  .loadingContent {
-    padding: 24px 20px;
-    max-width: 90vw;
-  }
-}
-
-@media (max-width: 1200px) {
-  .main {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto;
-  }
-  
-  .cardContainer {
-    height: auto;
-    max-height: none;
-    min-height: 400px;
+  .expandBtn {
+    min-width: 32px;
+    min-height: 32px;
   }
   
   .chatContainer {
-    height: 500px;
-    min-height: 400px;
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    min-height: 0 !important;
+    max-height: none;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .cardContainer {
+    width: 100%;
+    max-width: 100%;
+    min-width: 100%;
+    height: 100%;
+    min-height: 0 !important;
+    max-height: none;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: auto;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
   }
 }
 
@@ -350,25 +448,79 @@
     padding: 12px;
     gap: 12px;
     grid-template-columns: 1fr;
-    grid-template-rows: auto auto;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
     max-width: 100%;
+    height: calc(100vh - 80px);
+    overflow: hidden;
+  }
+  
+  .containerHeader {
+    display: flex !important;
+    min-height: 36px;
+  }
+  
+  .expandBtn {
+    min-width: 32px;
+    min-height: 32px;
+  }
+  
+  .chatContainer {
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    min-height: 0 !important;
+    max-height: none;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
   }
   
-  .chatContainer {
-    height: auto;
-    min-height: 350px;
-    max-height: 65vh;
-    /* Removed order: -1 - was causing view to jump to chat when state changed */
+  .cardContainer {
+    width: 100%;
+    max-width: 100%;
+    min-width: 100%;
+    height: 100%;
+    min-height: 0 !important;
+    max-height: none;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: auto;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
   }
   
-  .cardContainer {
-    height: auto;
-    min-height: 300px;
-    max-height: none;
-    overflow-y: auto;
-    overflow-x: hidden;
+  .chatContainer.mobileExpanded {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100% !important;
+    height: 100vh !important;
+    max-height: none !important;
+    z-index: 200;
+    border-radius: 0;
+    background: #0f0f1e;
+  }
+  
+  .cardContainer.mobileExpanded {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100% !important;
+    height: 100vh !important;
+    max-height: none !important;
+    z-index: 200;
+    border-radius: 0;
+    background: #0f0f1e;
+  }
+  
+  .loadingContent {
+    padding: 24px 20px;
+    max-width: 90vw;
   }
 }
 

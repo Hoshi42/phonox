@@ -1,5 +1,51 @@
 # Changelog
 
+## [1.9.0] - 2026-02-18 - Mobile UI Overhaul & Polish
+
+### New Features
+- **Full-Screen Expand/Collapse Panels**
+  - Chat and vinyl card panels can expand to full screen on mobile and intermediate views
+  - Non-expanded panel is hidden; expanded panel covers entire viewport including header
+  - Works across all three breakpoints: desktop (>1200px), intermediate (768-1200px), mobile (<768px)
+
+### Improvements
+- **Mobile Responsive Layout**
+  - Viewport locked to `100vh` — no page scrolling, all content fits within screen
+  - Grid rows use `minmax(0, 1fr)` for strict 50/50 panel split on mobile
+  - Container headers stay pinned with flex-shrink: 0
+  - Chat input section stays at bottom, textarea scrollbar removed
+
+- **Compact VinylCard Metadata**
+  - Inline label-value layout with fixed 80px label width
+  - Reduced gaps and font sizes for professional, dense display
+  - Edit mode fields properly separated (Artist, Est. Value as individual fields)
+
+- **VinylRegister Mobile Fix**
+  - Record cards now match dropdown width on mobile phones
+  - Added overflow protection and word-break on long titles/artists
+  - Matching horizontal padding between controls and records container
+
+- **Global Scrollbar Styling**
+  - Consistent scrollbar appearance across entire app (10px width, rounded thumb)
+  - Removed scrollbar arrow buttons for cleaner look
+  - Firefox support via `scrollbar-width: thin` and `scrollbar-color`
+  - Removed redundant per-component scrollbar styles
+
+- **ChatPanel Header on Mobile**
+  - Upload button now visible on mobile (header no longer hidden)
+  - Compact padding on smaller screens
+
+### Removed
+- **Raw Data Section** removed from VinylCard (toggle and JSON display)
+
+### Technical Details
+- 8 files changed across frontend
+- Global scrollbar in `index.css` replaces component-specific scrollbar rules
+- CSS Modules: `panelHidden` + `mobileExpanded` classes for expand/collapse
+- No overlay div — solid background approach eliminates darkening artifacts
+
+---
+
 ## [1.8.1] - 2026-02-17 - Backup & Restore Improvements
 
 ### Improvements

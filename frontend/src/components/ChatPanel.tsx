@@ -49,6 +49,7 @@ interface ChatPanelProps {
   onImageUpload?: (files: File[]) => void
   onAnalysisComplete?: (result: any) => void
   onMetadataUpdate?: (metadata: any) => void
+  chatInputRef?: React.MutableRefObject<HTMLTextAreaElement | null>
 }
 
 interface ChatResponse {
@@ -130,6 +131,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
   onImageUpload,
   onAnalysisComplete,
   onMetadataUpdate,
+  chatInputRef,
 }: ChatPanelProps, ref) => {
   const initialGreeting = record 
     ? '👋 Hi! Ask me anything about this record - its value, history, pressing details, or collecting tips!'
@@ -515,6 +517,7 @@ The vinyl card has been updated with all the details. You can edit any informati
       <div className={styles.inputSection}>
         <div className={styles.inputContainer}>
           <textarea
+            ref={chatInputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
