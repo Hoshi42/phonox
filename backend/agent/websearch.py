@@ -472,20 +472,37 @@ def search_spotify_album(
                         "source": "spotify",
                     }
 
-        logger.info("No site-restricted Spotify result found, trying broader Tavily search")
+        logger.info("No site-restricted Spotify result found via Tavily, trying DuckDuckGo fallback")
 
     except Exception as e:
         logger.warning(f"Tavily Spotify search failed: {e}, trying DuckDuckGo fallback")
 
     # Try DuckDuckGo as fallback
     try:
-        search_query = f"{artist} {title} spotify album"
+        # Include site: operator so DuckDuckGo also focuses on Spotify album pages
+        search_query = f"{artist} {title} album site:open.spotify.com"
         ddg_results = _duckduckgo_search(search_query, max_results=7)
         
         for result in ddg_results:
             url = result.get("url", "")
             if "spotify.com/album/" in url:
                 logger.info(f"Found Spotify album (DuckDuckGo): {url}")
+                return {
+                    "spotify_url": url,
+                    "artist": artist,
+                    "title": title,
+                    "source": "spotify",
+                }
+        
+        # If site-restricted query found nothing, try a broader fallback
+        logger.info("DuckDuckGo site-restricted search returned no album, trying broader query")
+        search_query_broad = f"{artist} {title} spotify album"
+        ddg_results_broad = _duckduckgo_search(search_query_broad, max_results=10)
+        
+        for result in ddg_results_broad:
+            url = result.get("url", "")
+            if "spotify.com/album/" in url:
+                logger.info(f"Found Spotify album (DuckDuckGo broad): {url}")
                 return {
                     "spotify_url": url,
                     "artist": artist,

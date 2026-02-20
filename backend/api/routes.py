@@ -13,6 +13,7 @@ Authentication: Not required (open API)
 Rate limiting: None (add before production)
 """
 
+import json
 import logging
 import os
 import uuid
@@ -1091,6 +1092,20 @@ async def reanalyze_vinyl(
         else:
             logger.info(f"Re-analyzing record {record_id} with {len(files)} images from browser memory")
         
+        # Parse current record data for preserving existing fields (e.g. Spotify URL)
+        existing_spotify_url = None
+        if current_record:
+            try:
+                current_record_data = json.loads(current_record)
+                existing_spotify_url = (
+                    current_record_data.get("metadata", {}).get("spotify_url")
+                    or current_record_data.get("spotify_url")
+                )
+                if existing_spotify_url:
+                    logger.info(f"Found existing Spotify URL in current_record: {existing_spotify_url}")
+            except Exception as e:
+                logger.warning(f"Failed to parse current_record for Spotify URL preservation: {e}")
+        
         try:
             # STEP 1: Analyze images from the request (all images are in memory/uploaded)
             graph = build_agent_graph()
@@ -1192,6 +1207,13 @@ async def reanalyze_vinyl(
             enhanced_metadata = new_metadata
             new_confidence = analysis_confidence
             logger.info(f"✅ Analysis complete with {len(files)} images (confidence: {new_confidence:.2f})")
+            
+            # Preserve existing Spotify URL if the graph didn't find a new one
+            # search_spotify_album relies on web search which is non-deterministic;
+            # fall back to the URL already stored in the current record.
+            if not enhanced_metadata.get("spotify_url") and existing_spotify_url:
+                enhanced_metadata["spotify_url"] = existing_spotify_url
+                logger.info(f"Preserved existing Spotify URL (not found by graph): {existing_spotify_url}")
             
             # STEP 3B: Estimate value based on extracted metadata using web search
             estimated_value_eur = None

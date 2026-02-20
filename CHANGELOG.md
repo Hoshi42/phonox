@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.9.1] - 2026-02-20 - Spotify URL Fix
+
+### Bug Fixes
+- **Fixed Spotify URL Lost on Re-Analysis**
+  - `reanalyze` endpoint now parses the `current_record` payload sent by the frontend
+  - If the agent graph's `search_spotify_album` call returns nothing (non-deterministic web search), the URL already stored in the current record is preserved as a fallback
+  - Previously the URL was silently dropped every time re-analysis ran without a Tavily hit
+
+- **Fixed Spotify Search Parity Between Tavily and DuckDuckGo**
+  - DuckDuckGo fallback in `search_spotify_album` previously used the plain query `{artist} {title} spotify album` with no site restriction, so results were dominated by review sites rather than direct Spotify album pages
+  - DuckDuckGo now first tries a site-restricted query `{artist} {title} album site:open.spotify.com` (mirrors what Tavily does with `site:spotify.com`)
+  - If that returns nothing it falls back to the broader query with `max_results=10`
+  - Corrected a misleading log message ("trying broader Tavily search") that actually jumped straight to DuckDuckGo
+
+---
+
 ## [1.9.0] - 2026-02-18 - Mobile UI Overhaul & Polish
 
 ### New Features
