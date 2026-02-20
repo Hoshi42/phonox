@@ -12,7 +12,15 @@ Phonox uses semantic versioning: `MAJOR.MINOR.PATCH`
 
 ## Versions
 
-### v1.9.0 (Current) - 2026-02-18
+### v1.9.1 (Current) - 2026-02-20
+
+**Spotify URL Fix**
+
+- **Re-analysis now preserves existing Spotify URL**: the `reanalyze` endpoint parses the `current_record` payload sent by the frontend and uses the stored URL as a fallback when the agent graph's Spotify web search returns nothing (non-deterministic)
+- **DuckDuckGo Spotify search parity with Tavily**: previously DDG used a plain query (`{artist} {title} spotify album`) with no site restriction, resulting in a near-zero hit rate for direct album links; it now first tries `site:open.spotify.com` (matching Tavily's `site:spotify.com` strategy), then falls back to the broader query
+- Fixed misleading log message ("trying broader Tavily search") that was actually jumping straight to DuckDuckGo
+
+### v1.9.0 - 2026-02-18
 
 **Mobile UI Overhaul & Polish**
 
