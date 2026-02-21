@@ -98,7 +98,7 @@ Return ONLY valid JSON:
 }}}}"""
     
     try:
-        aggregation_model = os.getenv("ANTHROPIC_AGGREGATION_MODEL", "claude-sonnet-4-5-20250929")
+        aggregation_model = os.getenv("ANTHROPIC_AGGREGATION_MODEL", "claude-sonnet-4-6")
         response = anthropic_client.messages.create(
             model=aggregation_model,
             max_tokens=1500,

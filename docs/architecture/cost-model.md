@@ -13,18 +13,18 @@ Models are set in `.env` and override the defaults shown here.
 
 | `.env` variable | Default | Used for |
 |---|---|---|
-| `ANTHROPIC_VISION_MODEL` | `claude-sonnet-4-5-20250929` | Vision extraction — both per-image calls |
-| `ANTHROPIC_AGGREGATION_MODEL` | `claude-sonnet-4-5-20250929` | Multi-image aggregation merge |
-| `ANTHROPIC_ENHANCEMENT_MODEL` | `claude-opus-4-1-20250805` | Re-analysis enhancement merge |
+| `ANTHROPIC_VISION_MODEL` | `claude-sonnet-4-6` | Vision extraction — both per-image calls |
+| `ANTHROPIC_AGGREGATION_MODEL` | `claude-sonnet-4-6` | Multi-image aggregation merge |
+| `ANTHROPIC_ENHANCEMENT_MODEL` | `claude-opus-4-5` | Re-analysis enhancement merge |
 
 ## Current API pricing (standard, no caching)
 
 | Model | Input / MTok | Output / MTok |
 |---|---|---|
+| `claude-sonnet-4-6` *(default vision/agg)* | $3.00 | $15.00 |
 | `claude-sonnet-4-5` | $3.00 | $15.00 |
-| `claude-sonnet-4-6` | $3.00 | $15.00 |
+| `claude-opus-4-5` *(default enhancement)* | $5.00 | $25.00 |
 | `claude-opus-4-1` | $15.00 | $75.00 |
-| `claude-opus-4-5` | $5.00 | $25.00 |
 | `claude-haiku-4-5` | $1.00 | $5.00 |
 
 ## Initial analysis — call-by-call breakdown (2 images)
@@ -42,7 +42,7 @@ START → validate_images → extract_features
 
 ### Call 1 — Vision extraction, Image 1
 
-**Model:** `ANTHROPIC_VISION_MODEL` (default: Sonnet 4.5)  
+**Model:** `ANTHROPIC_VISION_MODEL` (default: Sonnet 4.6)  
 **`max_tokens`:** 1,500  
 **`temperature`:** 0.3
 
@@ -57,7 +57,7 @@ START → validate_images → extract_features
 
 ### Call 2 — Vision extraction, Image 2
 
-**Model:** `ANTHROPIC_VISION_MODEL` (default: Sonnet 4.5)  
+**Model:** `ANTHROPIC_VISION_MODEL` (default: Sonnet 4.6)  
 **`max_tokens`:** 1,500  
 **`temperature`:** 0.3
 
@@ -72,7 +72,7 @@ START → validate_images → extract_features
 
 ### Call 3 — Multi-image aggregation
 
-**Model:** `ANTHROPIC_AGGREGATION_MODEL` (default: Sonnet 4.5)  
+**Model:** `ANTHROPIC_AGGREGATION_MODEL` (default: Sonnet 4.6)  
 **`max_tokens`:** 1,500  
 **`temperature`:** 0.3  
 **Vision:** No (text-only)
@@ -86,7 +86,7 @@ START → validate_images → extract_features
 
 ---
 
-### Total — initial analysis, 2 images (Sonnet 4.5)
+### Total — initial analysis, 2 images (Sonnet 4.6)
 
 | | Tokens | Rate | Cost |
 |---|---|---|---|
@@ -126,10 +126,10 @@ Phonox additionally compresses base64 strings above 4.5 MB before sending
 
 Re-analysis via `/api/v1/reanalyze/{id}` fires:
 
-1. One vision extraction call per **new** image (Sonnet 4.5, same as above)
-2. One enhancement merge call (`ANTHROPIC_ENHANCEMENT_MODEL`, default **Opus 4.1**)
+1. One vision extraction call per **new** image (Sonnet 4.6, same as above)
+2. One enhancement merge call (`ANTHROPIC_ENHANCEMENT_MODEL`, default **Opus 4.5**)
 
-### Enhancement merge call (Opus 4.1)
+### Enhancement merge call (Opus 4.5)
 
 | Input component | Tokens |
 |---|---|
@@ -140,17 +140,17 @@ Re-analysis via `/api/v1/reanalyze/{id}` fires:
 
 | | Tokens | Rate | Cost |
 |---|---|---|---|
-| Opus 4.1 input | 1,000 | $15.00 / MTok | $0.015 |
-| Opus 4.1 output | 400 | $75.00 / MTok | $0.030 |
-| 1 × Sonnet 4.5 vision call | 5,000 | mixed | ~$0.030 |
-| **Re-analysis total** | | | **~$0.075** |
+| Opus 4.5 input | 1,000 | $5.00 / MTok | $0.005 |
+| Opus 4.5 output | 400 | $25.00 / MTok | $0.010 |
+| 1 × Sonnet 4.6 vision call | 5,000 | mixed | ~$0.030 |
+| **Re-analysis total** | | | **~$0.045** |
 
-!!! warning "Opus 4.1 is 5× more expensive"
-    The enhancement model defaults to `claude-opus-4-1` for its superior
-    conflict-resolution quality on partial re-analyses. You can switch to
-    `claude-sonnet-4-5` in `.env` to reduce re-analysis cost to ~$0.045:
+!!! tip "Opus 4.5 is 3× cheaper than the previous Opus 4.1 default"
+    Opus 4.5 ($5/$25 MTok) replaced Opus 4.1 ($15/$75 MTok) as the default
+    enhancement model in v1.9.3, reducing re-analysis cost by ~40 %.
+    To reduce cost further, switch to Sonnet 4.6:
     ```env
-    ANTHROPIC_ENHANCEMENT_MODEL=claude-sonnet-4-5-20250929
+    ANTHROPIC_ENHANCEMENT_MODEL=claude-sonnet-4-6
     ```
 
 ## Websearch fallback

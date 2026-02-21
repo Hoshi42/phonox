@@ -112,7 +112,7 @@ Focus on HIGH CONFIDENCE enhancements only."""
 
         try:
             logger.info("Calling Claude for intelligent metadata enhancement")
-            enhancement_model = os.getenv("ANTHROPIC_ENHANCEMENT_MODEL", "claude-opus-4-1-20250805")
+            enhancement_model = os.getenv("ANTHROPIC_ENHANCEMENT_MODEL", "claude-opus-4-5")
 
             response = self.client.messages.create(
                 model=enhancement_model,

@@ -47,10 +47,11 @@ If you see `websearch_fallback` in logs frequently, your images may be unclear;
 try better-lit photos or add a back-cover image.
 
 ### Re-analysis
-Re-analysing a record with additional images uses `claude-opus-4-1` for the
-enhancement merge step. Opus 4.1 is **5× more expensive** per token than Sonnet 4.5
-($15/$75 vs $3/$15 per MTok). A single re-analysis with 1 new image costs
-roughly **$0.05–$0.15** depending on how much context is passed.
+Re-analysing a record with additional images uses `claude-opus-4-5` for the
+enhancement merge step. Opus 4.5 costs $5/$25 per MTok (input/output) — the
+same quality tier as before but **3× cheaper** than the old Opus 4.1 default
+($15/$75 MTok). A single re-analysis with 1 new image costs roughly
+**$0.04–$0.05** depending on how much context is passed.
 
 ## Cost at scale
 
@@ -91,8 +92,8 @@ covers but works well for clear, high-resolution photos.
 | Model | Cost / 2-image analysis | Accuracy |
 |---|---|---|
 | `claude-haiku-4-5` | ~$0.019 | Good (clear images) |
-| `claude-sonnet-4-5` *(default)* | ~$0.057 | Excellent |
-| `claude-sonnet-4-6` | ~$0.057 | Excellent |
+| `claude-sonnet-4-6` *(default)* | ~$0.057 | Excellent |
+| `claude-sonnet-4-5` | ~$0.057 | Excellent |
 | `claude-opus-4-5` | ~$0.190 | Best |
 
 ### 4 — Minimise re-analysis

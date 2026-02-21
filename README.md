@@ -180,7 +180,7 @@ Full CLI Reference:
 ./phonox-cli configure --anthropic YOUR_KEY --tavily YOUR_KEY
 
 # Configure Anthropic models (for advanced users)
-./phonox-cli configure --vision-model claude-sonnet-4-5-20250929
+./phonox-cli configure --vision-model claude-sonnet-4-6
 ./phonox-cli configure --chat-model claude-haiku-4-5-20251001
 
 # Start services

@@ -154,7 +154,7 @@ Response: { success: true }
 ```env
 # Anthropic (required for vision analysis)
 ANTHROPIC_API_KEY=sk-...
-ANTHROPIC_VISION_MODEL=claude-sonnet-4-5-20250929
+ANTHROPIC_VISION_MODEL=claude-sonnet-4-6
 ANTHROPIC_CHAT_MODEL=claude-haiku-4-5-20251001
 
 # Tavily (optional, falls back to DuckDuckGo)

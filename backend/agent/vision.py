@@ -449,7 +449,7 @@ CRITICAL:
         logger.info(f"After compression, image data length: {len(image_base64)}")
 
         # Get vision model from environment, with fallback
-        vision_model = os.getenv("ANTHROPIC_VISION_MODEL", "claude-sonnet-4-5-20250929")
+        vision_model = os.getenv("ANTHROPIC_VISION_MODEL", "claude-sonnet-4-6")
         logger.info(f"Using vision model: {vision_model}")
 
         # Try with the model name - Claude Sonnet 4.5 (vision capable)
