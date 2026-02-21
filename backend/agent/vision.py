@@ -4,7 +4,7 @@ Claude 3 Sonnet-powered vision extraction for vinyl record analysis.
 This module provides multimodal analysis of album artwork using Claude 3 Sonnet
 to extract structured metadata: artist, title, year, label, catalog_number, genres.
 
-Cost: ~$0.002 per image (Claude 3 Sonnet pricing)
+Cost: ~$0.027–$0.030 per image (Sonnet 4.5 pricing, incl. prompt + CoT output)
 """
 
 import base64
