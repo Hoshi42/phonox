@@ -97,6 +97,29 @@ Full record detail, image gallery, Spotify link, and market value in the palm of
 
 ---
 
+## Journey 8 — Live Upload & AI Identification
+
+The headline feature: photograph a vinyl label, upload it to Phonox, and watch the AI identify it in seconds — artist, title, year, pressing variant, genre tags, condition, and market value — backed by live web search.
+
+The record below is a **Danzig – Danzig (1988)** original US pressing on Def American, Catalog #DEF 24208, produced by Rick Rubin. Phonox identified it correctly with **97% confidence** and priced it at **€280 (VG+)** using real-time Discogs data.
+
+### Step 1 — Upload the Image
+The user clicks **📷 Upload Images** and selects a photo of the vinyl label. The chat confirms the upload immediately.
+
+![Upload Sent](screenshots/19_upload_sent.png)
+
+### Step 2 — AI Analysis Result
+The assistant returns a structured identification: band, album, year, pressing notes, pressing variants, and an estimated market value with an explanation.
+
+![Analysis Complete](screenshots/16_analysis_loading.png)
+
+### Step 3 — Full Metadata + Discogs Sources + Value Card
+The right-hand Vinyl Card updates in real time with complete metadata, a Spotify link, and a live-market value card. The chat panel shows the 7 Discogs sources used to compute the price.
+
+![Analysis — Full Detail](screenshots/18_analysis_full.png)
+
+---
+
 ## Feature Quick Reference
 
 | Feature | Where to find it |
