@@ -12,7 +12,13 @@ Phonox uses semantic versioning: `MAJOR.MINOR.PATCH`
 
 ## Versions
 
-### v1.9.2 (Current) - 2026-02-21
+### v1.9.3 (Current) - 2026-02-21
+
+**Samsung Internet Browser Mobile Fix**
+
+- **Page reload on image add fixed**: Samsung Internet Browser reloaded the page when adding a second image in VinylCard. Cause: synchronous `e.target.value = ''` reset inside `onChange` was mis-interpreted as a navigation event by Samsung's browser engine. Fixed by attaching a `ref` to the input and deferring the reset with `setTimeout(..., 100)`. Chrome and other browsers were unaffected by this Samsung-specific bug.
+
+### v1.9.2 - 2026-02-21
 
 **Search Resilience, Memory-First Images & Error UX**
 

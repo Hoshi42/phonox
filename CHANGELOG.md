@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.9.3] - 2026-02-21 - Samsung Internet Browser Mobile Fix
+
+### Bug Fixes
+- **Fixed Page Reload When Adding Multiple Images on Samsung Internet Browser** (`frontend/src/components/VinylCard.tsx`)
+  - On Samsung Internet Browser (Android), tapping "+ Add More Images" and selecting files caused the page to reload, losing all analysis state
+  - Root cause: the `onChange` handler was synchronously resetting `e.target.value = ''` inside the event callback; Samsung Internet Browser incorrectly interprets a synchronous file input value reset as a navigation event and triggers a page reload
+  - Fix: attached a `ref` (`addImageInputRef`) to the file input and deferred the value reset via `setTimeout(() => { addImageInputRef.current.value = '' }, 100)` so it runs after the event fully completes — Chrome was unaffected by this browser-specific bug
+
+---
+
 ## [1.9.2] - 2026-02-21 - Search Resilience, Memory-First Images & Error UX
 
 ### Bug Fixes

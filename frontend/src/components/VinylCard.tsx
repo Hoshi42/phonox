@@ -89,6 +89,9 @@ export default function VinylCard({
   
   // Use ref to track if we've already sent this message (prevents double-send in StrictMode)
   const sentIntermediateResultsRef = useRef<string | null>(null)
+  // Ref for the "Add More Images" file input – used to reset its value via setTimeout,
+  // avoiding a Samsung Internet Browser bug where synchronous value resets cause a page reload.
+  const addImageInputRef = useRef<HTMLInputElement>(null)
 
   // Auto-display intermediate results from image analysis
   useEffect(() => {
@@ -578,6 +581,7 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
           )}
           <label className={styles.addImageBtn}>
             <input 
+              ref={addImageInputRef}
               type="file" 
               multiple 
               accept="image/*"
@@ -585,8 +589,13 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
                 if (e.target.files) {
                   console.log('VinylCard: Adding images:', e.target.files.length)
                   onImageAdd?.(e.target.files)
-                  // Reset the input value to allow selecting the same files again (mobile fix)
-                  e.target.value = ''
+                  // Defer the value reset to avoid a Samsung Internet Browser bug:
+                  // resetting synchronously inside onChange causes a page reload on Samsung Internet.
+                  setTimeout(() => {
+                    if (addImageInputRef.current) {
+                      addImageInputRef.current.value = ''
+                    }
+                  }, 100)
                 }
               }}
               style={{ display: 'none' }}
