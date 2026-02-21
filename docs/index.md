@@ -172,7 +172,7 @@ Get free or affordable API keys from:
 
 | Service | Cost | Purpose |
 |---------|------|---------|
-| [Anthropic](https://console.anthropic.com) | Pay-per-use (~$0.002 per image) | Vision & chat AI |
+| [Anthropic](https://console.anthropic.com) | Pay-per-use (~$0.057 / 2-image analysis) | Vision & chat AI |
 | [Tavily](https://tavily.com) | Free tier (100 calls/month) | Web search |
 | Discogs | Free API | Vinyl metadata |
 | MusicBrainz | Free API | Music metadata |
@@ -244,9 +244,9 @@ Copyright © 2026 Phonox Contributors
 
 ## 🎵 Project Status
 
-**Version**: 1.8.0  
+**Version**: 1.9.2  
 **Status**: Active Development  
-**Last Updated**: February 16, 2026
+**Last Updated**: February 21, 2026
 
 See [Changelog](changelog.md) for version history.
 
