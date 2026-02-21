@@ -363,7 +363,13 @@
   text-align: center;
   backdrop-filter: blur(20px);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  max-width: 400px;
+  max-width: 560px;
+  width: 90%;
+}
+
+.errorIcon {
+  font-size: 2rem;
+  margin-bottom: 12px;
 }
 
 .errorContent h3 {
@@ -375,7 +381,18 @@
 .errorContent p {
   margin: 0 0 24px 0;
   color: rgba(255, 255, 255, 0.9);
-  line-height: 1.5;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.errorLink {
+  color: #60a5fa;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.errorLink:hover {
+  color: #93c5fd;
 }
 
 .errorCloseBtn {

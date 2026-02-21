@@ -18,6 +18,11 @@ WEB_SCRAPING_MAX_URLS = int(os.getenv("WEB_SCRAPING_MAX_URLS", "3"))  # number o
 
 logger.info(f"Web scraping configured: timeout={WEB_SCRAPING_TIMEOUT}s, max_urls={WEB_SCRAPING_MAX_URLS}")
 
+# Minimum Tavily results before DuckDuckGo is used to supplement
+MIN_RESULTS_THRESHOLD = int(os.getenv("WEBSEARCH_MIN_RESULTS_THRESHOLD", "4"))
+# Default max results per search call
+WEBSEARCH_MAX_RESULTS = int(os.getenv("WEBSEARCH_MAX_RESULTS", "7"))
+
 class WebSearchTool:
     """Web search tool using Tavily API."""
     
@@ -50,7 +55,7 @@ class WebSearchTool:
             essential_terms.append(term)
         return ' '.join(essential_terms[:6])  # Limit to first 6 terms
 
-    def search(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
+    def search(self, query: str, max_results: int = WEBSEARCH_MAX_RESULTS) -> List[Dict[str, Any]]:
         """Search the web using Tavily API with smart fallback strategy."""
         results: List[Dict[str, Any]] = []
 
@@ -73,9 +78,14 @@ class WebSearchTool:
                         "score": result.get("score", 0.0)
                     })
                 
-                if results:
+                if len(results) >= MIN_RESULTS_THRESHOLD:
                     logger.info(f"Tavily (domain-restricted) returned {len(results)} results")
-                    return results
+                    return results[:max_results]
+                elif results:
+                    logger.info(
+                        f"Tavily (domain-restricted) returned only {len(results)} result(s) "
+                        f"(< {MIN_RESULTS_THRESHOLD}), continuing to broader search"
+                    )
                 else:
                     logger.info("Tavily domain-restricted search returned 0 results, trying broader search")
 
@@ -100,14 +110,19 @@ class WebSearchTool:
                         "score": result.get("score", 0.0)
                     })
                 
-                if results:
+                if len(results) >= MIN_RESULTS_THRESHOLD:
                     logger.info(f"Tavily (unrestricted) returned {len(results)} results")
-                    return results
+                    return results[:max_results]
+                elif results:
+                    logger.info(
+                        f"Tavily (unrestricted) returned only {len(results)} result(s) "
+                        f"(< {MIN_RESULTS_THRESHOLD}), supplementing with DuckDuckGo"
+                    )
 
             except Exception as e:
                 logger.error(f"Tavily unrestricted search failed: {e}")
 
-        # Tertiary: DuckDuckGo fallback with cleaned query
+        # Tertiary: DuckDuckGo supplement/fallback
         try:
             # Clean up the query for DuckDuckGo - remove special chars and catalog nums
             clean_query = self._clean_query_for_fallback(query)

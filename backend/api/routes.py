@@ -1133,6 +1133,27 @@ async def reanalyze_vinyl(
             
             logger.info(f"Processing {len(image_dicts)} images from browser memory")
             
+            # If no files were provided but this is a registered-record re-analysis,
+            # fall back to loading images directly from the database.
+            # This handles the case where the frontend failed to pre-fetch images
+            # (e.g. backend was transiently unavailable while images were loading).
+            if len(image_dicts) == 0 and do_load_from_database:
+                logger.info(f"No client files received for registered record {record_id} – loading images from database")
+                db_images = db.query(VinylImage).filter(VinylImage.record_id == record_id).all()
+                for db_img in db_images:
+                    try:
+                        image_data = db_img.get_image_data()
+                        if image_data:
+                            file_content = base64.b64encode(image_data).decode('utf-8')
+                            image_dicts.append({
+                                "path": db_img.filename or f"db_image_{db_img.id}",
+                                "content": file_content,
+                                "content_type": db_img.content_type or "image/jpeg",
+                            })
+                    except Exception as e:
+                        logger.error(f"Error loading DB image {db_img.id}: {e}")
+                logger.info(f"Loaded {len(image_dicts)} image(s) from database for record {record_id}")
+            
             # Ensure we have at least one image to analyze
             if len(image_dicts) == 0:
                 raise HTTPException(

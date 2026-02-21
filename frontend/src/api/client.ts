@@ -212,7 +212,7 @@ export class ApiClient {
     return response.json()
   }
 
-  async reanalyze(recordId: string, files: File[], currentRecord?: any, reanalyzeAll?: boolean): Promise<{ record_id: string; id?: string }> {
+  async reanalyze(recordId: string, files: File[], currentRecord?: any, reanalyzeAll?: boolean): Promise<Record<string, unknown>> {
     const formData = new FormData()
     files.forEach((file) => {
       formData.append('files', file)

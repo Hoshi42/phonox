@@ -1,5 +1,56 @@
 # Changelog
 
+## [1.9.2] - 2026-02-21 - Search Resilience, Memory-First Images & Error UX
+
+### Bug Fixes
+- **Fixed CLI Restart Crash** (`scripts/phonox_cli.py`)
+  - `KeyboardInterrupt` (Ctrl+C) in the main menu no longer produces a raw traceback — caught gracefully and exits cleanly
+  - `check_database_health()` was checking the wrong container name (`--filter name=phonox_db`); fixed to use the service name (`ps db`)
+  - `cmd_restart()` ignored the return value of `check_database_health()` — it now reads the result and runs a real recovery loop (`docker compose restart db`) with a 10-second countdown if the database is unhealthy after restart
+
+- **Fixed Reanalysis Dead-Code Database Path** (`backend/api/routes.py`)
+  - When the frontend called the reanalyze endpoint with `do_load_from_database=True` but sent zero files (image pre-fetch failed during backend restart instability), the code path existed but never actually loaded images
+  - Added a proper fallback: queries the `VinylImage` table, reads files from disk via `get_image_data()`, and base64-encodes them so analysis proceeds without requiring the client to re-send images
+
+- **Fixed Duplicate `_parse_tavily_response` Function** (`backend/agent/websearch.py`)
+  - The function was defined twice (at two separate locations); Python silently used only the second definition. Removed the duplicate.
+
+- **Fixed Anthropic Credit Error Masked as Image Format Error** (`backend/agent/vision.py`)
+  - When the Anthropic API returned a 400 `invalid_request_error` due to an exhausted credit balance, the generic branch overwrote the real message with "Invalid image format or data."
+  - Added a specific `"credit balance is too low"` check before the generic branch so the real message (including the billing console URL) is surfaced correctly
+
+- **Fixed `reanalyze()` Return Type** (`frontend/src/api/client.ts`)
+  - Was typed as `{ record_id: string; id?: string }` — the actual response includes `status`, `error`, `metadata`, etc. Changed to `Record<string, unknown>`
+
+### New Features
+- **DuckDuckGo Supplements Sparse Tavily Results** (`backend/agent/websearch.py`, `backend/tools/web_tools.py`)
+  - Previously DuckDuckGo was only used when Tavily returned zero results
+  - Both search functions now check a configurable threshold: if Tavily returns fewer than `WEBSEARCH_MIN_RESULTS_THRESHOLD` results, DuckDuckGo runs and its results are merged and deduplicated
+  - Added `_deduplicate_results()` helper to prevent duplicate URL entries
+
+- **Configurable Search Variables via `.env`**
+  - `WEBSEARCH_MAX_RESULTS` (default `7`) — max results returned per search
+  - `WEBSEARCH_MIN_RESULTS_THRESHOLD` (default `4`) — minimum Tavily results before DDG supplements
+  - `WEBSEARCH_BARCODE_MAX_RESULTS` (default `5`) — max results for barcode-specific searches
+  - All three configurable in `.env` / `.env.example` under *WEB Search & Scraping Configuration*
+
+- **Memory-First Image Architecture** (`frontend/src/App.tsx`, `frontend/src/components/VinylCard.tsx`)
+  - `uploadedImages: File[]` (React state) is now the single source of truth for images; `image_urls` metadata is only used for backend DB round-trips, never for UI decisions
+  - Added `registeredImageCount` state to track how many images came from the register at load time
+  - Added `imagesLoading` state with a UI hint while images are fetched from the backend after selecting a register record
+  - "Reanalyze All" button visibility now checks `uploadedImages.length > 0` (was `image_urls.length > 0`)
+  - `originalImageCount` in VinylCard now uses `registeredImageCount` prop (was `image_urls.length`)
+  - Fixed `Promise.all` to `Promise.allSettled` for image pre-fetch so one failed image no longer loses all images
+
+### Improvements
+- **Actionable Error Messages in the Frontend** (`frontend/src/App.tsx`, `frontend/src/App.module.css`)
+  - Error display now surfaces the exact backend message (e.g. "Anthropic API credit balance exhausted. Please top up at https://console.anthropic.com/settings/billing") instead of a generic "Re-analysis failed. Please try again."
+  - URLs inside error messages are rendered as clickable links (opens in new tab)
+  - Error panel widened to 560 px (was 400 px) and gets flexible width on smaller screens
+  - Added warning icon; close button renamed "Dismiss"
+
+---
+
 ## [1.9.1] - 2026-02-20 - Spotify URL Fix
 
 ### Bug Fixes

@@ -578,6 +578,8 @@ CRITICAL:
             error_details = "Image file is too large. Please ensure the image is under 5 MB."
         elif "timeout" in error_msg.lower():
             error_details = "Image analysis request timed out. Please try again or with a smaller image."
+        elif "credit balance is too low" in error_msg.lower() or "credit_balance" in error_msg.lower():
+            error_details = "Anthropic API credit balance exhausted. Please top up at https://console.anthropic.com/settings/billing"
         elif "invalid_request_error" in error_msg.lower():
             error_details = "Invalid image format or data. Please upload a valid JPEG, PNG, or WebP image."
         elif "rate_limit" in error_msg.lower():

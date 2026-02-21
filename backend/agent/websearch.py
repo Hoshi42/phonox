@@ -19,6 +19,14 @@ from ddgs import DDGS
 
 logger = logging.getLogger(__name__)
 
+# Search tuning – all values can be overridden via environment variables
+# Minimum number of Tavily results before DuckDuckGo is used to supplement
+MIN_RESULTS_THRESHOLD = int(os.getenv("WEBSEARCH_MIN_RESULTS_THRESHOLD", "4"))
+# Maximum results fetched per Tavily / DuckDuckGo call
+WEBSEARCH_MAX_RESULTS = int(os.getenv("WEBSEARCH_MAX_RESULTS", "7"))
+# Maximum results returned from barcode searches
+WEBSEARCH_BARCODE_MAX_RESULTS = int(os.getenv("WEBSEARCH_BARCODE_MAX_RESULTS", "5"))
+
 
 class WebsearchError(Exception):
     """Raised when websearch operation fails."""
@@ -55,6 +63,8 @@ def search_vinyl_metadata(
     # Construct search query
     search_query = f"{artist} {title} vinyl record album"
 
+    tavily_results: List[Dict[str, Any]] = []
+
     # Try Tavily first
     try:
         logger.info(f"Searching Tavily for: {search_query}")
@@ -63,31 +73,45 @@ def search_vinyl_metadata(
         response: Dict[str, Any] = client.search(
             query=search_query,
             include_images=False,
-            max_results=7,
+            max_results=WEBSEARCH_MAX_RESULTS,
         )
 
         # Parse Tavily response
-        results = _parse_tavily_response(response)
-        if results:
-            logger.info(f"Found {len(results)} search results via Tavily")
-            return results
+        tavily_results = _parse_tavily_response(response)
+        if len(tavily_results) >= MIN_RESULTS_THRESHOLD:
+            logger.info(f"Found {len(tavily_results)} search results via Tavily")
+            return tavily_results
+        elif tavily_results:
+            logger.info(
+                f"Tavily returned only {len(tavily_results)} result(s) "
+                f"(< {MIN_RESULTS_THRESHOLD}), supplementing with DuckDuckGo"
+            )
         else:
-            logger.info("Tavily returned no results, trying DuckDuckGo fallback")
+            logger.info("Tavily returned no results, trying DuckDuckGo")
 
     except Exception as e:
         logger.warning(f"Tavily search failed: {e}, trying DuckDuckGo fallback")
 
-    # Fallback to DuckDuckGo
+    # Supplement or replace with DuckDuckGo when Tavily results < MIN_RESULTS_THRESHOLD
     try:
-        ddg_results = _duckduckgo_search(search_query, max_results=7)
-        if ddg_results:
-            logger.info(f"Found {len(ddg_results)} search results via DuckDuckGo")
-            return ddg_results
+        ddg_results = _duckduckgo_search(search_query, max_results=WEBSEARCH_MAX_RESULTS)
+        combined = _deduplicate_results(tavily_results + ddg_results)
+        if combined:
+            logger.info(
+                f"Combined results: {len(tavily_results)} Tavily + "
+                f"{len(ddg_results)} DuckDuckGo = {len(combined)} unique"
+            )
+            return combined[:WEBSEARCH_MAX_RESULTS]
+        elif tavily_results:
+            logger.warning("DuckDuckGo returned no results; returning sparse Tavily results")
+            return tavily_results
         else:
             logger.warning("Both Tavily and DuckDuckGo returned no results")
-            
+
     except Exception as e:
-        logger.error(f"DuckDuckGo fallback also failed: {e}")
+        logger.error(f"DuckDuckGo also failed: {e}")
+        if tavily_results:
+            return tavily_results
 
     # If we get here, all searches failed
     if fallback_on_error:
@@ -160,7 +184,7 @@ def search_vinyl_by_barcode(
                 response: Dict[str, Any] = client.search(
                     query=query,
                     include_images=False,
-                    max_results=7,
+                    max_results=WEBSEARCH_MAX_RESULTS,
                 )
                 
                 results = _parse_tavily_response(response)
@@ -171,51 +195,43 @@ def search_vinyl_by_barcode(
                 logger.warning(f"Tavily barcode search {i+1} failed: {e}")
                 continue
         
-        if all_results:
-            # Return Tavily results
-            seen_urls = set()
-            unique_results = []
-            for result in all_results:
-                url = result.get('url', '')
-                if url not in seen_urls:
-                    seen_urls.add(url)
-                    unique_results.append(result)
-            
-            logger.info(f"Found {len(unique_results)} unique barcode search results via Tavily")
-            return unique_results[:5]
+        tavily_unique = _deduplicate_results(all_results)
+        if len(tavily_unique) >= MIN_RESULTS_THRESHOLD:
+            logger.info(f"Found {len(tavily_unique)} unique barcode search results via Tavily")
+            return tavily_unique[:WEBSEARCH_BARCODE_MAX_RESULTS]
+        elif tavily_unique:
+            logger.info(
+                f"Tavily returned only {len(tavily_unique)} barcode result(s) "
+                f"(< {MIN_RESULTS_THRESHOLD}), supplementing with DuckDuckGo"
+            )
+            all_results = tavily_unique  # keep for merging below
 
     except Exception as e:
         logger.warning(f"Tavily barcode search failed: {e}, trying DuckDuckGo fallback")
 
-    # Fallback to DuckDuckGo
+    # Supplement or replace with DuckDuckGo when Tavily results < MIN_RESULTS_THRESHOLD
     try:
         logger.info(f"Trying DuckDuckGo barcode search for: {clean_barcode}")
         for query in search_queries[:2]:
             logger.info(f"DuckDuckGo barcode search: {query}")
-            
+
             try:
-                ddg_results = _duckduckgo_search(query, max_results=7)
+                ddg_results = _duckduckgo_search(query, max_results=WEBSEARCH_MAX_RESULTS)
                 all_results.extend(ddg_results)
                 logger.info(f"DuckDuckGo barcode search found {len(ddg_results)} results")
             except Exception as e:
                 logger.warning(f"DuckDuckGo barcode search failed: {e}")
                 continue
 
-        if all_results:
-            # Deduplicate and return
-            seen_urls = set()
-            unique_results = []
-            for result in all_results:
-                url = result.get('url', '')
-                if url not in seen_urls:
-                    seen_urls.add(url)
-                    unique_results.append(result)
-            
-            logger.info(f"Found {len(unique_results)} unique barcode search results via DuckDuckGo")
-            return unique_results[:5]
+        combined = _deduplicate_results(all_results)
+        if combined:
+            logger.info(f"Found {len(combined)} unique barcode search results (Tavily + DuckDuckGo)")
+            return combined[:WEBSEARCH_BARCODE_MAX_RESULTS]
 
     except Exception as e:
         logger.error(f"DuckDuckGo barcode search also failed: {e}")
+        if all_results:
+            return _deduplicate_results(all_results)[:WEBSEARCH_BARCODE_MAX_RESULTS]
 
     # If we get here, both search methods failed
     logger.error(f"Barcode search failed for {clean_barcode} (both Tavily and DuckDuckGo)")
@@ -262,6 +278,21 @@ def _parse_tavily_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
     return results
 
 
+def _deduplicate_results(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Remove duplicate results by URL, preserving order.
+    Results with empty/missing URLs are kept only once.
+    """
+    seen: set = set()
+    deduped: List[Dict[str, Any]] = []
+    for result in results:
+        url = result.get("url", "")
+        if url and url not in seen:
+            seen.add(url)
+            deduped.append(result)
+    return deduped
+
+
 def _duckduckgo_search(query: str, max_results: int = 7) -> List[Dict[str, Any]]:
     """
     Fallback web search using DuckDuckGo Search API (via duckduckgo-search library).
@@ -301,42 +332,6 @@ def _duckduckgo_search(query: str, max_results: int = 7) -> List[Dict[str, Any]]
     except Exception as e:
         logger.warning(f"DuckDuckGo fallback search failed: {type(e).__name__}: {e}")
         return []
-
-
-def _parse_tavily_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """
-    Parse Tavily API response into standardized format.
-
-    Args:
-        response: Dictionary response from Tavily API
-
-    Returns:
-        List of standardized result dictionaries
-    """
-    results: List[Dict[str, Any]] = []
-
-    if not response or not isinstance(response, dict):
-        logger.warning("Invalid Tavily response structure")
-        return results
-
-    # Tavily returns results in "results" key
-    tavily_results = response.get("results", [])
-    
-    if not tavily_results:
-        logger.warning("No results in Tavily response")
-        return results
-
-    for idx, result in enumerate(tavily_results):
-        # Extract fields from Tavily result dict
-        parsed_result: Dict[str, Any] = {
-            "title": result.get("title", f"Result {idx + 1}"),
-            "url": result.get("url", ""),
-            "snippet": result.get("content", ""),
-            "relevance": _calculate_relevance(result.get("url", "")),
-        }
-        results.append(parsed_result)
-
-    return results
 
 
 def _calculate_relevance(result: Any) -> float:

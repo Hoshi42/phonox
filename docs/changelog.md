@@ -12,7 +12,20 @@ Phonox uses semantic versioning: `MAJOR.MINOR.PATCH`
 
 ## Versions
 
-### v1.9.1 (Current) - 2026-02-20
+### v1.9.2 (Current) - 2026-02-21
+
+**Search Resilience, Memory-First Images & Error UX**
+
+- **CLI restart crash fixed**: `KeyboardInterrupt` now exits cleanly; `check_database_health()` used the wrong container filter (fixed to `ps db`); `cmd_restart()` now reads the health result and runs a real recovery loop with a 10-second countdown
+- **Reanalysis DB fallback**: when the frontend sends zero files with `do_load_from_database=True` (image pre-fetch failed during restart instability), the backend queries `VinylImage`, reads files from disk, and proceeds with analysis
+- **Duplicate `_parse_tavily_response` removed** from `websearch.py` (was defined twice; Python silently used only the second copy)
+- **Anthropic credit error no longer masked**: a specific `"credit balance is too low"` check in `vision.py` prevents the generic `invalid_request_error` branch from overwriting the real message with "Invalid image format or data."
+- **DuckDuckGo supplements sparse Tavily results**: if Tavily returns fewer results than `WEBSEARCH_MIN_RESULTS_THRESHOLD`, DuckDuckGo runs and its results are merged and deduplicated via `_deduplicate_results()`
+- **Configurable search variables** in `.env` / `.env.example`: `WEBSEARCH_MAX_RESULTS` (default `7`), `WEBSEARCH_MIN_RESULTS_THRESHOLD` (default `4`), `WEBSEARCH_BARCODE_MAX_RESULTS` (default `5`)
+- **Memory-first image architecture**: `uploadedImages: File[]` is the single source of truth; removed all `image_urls` length reads from UI decisions; added `registeredImageCount` + `imagesLoading` states; `Promise.all` changed to `Promise.allSettled` for resilient image pre-fetch
+- **Actionable frontend error messages**: backend error detail (including billing URLs) now shown verbatim; URLs rendered as clickable links; error panel widened with warning icon and "Dismiss" button
+
+### v1.9.1 - 2026-02-20
 
 **Spotify URL Fix**
 

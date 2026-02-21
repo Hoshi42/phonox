@@ -274,8 +274,17 @@
 
 .imageActionButtons {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: stretch;
+}
+
+.imagesLoadingHint {
+  width: 100%;
+  font-size: 0.8rem;
+  color: #9ca3af;
+  text-align: center;
+  padding: 4px 0;
 }
 
 .imageActionButtons .addImageBtn {

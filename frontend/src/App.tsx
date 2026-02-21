@@ -78,6 +78,11 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [pollInterval, setPollInterval] = useState<any>(null)
   const [uploadedImages, setUploadedImages] = useState<File[]>([])
+  // Number of images that came from the register at load time.
+  // Memory-first: UI decisions use uploadedImages, not image_urls metadata.
+  const [registeredImageCount, setRegisteredImageCount] = useState(0)
+  // True while images are being fetched from the backend after selecting a register record.
+  const [imagesLoading, setImagesLoading] = useState(false)
   const [vinylRegister, setVinylRegister] = useState<RegisterRecord[]>([])
   const [showRegister, setShowRegister] = useState(false)
   const [registerLoading, setRegisterLoading] = useState(false)
@@ -110,6 +115,7 @@ function App() {
       console.log('App: Full initial response:', response)
       setRecordId(newRecordId)
       setUploadedImages(files)
+      setRegisteredImageCount(0) // fresh analysis – no images come from the register
 
       // If already analyzed/complete from initial response, use it
       if (response.status === 'analyzed' || response.status === 'complete') {
@@ -269,6 +275,12 @@ function App() {
         clearTimeout(metadataUpdateTimeoutRef.current)
       }
       
+      // If the save flow updated image_urls (new DB URLs after upload), sync registeredImageCount
+      // so the "new images" detection stays accurate after saving.
+      if (metadata.image_urls !== undefined) {
+        setRegisteredImageCount(metadata.image_urls.length)
+      }
+      
       // Debounce metadata updates by 300ms to prevent excessive re-renders during editing
       metadataUpdateTimeoutRef.current = setTimeout(() => {
         setRecord(prev => prev ? {
@@ -312,6 +324,10 @@ function App() {
   }
 
   const handleImageRemove = (index: number) => {
+    // Keep registeredImageCount in sync: removing an image that came from the register shrinks the baseline
+    if (index < registeredImageCount) {
+      setRegisteredImageCount(prev => prev - 1)
+    }
     setUploadedImages(prev => prev.filter((_, i) => i !== index))
   }
 
@@ -368,7 +384,8 @@ function App() {
         console.error('App: Re-analysis failed with status:', response.status, response.error)
         setRecord(originalRecord)
         setRecordId(originalRecordId)
-        setError('Re-analysis failed. Please try again.')
+        const reanalyzeErrorMsg = (response.error as string) || (response.message as string) || 'Re-analysis failed. Please try again.'
+        setError(`Re-analysis failed: ${reanalyzeErrorMsg}`)
       } else {
         console.warn('App: Unexpected re-analysis status:', response.status)
         setError('Unexpected response from re-analysis. Please try again.')
@@ -378,7 +395,8 @@ function App() {
       setLoading(false)
       setRecord(originalRecord)
       setRecordId(originalRecordId)
-      setError('Re-analysis failed. ' + (error instanceof Error ? error.message : 'Please try again.'))
+      const catchMsg = error instanceof Error ? error.message : 'Please try again.'
+      setError(`Re-analysis failed: ${catchMsg}`)
     }
   }
 
@@ -448,32 +466,37 @@ function App() {
     setRecord(vinylRecord)
     setRecordId(registerRecord.id)
     
-    // Load images from URLs into memory as File objects
+    // Load images from URLs into memory as File objects (memory-first)
     console.log('App: Loading images from database URLs into memory...')
+    setImagesLoading(true)
     try {
-      const fileObjects = await Promise.all(
+      const results = await Promise.allSettled(
         (registerRecord.image_urls || []).map(async (url) => {
-          const response = await fetch(url);
+          const response = await fetch(url)
           if (!response.ok) {
-            console.error(`Failed to fetch image from ${url}: ${response.statusText}`);
-            return null;
+            console.error(`Failed to fetch image from ${url}: ${response.statusText}`)
+            return null
           }
-          const blob = await response.blob();
-          const filename = url.split('/').pop() || 'image.jpg';
-          return new File([blob], filename, { type: blob.type });
+          const blob = await response.blob()
+          const filename = url.split('/').pop() || 'image.jpg'
+          return new File([blob], filename, { type: blob.type })
         })
-      );
-      // Filter out any failed fetches
-      const validFiles = fileObjects.filter((f): f is File => f !== null);
-      console.log(`App: Loaded ${validFiles.length} images into memory`);
-      setUploadedImages(validFiles);
-      
-      // Keep image_urls in metadata (don't clear them) so we can track which images are original
-      // VinylCard will prioritize displaying uploadedImages for consistency
-      console.log('App: Kept image_urls in metadata as reference for database images');
+      )
+      const validFiles = results
+        .filter((r): r is PromiseFulfilledResult<File | null> => r.status === 'fulfilled')
+        .map(r => r.value)
+        .filter((f): f is File => f !== null)
+      console.log(`App: Loaded ${validFiles.length}/${registerRecord.image_urls?.length || 0} images into memory`)
+      setUploadedImages(validFiles)
+      // registeredImageCount = how many images came from the register at load time
+      // Used by VinylCard to distinguish original vs newly added images (memory-first, no image_urls lookup)
+      setRegisteredImageCount(validFiles.length)
     } catch (error) {
-      console.error('App: Error loading images into memory:', error);
-      setUploadedImages([]);
+      console.error('App: Error loading images into memory:', error)
+      setUploadedImages([])
+      setRegisteredImageCount(0)
+    } finally {
+      setImagesLoading(false)
     }
     
     // Close the register view
@@ -608,6 +631,21 @@ function App() {
     }
   }
 
+  // Renders an error message string, converting any URLs into clickable anchor tags
+  const renderErrorMessage = (message: string) => {
+    const urlPattern = /(https?:\/\/[^\s]+)/g
+    const parts = message.split(urlPattern)
+    return parts.map((part, i) =>
+      urlPattern.test(part) ? (
+        <a key={i} href={part} target="_blank" rel="noopener noreferrer" className={styles.errorLink}>
+          {part}
+        </a>
+      ) : (
+        <span key={i}>{part}</span>
+      )
+    )
+  }
+
   return (
     <div className={styles.container}>
       <header className={styles.header}>
@@ -675,6 +713,8 @@ function App() {
             key={record?.record_id || 'empty'}
             record={record}
             uploadedImages={uploadedImages}
+            registeredImageCount={registeredImageCount}
+            imagesLoading={imagesLoading}
             onMetadataUpdate={handleMetadataUpdate}
             onImageAdd={handleImageAdd}
             onImageRemove={handleImageRemove}
@@ -722,13 +762,14 @@ function App() {
       {error && (
         <div className={styles.errorOverlay}>
           <div className={styles.errorContent}>
+            <div className={styles.errorIcon}>⚠️</div>
             <h3>Error</h3>
-            <p>{error}</p>
+            <p>{renderErrorMessage(error)}</p>
             <button 
               onClick={() => setError(null)}
               className={styles.errorCloseBtn}
             >
-              Close
+              Dismiss
             </button>
           </div>
         </div>

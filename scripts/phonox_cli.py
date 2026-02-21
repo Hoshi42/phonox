@@ -29,7 +29,11 @@ def style(text: str, *styles: str) -> str:
 
 
 def run(cmd, cwd=ROOT_DIR):
-    result = subprocess.run(cmd, cwd=cwd)
+    try:
+        result = subprocess.run(cmd, cwd=cwd)
+    except KeyboardInterrupt:
+        print(style("\n⚠ Interrupted.", "yellow"))
+        sys.exit(1)
     if result.returncode != 0:
         sys.exit(result.returncode)
 
@@ -191,7 +195,7 @@ def check_database_health():
     
     try:
         result = subprocess.run(
-            compose + ["ps", "--filter", "name=phonox_db"],
+            compose + ["ps", "db"],
             cwd=ROOT_DIR,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -264,6 +268,7 @@ def cmd_start(_args):
 
 def cmd_restart(_args):
     """Stop and start containers with network recovery."""
+    import time
     compose = get_compose_cmd()
     
     print(style("Stopping containers...", "cyan"))
@@ -273,11 +278,27 @@ def cmd_restart(_args):
     run(compose + ["up", "-d"])
     
     # Wait for startup
-    import time
     time.sleep(3)
     
     print(style("\nChecking database health...", "cyan"))
-    check_database_health()
+    health = check_database_health()
+    
+    if health is not True:
+        print(style("\n⚠ Database not healthy. Running recovery...", "yellow"))
+        subprocess.run(
+            compose + ["restart", "db"],
+            cwd=ROOT_DIR,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        for i in range(10, 0, -1):
+            print(style(f"  Waiting {i}s for database recovery...", "dim"), end="\r")
+            time.sleep(1)
+        print(" " * 44, end="\r")  # clear line
+        health = check_database_health()
+        if health is not True:
+            print(style("\n✗ Database recovery failed. Check logs: docker compose logs db", "red"))
+            return
     
     print(style("\n✓ Containers restarted successfully", "green"))
 

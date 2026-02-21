@@ -42,6 +42,11 @@ interface VinylCardProps {
   currentUser?: string
   isCheckingValue?: boolean
   onSetIsCheckingValue?: (value: boolean) => void
+  // Memory-first: registeredImageCount is the authoritative count of images that came
+  // from the register at load time – avoids reading image_urls from metadata for UI decisions.
+  registeredImageCount?: number
+  // True while images are being fetched from the backend after selecting a register record.
+  imagesLoading?: boolean
 }
 
 export default function VinylCard({ 
@@ -58,8 +63,9 @@ export default function VinylCard({
   isInRegister = false,
   currentUser,
   isCheckingValue = false,
-  onSetIsCheckingValue
-}: VinylCardProps) {
+  onSetIsCheckingValue,
+  registeredImageCount = 0,
+  imagesLoading = false,}: VinylCardProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editData, setEditData] = useState({
     artist: '',
@@ -567,6 +573,9 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
           ))}
         </div>
         <div className={styles.imageActionButtons}>
+          {imagesLoading && (
+            <span className={styles.imagesLoadingHint}>⏳ Loading images…</span>
+          )}
           <label className={styles.addImageBtn}>
             <input 
               type="file" 
@@ -584,7 +593,8 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
               />
               + Add More Images
             </label>
-            {isInRegister && onReanalyze && (record.metadata?.image_urls?.length || 0) > 0 && (
+            {/* Memory-first: show "Reanalyze All" when images are in memory, regardless of image_urls */}
+            {isInRegister && onReanalyze && uploadedImages.length > 0 && (
             <button 
               onClick={() => {
                 // Complete re-analysis: Re-analyze ALL images (existing + new) from scratch
@@ -599,8 +609,9 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
           )}
         </div>
           {(() => {
-            // Only show analyze button when there are NEW images added (not just loaded from register)
-            const originalImageCount = isInRegister ? (record?.metadata?.image_urls?.length || 0) : 0
+            // Memory-first: use registeredImageCount prop (set by App when loading from register)
+            // instead of image_urls which is a DB reference and can be stale.
+            const originalImageCount = registeredImageCount
             const newImagesCount = uploadedImages.length - originalImageCount
             return newImagesCount > 0 && onReanalyze ? (
               <button 
