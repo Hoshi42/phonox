@@ -62,6 +62,12 @@ nav:
   - Changelog: changelog.md
   - License: license.md
 
+extra:
+  social:
+    - icon: fontawesome/solid/blog
+      link: https://phonox-blog.web.app/
+      name: Phonox Blog
+
 markdown_extensions:
   - pymdownx.highlight:
       use_pygments: true

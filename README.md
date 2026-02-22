@@ -21,6 +21,7 @@ Phonox is an intelligent assistant for vinyl record collectors. It helps you:
 - **💬 Chat about records** with an AI agent that remembers your collection
 
 > 🖼️ **See it in action** → [UI Gallery & feature walkthrough](docs/gallery.md)
+> 📝 **Blog** → [phonox-blog.web.app](https://phonox-blog.web.app/)
 
 Perfect for collectors managing large vinyl libraries or insuring valuable collections.
 
