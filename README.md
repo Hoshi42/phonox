@@ -474,13 +474,19 @@ A: Currently manual. We're working on CSV import (see roadmap). For now, use the
 
 ---
 
-## What's New (Latest Version: 1.8.0)
+## What's New (Latest Version: 1.9.3)
 
-✨ **Version 1.8.0** (February 14, 2026)
-- Optimized web search query strategy with domain restrictions and fallback
-- Upgraded to ddgs>=4.0.0 library for better DuckDuckGo integration
-- Fixed inappropriate search results with query sanitization
-- Eliminated deprecation warnings
+✨ **Version 1.9.3** (February 21, 2026)
+- Fixed page reload when adding multiple images on Samsung Internet Browser (Android)
+
+✨ **Version 1.9.2** (February 21, 2026)
+- DuckDuckGo now supplements sparse Tavily results (configurable threshold via `.env`)
+- Added configurable search variables: `WEBSEARCH_MAX_RESULTS`, `WEBSEARCH_MIN_RESULTS_THRESHOLD`, `WEBSEARCH_BARCODE_MAX_RESULTS`
+- Memory-first image architecture: uploaded images are now the single source of truth in the UI
+- Actionable error messages surfaced directly from the backend (including clickable billing URLs)
+- Fixed CLI restart crash and unhealthy database detection
+- Fixed Anthropic credit-balance error being masked as an image format error
+- Fixed reanalysis dead-code path when backend restarts with no client-sent images
 
 See [CHANGELOG.md](CHANGELOG.md) for complete history.
 
@@ -488,8 +494,8 @@ See [CHANGELOG.md](CHANGELOG.md) for complete history.
 
 ## Status & Roadmap
 
-**Last Updated**: 2026-02-16  
-**Current Version**: 1.8.0  
+**Last Updated**: 2026-02-21  
+**Current Version**: 1.9.3  
 **Status**: Production Ready ✅
 
 ### Completed Features
