@@ -82,7 +82,7 @@ if docker compose exec -T backend test -d /app/uploads > /dev/null 2>&1; then
     
     # Copy uploads from container to temp location
     print_info "  Extracting images from container..."
-    if docker cp "phonox_backend:/app/uploads/." "${TEMP_UPLOADS}/uploads/" 2>/dev/null; then
+    if docker compose cp backend:/app/uploads/. "${TEMP_UPLOADS}/uploads/" 2>/dev/null; then
         # Count files
         IMAGE_COUNT=$(find "${TEMP_UPLOADS}/uploads" -type f 2>/dev/null | wc -l)
         

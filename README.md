@@ -475,7 +475,10 @@ A: Currently manual. We're working on CSV import (see roadmap). For now, use the
 
 ---
 
-## What's New (Latest Version: 1.9.3)
+## What's New (Latest Version: 1.9.4)
+
+✨ **Version 1.9.4** (February 22, 2026)
+- Fixed false "Could not access images" warning in backup script — replaced hardcoded container name with `docker compose cp` service name
 
 ✨ **Version 1.9.3** (February 21, 2026)
 - Fixed page reload when adding multiple images on Samsung Internet Browser (Android)
@@ -495,8 +498,8 @@ See [CHANGELOG.md](CHANGELOG.md) for complete history.
 
 ## Status & Roadmap
 
-**Last Updated**: 2026-02-21  
-**Current Version**: 1.9.3  
+**Last Updated**: 2026-02-22  
+**Current Version**: 1.9.4  
 **Status**: Production Ready ✅
 
 ### Completed Features

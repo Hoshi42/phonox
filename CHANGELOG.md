@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.9.4] - 2026-02-22 - Backup Script Fix
+
+### Bug Fixes
+- **Fixed False "Could Not Access Images" Warning in Backup Script** (`scripts/backup.sh`)
+  - `docker cp` used a hardcoded container name (`phonox_backend`) which does not match the actual container name assigned by Docker Compose v2 (e.g. `phonox-backend-1`), causing the copy command to return a non-zero exit code
+  - Despite the warning the archive was sometimes still populated (if `docker cp` managed to transfer files before failing), leading to a misleading "Empty image archive created" message while the backup was actually intact
+  - Fix: replaced `docker cp "phonox_backend:/app/uploads/."` with `docker compose cp backend:/app/uploads/.` — uses the Compose service name, consistent with the directory-existence check already in the script, and works regardless of how Docker names the underlying container
+
+---
+
 ## [1.9.3] - 2026-02-21 - Samsung Internet Browser Mobile Fix
 
 ### Bug Fixes
