@@ -31,17 +31,21 @@ For configuration and management tasks:
 
 ### Interactive Mode
 
-Run without arguments for an interactive menu:
+Run without arguments for a full-screen interactive menu:
 
 ```bash
 ./phonox-cli
 ```
 
-The interactive menu displays:
-- Container status
-- Network status
-- Backup information
-- Numbered menu options
+The interactive menu uses a **curses-based arrow-key interface**. Use **↑ / ↓** to move the highlight bar, **Enter** to select, and **q** or **Esc** to cancel or go back.
+
+The header displays:
+- The Phonox ASCII logo (magenta)
+- A live status panel showing each service individually:
+  - **Frontend**, **Backend**, **DB** — each with a ✔ / ✘ icon
+  - **Network** status and the **latest backup** timestamp
+
+No mouse or numbered key input is required.
 
 ---
 
@@ -76,37 +80,45 @@ Build Docker images and prepare directories.
 
 ### configure
 
-Set API keys and model configuration in `.env` file.
+Open the interactive API key and model configurator.
 
-**Prerequisites:** You must first create `.env` from the template:
+```bash
+./phonox-cli configure
+```
+
+**How it works:**
+
+A curses menu lists all configurable keys with their current values masked:
+
+```
+  Anthropic API key          ****…TgAA
+  Tavily API key             ****…UxT4
+  Vision model               claude-sonnet-4-6
+  Chat model                 claude-haiku-4-5-20251001
+  Aggregation model          claude-sonnet-4-6
+  Enhancement model          claude-opus-4-5
+  ──────────────────────────────────────
+  Save & apply
+  Cancel
+```
+
+Select a key, type the new value (leave blank to keep the current value), then choose **Save & apply** to write the changes to `.env`. The running containers are restarted automatically so changes take effect immediately.
+
+**Configurable keys:**
+
+| Key | Purpose | Secret |
+|-----|---------|--------|
+| `ANTHROPIC_API_KEY` | Anthropic AI API access | Yes |
+| `TAVILY_API_KEY` | Web search API access | Yes |
+| `ANTHROPIC_VISION_MODEL` | Model for image analysis | No |
+| `ANTHROPIC_CHAT_MODEL` | Model for conversational chat | No |
+| `ANTHROPIC_AGGREGATION_MODEL` | Model for merging multi-image results | No |
+| `ANTHROPIC_ENHANCEMENT_MODEL` | Model for metadata enrichment | No |
+
+**Prerequisites:** A `.env` file must exist. Create one from the template first:
 ```bash
 cp .env.example .env
 ```
-
-**Usage:**
-```bash
-# Configure Anthropic API key
-./phonox-cli configure --anthropic sk-ant-xxxxx
-
-# Configure Tavily web search key
-./phonox-cli configure --tavily tvly-xxxxx
-
-# Configure multiple at once
-./phonox-cli configure \
-  --anthropic sk-ant-xxxxx \
-  --tavily tvly-xxxxx
-```
-
-**After configuring, restart services:**
-```bash
-./phonox-cli restart
-```
-
-**Configuration Keys:**
-- `--anthropic` - Anthropic API key (required for AI features)
-- `--tavily` - Tavily API key (optional, for web search)
-- `--vision-model` - Model for image analysis (default: claude-sonnet-4-5-20250929)
-- `--chat-model` - Model for chat (default: claude-haiku-4-5-20251001)
 
 ---
 
@@ -204,28 +216,58 @@ backups/
 
 ### restore
 
-Restore database and images from a previous backup.
+Restore database and images from a previous backup — interactively.
 
 ```bash
-# List available backups
-ls -lh backups/
-
-# Restore specific backup
-./phonox-cli restore 20260206_143022
+./phonox-cli restore
 ```
 
-**What it does:**
-- Restores PostgreSQL database from SQL dump
-- Extracts uploaded images from archive
-- Replaces current data
+**How it works:**
 
-**⚠️ Warning:** This overwrites current data. Always backup first!
+A curses menu lists all available backups sorted newest-first:
+
+```
+  2026-02-22  22:26:04
+  2026-02-16  23:23:22
+  2026-02-16  22:49:52
+  2026-02-11  21:28:24
+  ─────────────────────
+  Cancel
+```
+
+Select a backup, then type `yes` to confirm. The CLI then restores the PostgreSQL database from the SQL dump and extracts the image archive.
+
+**⚠️ Warning:** This overwrites current data. Always create a backup first!
 
 **When to use:**
 - Recovering from data loss
 - Rolling back changes
 - Testing with previous data
-- Migrating to new system
+- Migrating to a new system
+
+---
+
+### manage-users
+
+Rename vinyl record collections (user tags) directly from the CLI.
+
+```bash
+./phonox-cli manage-users
+```
+
+**How it works:**
+
+A curses menu lists all collections with their record counts:
+
+```
+  Jan (142 records)
+  ─────────────────
+  Back
+```
+
+Select a collection, then choose **Rename collection** and type the new name. All records in that collection are updated instantly via a database query.
+
+> **Note:** Collections are derived from the `user_tag` field on records — a collection exists only while it has records. Empty collections cannot appear in the list and therefore cannot be created or deleted independently.
 
 ---
 
@@ -247,79 +289,80 @@ Start the MkDocs documentation server.
 - Open http://localhost:8001 in your browser
 - Press Ctrl+C to stop the server
 
-**When to use:**
-- Reading documentation offline
-- Contributing to docs
-- Previewing doc changes
-
 ---
 
 ## Interactive Menu
 
-When run without arguments, Phonox CLI presents an interactive menu:
+When run without arguments, Phonox CLI opens a full-screen curses interface:
 
 ```
  ██████╗ ██╗  ██╗ ██████╗ ███╗   ██╗ ██████╗ ██╗  ██╗
  ██╔══██╗██║  ██║██╔═══██╗████╗  ██║██╔═══██╗╚██╗██╔╝
- ██████╔╝███████║██║   ██║██╔██╗ ██║██║   ██║ ╚███╔╝ 
- ██╔═══╝ ██╔══██║██║   ██║██║╚██╗██║██║   ██║ ██╔██╗ 
+ ██████╔╝███████║██║   ██║██╔██╗ ██║██║   ██║ ╚███╔╝
+ ██╔═══╝ ██╔══██║██║   ██║██║╚██╗██║██║   ██║ ██╔██╗
  ██║     ██║  ██║╚██████╔╝██║ ╚████║╚██████╔╝██╔╝ ██╗
  ╚═╝     ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝ ╚═╝  ╚═╝
-Vinyl Intelligence Console
+ Vinyl Intelligence Console
 
-Status
-────────────────────────────────────────────
-Containers:
-NAME                 STATUS              PORTS
-phonox-backend-1     Up 2 hours          0.0.0.0:8000->8000/tcp
-phonox-frontend-1    Up 2 hours          0.0.0.0:5173->5173/tcp
-phonox-db-1          Up 2 hours          5432/tcp
-Network: phonox_phonox_network
-Backups: 3 set(s) (latest: 20260206_143022)
+──────  Status  ──────
+  Frontend ✔   Backend ✔   DB ✔
+  Network ✔   Backup 2026-02-22  22:26
 
-Menu
-────────────────────────────────────────────
-1) Install (build images)
-2) Install + start
-3) Configure API keys
-4) Start containers
-5) Stop containers
-6) Restart containers (with recovery)
-7) Backup
-8) Restore
-9) View documentation (MkDocs)
-0) Exit
-
-Select an option: 
+┌──────────────────────────────────┐
+│ Phonox — Main Menu               │
+├──────────────────────────────────┤
+│   Install (build images)         │
+│   Install + start                │
+│ ▶ Configure API keys             │
+│   Start containers               │
+│   Stop containers                │
+│   Restart containers             │
+│   Backup                         │
+│   Restore                        │
+│   Manage collections             │
+│   View documentation (MkDocs)    │
+│   Exit                           │
+└──────────────────────────────────┘
+  ↑/↓ navigate  Enter select  q/Esc cancel
 ```
 
-### Menu Options
+### Navigation
 
-1. **Install** - Build Docker images only
-2. **Install + start** - Build and start immediately (recommended for first run)
-3. **Configure API keys** - Interactive prompt for API keys
-4. **Start** - Launch containers
-5. **Stop** - Stop containers
-6. **Restart** - Full restart with recovery
-7. **Backup** - Create backup now
-8. **Restore** - Restore from backup (prompts for timestamp)
-9. **View documentation** - Start MkDocs server
-0. **Exit** - Quit CLI
+| Key | Action |
+|-----|--------|
+| `↑` / `↓` | Move highlight bar |
+| `Enter` | Select item |
+| `q` or `Esc` | Cancel / go back |
+
+### Status Panel
+
+The header status panel refreshes each time the menu opens:
+
+- **Frontend ✔ / ✘** — Vite dev server container state
+- **Backend ✔ / ✘** — FastAPI backend container state
+- **DB ✔ / ✘** — PostgreSQL container state
+- **Network ✔ / ✘** — Docker network status
+- **Backup** — Timestamp of the most recent backup set
+
+Icons are colour-coded: green (✔ running), yellow (⚠ degraded), red (✘ down).
+
+---
 
 ## Common Workflows
 
 ### First-Time Setup
 
 ```bash
-# 1. Configure API keys
-./phonox-cli configure --anthropic sk-ant-xxxxx --tavily tvly-xxxxx
-
-# 2. Install and start
+# 1. Install and start
 ./phonox-cli install --up
 
-# 3. Access application
+# 2. Configure API keys interactively
+./phonox-cli configure
+# — or open the interactive menu and select "Configure API keys"
+
+# 3. Access the application
 # Frontend: http://localhost:5173
-# API: http://localhost:8000
+# API:      http://localhost:8000
 ```
 
 ### Daily Use
@@ -335,14 +378,11 @@ Select an option:
 ### Backup Workflow
 
 ```bash
-# Weekly backup
+# Create a backup
 ./phonox-cli backup
 
-# Verify backup exists
-ls -lh backups/
-
-# Restore if needed
-./phonox-cli restore 20260206_143022
+# Restore interactively (pick from list)
+./phonox-cli restore
 ```
 
 ### Troubleshooting Workflow
@@ -356,17 +396,19 @@ ls -lh backups/
 ./phonox-cli install --skip-build
 ./phonox-cli start
 
-# Check status
-./phonox-cli  # Run interactive mode to see status
+# Check status at a glance
+./phonox-cli  # open the interactive menu
 ```
+
+---
 
 ## Requirements
 
 ### System Requirements
 
 - **Docker** - Container runtime
-- **Docker Compose** - Multi-container orchestration
-- **Python 3.8+** - For CLI script
+- **Docker Compose v2** - Multi-container orchestration
+- **Python 3.8+** - For CLI script (uses only stdlib: `curses`, `subprocess`, `re`)
 - **Bash** - For wrapper scripts
 
 ### Checking Installation
@@ -383,17 +425,24 @@ python3 --version
 ./phonox-cli --help
 ```
 
+---
+
 ## Environment Variables
 
-The CLI manages these environment variables in `.env`:
+The `configure` command manages these keys in `.env`:
 
-| Variable | Purpose | Default | Required |
-|----------|---------|---------|----------|
-| `ANTHROPIC_API_KEY` | Anthropic AI API access | - | Yes |
-| `TAVILY_API_KEY` | Web search API access | - | No |
-| `ANTHROPIC_VISION_MODEL` | Image analysis model | claude-sonnet-4-5-20250929 | No |
-| `ANTHROPIC_CHAT_MODEL` | Chat model | claude-haiku-4-5-20251001 | No |
-| `DATABASE_URL` | PostgreSQL connection | Set by docker-compose | Auto |
+| Variable | Purpose | Secret |
+|----------|---------|--------|
+| `ANTHROPIC_API_KEY` | Anthropic AI API access | Yes |
+| `TAVILY_API_KEY` | Web search API access | Yes |
+| `ANTHROPIC_VISION_MODEL` | Model for image analysis | No |
+| `ANTHROPIC_CHAT_MODEL` | Model for conversational chat | No |
+| `ANTHROPIC_AGGREGATION_MODEL` | Model for merging multi-image results | No |
+| `ANTHROPIC_ENHANCEMENT_MODEL` | Model for metadata enrichment | No |
+
+Additional variables (database, retry, scraping, etc.) can be edited directly in `.env` — see [Configuration Guide](configuration.md) for full details.
+
+---
 
 ## Troubleshooting
 
@@ -424,8 +473,7 @@ docker compose version
 # Add user to docker group (Linux)
 sudo usermod -aG docker $USER
 
-# Log out and back in
-# Or use sudo
+# Log out and back in, or use sudo
 sudo ./phonox-cli start
 ```
 
@@ -456,11 +504,13 @@ docker network prune
 ./phonox-cli start
 ```
 
+---
+
 ## Advanced Usage
 
 ### Custom Backup Location
 
-Edit `scripts/backup.sh` to change backup directory:
+Edit `scripts/backup.sh` to change the backup directory:
 
 ```bash
 BACKUP_DIR="./backups"  # Change this path
@@ -498,6 +548,8 @@ git pull
 # Check status
 docker compose ps
 ```
+
+---
 
 ## Next Steps
 

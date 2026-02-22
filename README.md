@@ -475,7 +475,14 @@ A: Currently manual. We're working on CSV import (see roadmap). For now, use the
 
 ---
 
-## What's New (Latest Version: 1.9.4)
+## What's New (Latest Version: 1.9.5)
+
+✨ **Version 1.9.5** (February 22, 2026)
+- Full curses arrow-key interactive menu — ↑/↓ navigation, white-on-blue selection bar
+- Per-service status panel: Frontend / Backend / DB each with own ✔/✘ icon
+- Interactive configure with 6 masked keys (added Aggregation + Enhancement models)
+- Interactive restore: pick backup from list, confirm with `yes`
+- Collection management: rename collections directly from the CLI
 
 ✨ **Version 1.9.4** (February 22, 2026)
 - Fixed false "Could not access images" warning in backup script — replaced hardcoded container name with `docker compose cp` service name
@@ -499,7 +506,7 @@ See [CHANGELOG.md](CHANGELOG.md) for complete history.
 ## Status & Roadmap
 
 **Last Updated**: 2026-02-22  
-**Current Version**: 1.9.4  
+**Current Version**: 1.9.5  
 **Status**: Production Ready ✅
 
 ### Completed Features

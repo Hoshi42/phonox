@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.9.5] - 2026-02-22 - CLI Curses Overhaul
+
+### Added
+- **Arrow-key interactive menu** — replaced all numbered-input menus with a curses-based full-screen interface; navigate with ↑/↓, select with Enter, cancel with q/Esc
+- **Per-service status panel** — header now shows Frontend, Backend, and DB each with their own ✔/✘ icon (colour-coded green/yellow/red) plus Network and latest Backup timestamp
+- **Interactive configure** (`./phonox-cli configure`) — curses menu lists all 6 configurable keys with masked current values; select a key, type new value, Save & apply writes `.env` and restarts containers
+- **Two new model keys** added to configure: `ANTHROPIC_AGGREGATION_MODEL` and `ANTHROPIC_ENHANCEMENT_MODEL`
+- **Interactive restore** (`./phonox-cli restore`) — curses menu lists all backups newest-first; requires typing `yes` to confirm before overwriting data
+- **Collection management** (`./phonox-cli manage-users`) — curses menu lists collections with record counts; supports renaming all records in a collection via a single DB update
+
+### Changed
+- Selection bar colour changed from black-on-cyan to **white-on-blue** for better readability on dark terminals
+- CLI documentation (`docs/getting-started/cli.md`) fully rewritten to reflect the new curses interface, all 6 configurable keys, interactive restore/configure/manage-users, and the new status panel
+
+---
+
 ## [1.9.4] - 2026-02-22 - Backup Script Fix
 
 ### Bug Fixes
