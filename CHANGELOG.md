@@ -1,4 +1,12 @@
 # Changelog
+## [1.9.6] - 2026-02-23 - Vinyl Register Modal Height Fix
+
+### Changed
+- **Vinyl Register Modal Height & Scrolling Improved** (`frontend/src/components/VinylRegister.module.css`)
+  - Modal height increased to 98% (desktop), 100dvh (mobile)
+  - Vertical scrolling enabled for modal
+  - Fixes cut-off panel and ensures bottom button visibility
+
 
 ## [1.9.5] - 2026-02-22 - CLI Curses Overhaul
 

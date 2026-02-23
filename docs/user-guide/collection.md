@@ -1,4 +1,5 @@
 # Managing Your Collection
+> **Update (v1.9.6):** The VinylRegister modal now uses a taller layout and vertical scrolling, ensuring all records and action buttons (like 'Add to Register' and 'Update') are always visible, even with large collections.
 
 Learn how to manage, organize, and maintain your vinyl collection in Phonox.
 
