@@ -944,9 +944,11 @@ Keep responses informative but conversational."""
             })
             
             chat_model = os.getenv("ANTHROPIC_CHAT_MODEL", "claude-haiku-4-5-20251001")
+            # Increase max_tokens for collection analysis reports (comprehensive analysis)
+            output_tokens = 16000 if request.collection_analysis else 4000
             response = anthropic_client.messages.create(
                 model=chat_model,
-                max_tokens=4000,
+                max_tokens=output_tokens,
                 system=system_prompt + "\n\n" + web_context,
                 messages=messages_for_claude,
             )
