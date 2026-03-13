@@ -213,7 +213,7 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     """Chat message request."""
-    message: str = Field(..., min_length=1, max_length=50000)  # Increased for collection analysis JSON
+    message: str = Field(..., min_length=1, max_length=150000)  # Increased for large collection analysis JSON with full prompt
     metadata: Optional[Dict[str, str]] = None  # e.g. {"pressing": "first", "condition": "VG+"}
     chat_history: Optional[List[Dict[str, str]]] = None  # Previous messages for context: [{"role": "user"/"assistant", "content": "..."}]
     collection_analysis: bool = Field(default=False, description="Skip web search for collection analysis")
