@@ -1,4 +1,19 @@
 # Changelog
+## [1.9.8] - 2026-03-13 - Collection Analysis & Restore Fixes
+
+### Fixed
+- **Collection Analysis** (`backend/api/models.py`, `backend/api/routes.py`, `frontend/src/components/VinylRegister.tsx`)
+  - Increased `ChatRequest.message` max_length from 2000 → 150000 to accommodate full collection JSON (110K+ chars for 500 records)
+  - Added `collection_analysis` flag to skip Tavily web search for analysis requests (faster response)
+  - Increased `max_tokens` for collection analysis responses from 4000 → 16000 to prevent truncated reports
+- **Restore Script** (`scripts/restore.sh`)
+  - Fixed image restore extracting to `/uploads` instead of `/app/uploads` inside the container
+  - Changed `tar -xf - -C /` to `tar -xf - -C /app` so images land at the correct Docker volume mount path
+- **Upload Directory Path** (`backend/api/register.py`)
+  - Fixed default `UPLOAD_DIR` fallback path from hardcoded `/app/uploads` to a relative path for local development
+
+---
+
 ## [1.9.7] - 2026-03-13 - Move Records Between Users & UI Refinements
 
 ### Added
