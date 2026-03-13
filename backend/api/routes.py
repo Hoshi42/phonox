@@ -666,8 +666,11 @@ async def chat_with_agent(
             "label": vinyl_record.label,
             "spotify_url": vinyl_record.spotify_url,
             "catalog_number": vinyl_record.catalog_number,
+            "barcode": vinyl_record.barcode,
             "genres": vinyl_record.get_genres() if hasattr(vinyl_record, 'get_genres') else [],
             "estimated_value_eur": vinyl_record.estimated_value_eur,
+            "condition": vinyl_record.condition,
+            "user_notes": vinyl_record.user_notes,
         }
 
         # Build system prompt for Claude to understand vinyl record correction context
@@ -696,15 +699,25 @@ Current vinyl record context:
 - Year: {year}
 - Label: {label}
 - Catalog Number: {catalog_number}
+- Barcode: {barcode}
 - Genres: {genres}
+- Condition: {condition}
+- Estimated Value: {estimated_value_eur}
+- Spotify URL: {spotify_url}
+- User Notes: {user_notes}
 
 When web search information is provided below, use it to enhance your answer but keep your response focused on answering the user's question directly.""".format(
             artist=current_metadata.get("artist", "Unknown"),
             title=current_metadata.get("title", "Unknown"),
             year=current_metadata.get("year", "Unknown"),
             label=current_metadata.get("label", "Unknown"),
-            catalog_number=current_metadata.get("catalog_number", "Unknown"),
+            catalog_number=current_metadata.get("catalog_number") or "Unknown",
+            barcode=current_metadata.get("barcode") or "Unknown",
             genres=", ".join(current_metadata.get("genres", [])) or "Unknown",
+            condition=current_metadata.get("condition") or "Unknown",
+            estimated_value_eur=f"€{current_metadata['estimated_value_eur']:.2f}" if current_metadata.get("estimated_value_eur") else "Unknown",
+            spotify_url=current_metadata.get("spotify_url") or "Not available",
+            user_notes=current_metadata.get("user_notes") or "None",
         )
 
         # Determine if we need web search based on user message or /web trigger

@@ -445,7 +445,7 @@ The vinyl card has been updated with all the details. You can edit any informati
                       .replace(/\n/g, '<br>')
                       .replace(/^(📅|🏷️|📋|🎵|✅)/gm, '<br>$1')
                   }} />
-                  {message.sourcesUsed && message.sourcesUsed > 0 && (
+                  {(message.sourcesUsed ?? 0) > 0 && (
                     <div style={{ 
                       fontSize: '0.75rem', 
                       marginTop: '12px', 

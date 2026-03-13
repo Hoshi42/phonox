@@ -652,7 +652,19 @@ function App() {
         {/* Left: Logo */}
         <div className={styles.headerLeft}>
           <img src="/phonox.png" alt="Phonox" className={styles.logo} />
-          <h1 className={styles.title}>Phonox</h1>
+          <div>
+            <h1 className={styles.title} style={{ lineHeight: 1 }}>Phonox</h1>
+            <a
+              href="https://phonox-blog.web.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: 'block', marginTop: '1px', fontSize: '0.65rem', opacity: 0.6, color: 'inherit', textDecoration: 'none', letterSpacing: '0.03em' }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '0.6')}
+            >
+              phonox-blog.web.app
+            </a>
+          </div>
         </div>
         
         {/* Right: Register & User */}

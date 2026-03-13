@@ -1,4 +1,23 @@
 # Changelog
+## [1.9.9] - 2026-03-13 - Chat Context Fix, UI Polish
+
+### Fixed
+- **Chat Missing Metadata Context** (`backend/api/routes.py`)
+  - `barcode`, `condition`, `user_notes` were never fetched from the DB for chat context
+  - `estimated_value_eur` and `spotify_url` were fetched but not injected into the Claude system prompt
+  - All five fields now included in `current_metadata` and rendered in the system prompt so Claude has full record context when chatting against a loaded record
+- **Chat Response Ending With "0"** (`frontend/src/components/ChatPanel.tsx`)
+  - `{message.sourcesUsed && message.sourcesUsed > 0 && (...)}` evaluated to `0` (rendered as text) when no web sources were used
+  - Fixed by changing condition to `{(message.sourcesUsed ?? 0) > 0 && (...)}`
+
+### Added
+- **Blog Link in Header** (`frontend/src/App.tsx`)
+  - Added `phonox-blog.web.app` link below the Phonox headline in small, muted text
+  - Opens in new tab; brightens on hover
+  - Tight spacing: `lineHeight: 1` on `h1` + `marginTop: 1px` on the link
+
+---
+
 ## [1.9.8] - 2026-03-13 - Collection Analysis & Restore Fixes
 
 ### Fixed
