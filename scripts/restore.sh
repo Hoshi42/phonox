@@ -171,9 +171,9 @@ if [ -f "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" ]; then
         UPLOAD_SIZE=$(du -sh "${TEMP_UPLOADS}/uploads" 2>/dev/null | cut -f1)
         print_info "Copying $IMAGE_COUNT image files ($UPLOAD_SIZE) to container..."
         
-        # Use tar to copy files efficiently
+        # Use tar to copy files efficiently (extract to /app so uploads/ becomes /app/uploads/)
         if tar -C "${TEMP_UPLOADS}" -cf - uploads/ 2>/dev/null | \
-           docker exec -i phonox_backend tar -xf - -C / 2>/dev/null; then
+           docker exec -i phonox_backend tar -xf - -C /app 2>/dev/null; then
             
             # Verify copy was successful
             CONTAINER_FILE_COUNT=$(docker exec -T phonox_backend find /app/uploads -type f 2>/dev/null | wc -l)
