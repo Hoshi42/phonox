@@ -23,6 +23,13 @@
 - Error handling in move dialog with user-facing messages
 - Loading state with "⏳ Moving..." confirmation button feedback
 
+### Fixed
+- **Collection Analysis Large Payload Support** (`backend/api/models.py`, `backend/api/routes.py`, `frontend/src/components/VinylRegister.tsx`)
+  - Increased ChatRequest.message max_length from 2000 to 50000 characters to support full collection JSON (14-15K chars for 500+ records)
+  - Added collection_analysis flag to ChatRequest to skip unnecessary web search for analysis requests (performance optimization)
+  - Backend now skips Tavily web search when collection_analysis=true, only using Claude's knowledge for faster analysis
+  - Resolves issue where "Analyze Collection" button would fail silently due to validation rejection
+
 ---
 
 ## [1.9.6] - 2026-02-23 - Vinyl Register Modal Height Fix
