@@ -155,85 +155,74 @@ export default function VinylRegister({
     setAnalysis({ summary: '', loading: true, error: null })
     
     try {
-      // Compile collection summary data
+      // Compile complete collection data as JSON
       const totalRecords = records.length
       const totalValue = records.reduce((sum, record) => sum + getRecordValue(record), 0)
       
-      // Genre analysis
-      const genreCount: Record<string, number> = {}
-      records.forEach(record => {
-        (record.genres || []).forEach(genre => {
-          genreCount[genre] = (genreCount[genre] || 0) + 1
-        })
-      })
-      
-      // Decade distribution
-      const decadeCount: Record<string, number> = {}
-      records.forEach(record => {
-        if (record.year) {
-          const decade = Math.floor(record.year / 10) * 10
-          const decadeLabel = `${decade}s`
-          decadeCount[decadeLabel] = (decadeCount[decadeLabel] || 0) + 1
-        }
-      })
-      
-      // Condition analysis
-      const conditionCount: Record<string, number> = {}
-      records.forEach(record => {
-        const condition = record.condition || 'Unknown'
-        conditionCount[condition] = (conditionCount[condition] || 0) + 1
-      })
-      
-      // Top artists
-      const artistCount: Record<string, number> = {}
-      records.forEach(record => {
-        const artist = record.artist || 'Unknown'
-        artistCount[artist] = (artistCount[artist] || 0) + 1
-      })
-      const topArtists = Object.entries(artistCount)
-        .sort(([,a], [,b]) => b - a)
-        .slice(0, 10)
-        .map(([artist, count]) => `${artist} (${count})`)
-      
-      // Build collection summary prompt
+      const collectionData = {
+        metadata: {
+          total_records: totalRecords,
+          total_value_eur: Math.round(totalValue),
+          average_value_eur: parseFloat((totalValue / totalRecords).toFixed(2)),
+          analysis_date: new Date().toISOString()
+        },
+        records: records.map(record => ({
+          artist: record.artist || 'Unknown',
+          title: record.title || 'Unknown',
+          year: record.year || null,
+          label: record.label || 'Unknown',
+          genres: record.genres || [],
+          condition: record.condition || 'Unknown',
+          value_eur: getRecordValue(record)
+        }))
+      }
+
       const collectionSummary = `
-VINYL COLLECTION ANALYSIS REQUEST
+Analyze this complete vinyl collection and provide professional insights:
 
-Collection Overview:
-- Total Records: ${totalRecords}
-- Total Estimated Value: €${totalValue}
-- Average Value per Record: €${(totalValue / totalRecords).toFixed(2)}
+${JSON.stringify(collectionData, null, 2)}
 
-Genre Distribution:
-${Object.entries(genreCount)
-  .sort(([,a], [,b]) => b - a)
-  .slice(0, 15)
-  .map(([genre, count]) => `- ${genre}: ${count} records`)
-  .join('\n')}
+Please analyze this vinyl collection as a professional record appraiser and collector would. Provide detailed insights on:
 
-Decade Distribution:
-${Object.entries(decadeCount)
-  .sort()
-  .reverse()
-  .map(([decade, count]) => `- ${decade}: ${count} records`)
-  .join('\n')}
+1. **Collection Composition & Strengths**
+   - Genre distribution and specialization areas
+   - Decade coverage and historical breadth
+   - Label diversity and notable publishers
+   - Overall character and focus of the collection
 
-Condition Distribution:
-${Object.entries(conditionCount)
-  .map(([condition, count]) => `- ${condition}: ${count} records`)
-  .join('\n')}
+2. **Rarity & Value Assessment**
+   - Estimated total collection value accuracy
+   - Identification of particularly valuable or rare records
+   - Condition impact on market value
+   - Hidden gems or underappreciated records
 
-Top 10 Artists:
-${topArtists.map((artist, i) => `${i + 1}. ${artist}`).join('\n')}
+3. **Market Potential & Investment Value**
+   - Current market demand for this collection's focus areas
+   - Appreciation potential for key genres/labels
+   - Liquidity assessment (ease of selling)
+   - Price trend analysis for collection genres
 
-Please analyze this vinyl collection as a professional record appraiser and collector would. Provide insights on:
-1. Collection composition and strengths
-2. Rarity and value assessment
-3. Market potential and investment value
-4. Recommendations for growth and improvement
-5. Notable gaps or opportunities for completing sets
-6. Suggestions for preservation and care
-Keep your analysis professional but personable, suitable for a collector.
+4. **Recommendations for Growth & Improvement**
+   - Gaps in major artist discographies
+   - Genre areas that would strengthen the collection
+   - Recommended next acquisitions based on collection focus
+   - Complementary albums or artists to pursue
+
+5. **Notable Patterns, Gaps & Opportunities**
+   - Underrepresented decades or genres
+   - Opportunities for completing collections/series
+   - Artist catalog gaps
+   - Special edition or variant opportunities
+
+6. **Preservation & Care Suggestions**
+   - Storage recommendations based on condition distribution
+   - Maintenance tips for collection longevity
+   - Value protection strategies
+   - Climate and environmental considerations
+
+Keep your analysis professional yet personable, suitable for a serious collector.
+
+IMPORTANT: Do NOT recommend switching to other services or platforms like Discogs. Focus on optimizing their current Phonox management system.
 `
 
       // Send to Claude for analysis
@@ -243,7 +232,8 @@ Keep your analysis professional but personable, suitable for a collector.
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          message: collectionSummary
+          message: collectionSummary,
+          collection_analysis: true
         })
       })
 

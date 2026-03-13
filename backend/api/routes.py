@@ -882,15 +882,20 @@ async def general_chat(
     try:
         logger.info(f"General chat query: {request.message[:100]}")
         
-        # Check for explicit /web trigger - always search for general queries, but clean the message
-        has_web_trigger = "/web" in request.message.lower()
-        search_message = request.message.replace("/web", "").strip() if has_web_trigger else request.message
-        
-        # Always perform web search for general queries since we have no specific record context
-        search_results = chat_tools.search_and_scrape(
-            search_message,  # Use cleaned message
-            scrape_results=True
-        )
+        # Skip web search for collection analysis
+        if request.collection_analysis:
+            logger.info("Collection analysis mode - skipping web search")
+            search_results = {"search_results": [], "scraped_content": []}
+        else:
+            # Check for explicit /web trigger - always search for general queries, but clean the message
+            has_web_trigger = "/web" in request.message.lower()
+            search_message = request.message.replace("/web", "").strip() if has_web_trigger else request.message
+            
+            # Always perform web search for general queries since we have no specific record context
+            search_results = chat_tools.search_and_scrape(
+                search_message,  # Use cleaned message
+                scrape_results=True
+            )
         
         # Prepare context for Claude
         web_context = ""
