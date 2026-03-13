@@ -25,10 +25,11 @@
 
 ### Fixed
 - **Collection Analysis Large Payload Support** (`backend/api/models.py`, `backend/api/routes.py`, `frontend/src/components/VinylRegister.tsx`)
-  - Increased ChatRequest.message max_length from 2000 to 50000 characters to support full collection JSON (14-15K chars for 500+ records)
+  - Increased ChatRequest.message max_length from 2000 to 150000 characters to support full collection JSON (14-15K chars for 500+ records)
   - Added collection_analysis flag to ChatRequest to skip unnecessary web search for analysis requests (performance optimization)
   - Backend now skips Tavily web search when collection_analysis=true, only using Claude's knowledge for faster analysis
-  - Resolves issue where "Analyze Collection" button would fail silently due to validation rejection
+  - Increased max_tokens for collection analysis responses from 4000 → 16000 to prevent truncated reports
+  - Resolves issue where "Analyze Collection" button would fail silently or return incomplete analysis
 
 ---
 
