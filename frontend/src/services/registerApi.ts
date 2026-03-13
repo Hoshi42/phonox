@@ -182,6 +182,41 @@ class RegisterApiClient {
     }
   }
 
+  async getUsers(): Promise<string[]> {
+    const response = await fetch(`${this.baseUrl}/users`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to get users: ${response.statusText}`)
+    }
+
+    return response.json()
+  }
+
+  async moveRecord(recordId: string, toUser: string, fromUser?: string): Promise<RegisterRecord> {
+    const response = await fetch(`${this.baseUrl}/move`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        record_id: recordId,
+        from_user: fromUser,
+        to_user: toUser,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to move record: ${response.statusText}`)
+    }
+
+    return response.json()
+  }
+
   async uploadImages(recordId: string, files: File[]): Promise<{uploaded_images: Array<{id: string, filename: string, url: string}>}> {
     const formData = new FormData()
     files.forEach(file => {

@@ -1,4 +1,30 @@
 # Changelog
+## [1.9.7] - 2026-03-13 - Move Records Between Users & UI Refinements
+
+### Added
+- **Move Records to Other Users** (`frontend/src/components/VinylRegister.tsx`, `backend/api/register.py`, `frontend/src/services/registerApi.ts`)
+  - New 👤 button in Vinyl Register (alongside Spotify and Delete buttons) to transfer records between users
+  - Modal dialog for selecting target user or creating a new user
+  - Supports multi-user collections: if no other users exist, prompts to create one before moving
+  - Moved records instantly removed from current user's collection with updated record count
+  - Register auto-closes if last record is moved, allows parent to handle user selection
+  - Backend endpoint: `POST /api/register/move` with record_id, from_user, to_user parameters
+
+### Changed
+- **Button Consistency in List View**
+  - All action buttons (Spotify 🎧, Move 👤, Delete 🗑️) now unified to 28×28px (desktop) and 22×22px (mobile)
+  - Delete button styling aligned with Spotify button (structured border + background)
+  - Consistent 0.8rem font size in list view, 0.7rem on mobile
+  - Eliminates visual inconsistency where delete button had different appearance
+
+### UI/UX Improvements
+- Record image in list view now stretches to full row height (maintained 80×80px for balanced mobile UX)
+- Move dialog includes record title/artist preview and smooth form flow (select user → create new user option)
+- Error handling in move dialog with user-facing messages
+- Loading state with "⏳ Moving..." confirmation button feedback
+
+---
+
 ## [1.9.6] - 2026-02-23 - Vinyl Register Modal Height Fix
 
 ### Changed

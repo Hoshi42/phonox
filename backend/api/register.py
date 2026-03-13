@@ -67,6 +67,13 @@ class DeleteImagesRequest(BaseModel):
     image_urls: List[str] = []
 
 
+class MoveRecordRequest(BaseModel):
+    """Request model for moving a record between users."""
+    record_id: str
+    from_user: Optional[str] = None
+    to_user: str
+
+
 class RegisterRecordRequest(BaseModel):
     record_id: str
     artist: Optional[str] = None
@@ -160,6 +167,62 @@ async def get_users(db: Session = Depends(get_db)):
     ).distinct().all()
     
     return [row[0] for row in result if row[0]]
+
+
+@router.post("/move", response_model=RegisterRecordResponse)
+async def move_record(
+    request: MoveRecordRequest,
+    db: Session = Depends(get_db)
+):
+    """Move a record from one user to another."""
+    # Get the record
+    query = db.query(VinylRecord).filter(VinylRecord.id == request.record_id)
+    
+    # If from_user is specified, filter by it
+    if request.from_user:
+        query = query.filter(VinylRecord.user_tag == request.from_user)
+    
+    record = query.first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Record not found")
+    
+    # Update the user tag
+    record.user_tag = request.to_user
+    record.updated_at = datetime.utcnow()
+    
+    db.commit()
+    db.refresh(record)
+    
+    # Parse genres
+    genres = []
+    if record.genres:
+        try:
+            genres = json.loads(record.genres)
+        except (json.JSONDecodeError, TypeError):
+            genres = []
+    
+    # Get image URLs
+    image_urls = [f"/api/register/images/{img.id}" for img in record.images]
+    
+    return RegisterRecordResponse(
+        id=record.id,
+        artist=record.artist,
+        title=record.title,
+        year=record.year,
+        label=record.label,
+        spotify_url=record.spotify_url,
+        catalog_number=record.catalog_number,
+        barcode=record.barcode,
+        genres=genres,
+        estimated_value_eur=record.estimated_value_eur,
+        condition=record.condition,
+        user_notes=record.user_notes,
+        confidence=record.confidence,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+        image_urls=image_urls,
+        user_tag=record.user_tag
+    )
 
 
 @router.post("/add", response_model=RegisterRecordResponse)

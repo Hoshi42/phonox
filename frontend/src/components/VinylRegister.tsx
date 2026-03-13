@@ -21,7 +21,7 @@
  */
 
 import { useState } from 'react'
-import { RegisterRecord } from '../services/registerApi'
+import { RegisterRecord, registerApiClient } from '../services/registerApi'
 import VinylSpinner from './VinylSpinner'
 import styles from './VinylRegister.module.css'
 
@@ -60,6 +60,23 @@ export default function VinylRegister({
     loading: false,
     error: null
   })
+  
+  // Track moved records to update UI immediately
+  const [movedRecordIds, setMovedRecordIds] = useState<Set<string>>(new Set())
+  
+  // Move record state
+  const [moveDialog, setMoveDialog] = useState({
+    show: false,
+    recordId: '',
+    recordTitle: '',
+    recordArtist: '',
+    availableUsers: [] as string[],
+    selectedUser: '',
+    newUserName: '',
+    isCreatingUser: false,
+    loading: false,
+    error: ''
+  })
 
   const getRecordValue = (record: RegisterRecord) => {
     // Use the stored estimated_value_eur if available, otherwise calculate
@@ -90,7 +107,13 @@ export default function VinylRegister({
     }
   })
 
+  // Filter out moved records and apply other filters
   const filteredRecords = sortedRecords.filter(record => {
+    // Skip moved records
+    if (movedRecordIds.has(record.id)) {
+      return false
+    }
+    
     // Genre filter
     if (filterGenre) {
       const genres = record.genres || []
@@ -277,6 +300,77 @@ ${analysis.summary}
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
+  }
+
+  const handleMoveRecord = async (record: RegisterRecord) => {
+    try {
+      setMoveDialog(prev => ({ ...prev, loading: true, error: '' }))
+      
+      // Fetch available users
+      const users = await registerApiClient.getUsers()
+      
+      // Filter out the current user
+      const otherUsers = users.filter(u => u !== record.user_tag)
+      
+      setMoveDialog({
+        show: true,
+        recordId: record.id,
+        recordTitle: record.title || 'Unknown Title',
+        recordArtist: record.artist || 'Unknown Artist',
+        availableUsers: otherUsers,
+        selectedUser: otherUsers.length > 0 ? otherUsers[0] : '',
+        newUserName: '',
+        isCreatingUser: otherUsers.length === 0,
+        loading: false,
+        error: ''
+      })
+    } catch (err) {
+      setMoveDialog(prev => ({
+        ...prev,
+        loading: false,
+        error: err instanceof Error ? err.message : 'Failed to load users'
+      }))
+    }
+  }
+
+  const handleMoveRecordConfirm = async () => {
+    if (!moveDialog.selectedUser && !moveDialog.newUserName) {
+      setMoveDialog(prev => ({ ...prev, error: 'Please select or enter a user' }))
+      return
+    }
+
+    const targetUser = moveDialog.newUserName || moveDialog.selectedUser
+
+    try {
+      setMoveDialog(prev => ({ ...prev, loading: true, error: '' }))
+      
+      // Move the record
+      await registerApiClient.moveRecord(
+        moveDialog.recordId,
+        targetUser,
+        records.find(r => r.id === moveDialog.recordId)?.user_tag
+      )
+
+      // Add to moved records set to update UI immediately
+      setMovedRecordIds(prev => new Set([...prev, moveDialog.recordId]))
+
+      // Close the move dialog
+      setMoveDialog(prev => ({ ...prev, show: false }))
+      
+      // Check if any records remain after this move
+      const remainingRecords = records.filter(r => !movedRecordIds.has(r.id) && r.id !== moveDialog.recordId)
+      
+      if (remainingRecords.length === 0) {
+        // No records left for current user - close register to let parent handle user selection
+        setTimeout(() => onClose(), 800)
+      }
+    } catch (err) {
+      setMoveDialog(prev => ({
+        ...prev,
+        loading: false,
+        error: err instanceof Error ? err.message : 'Failed to move record'
+      }))
+    }
   }
 
   const renderMarkdown = (text: string) => {
@@ -647,6 +741,16 @@ ${analysis.summary}
                       <button 
                         onClick={(e) => {
                           e.stopPropagation()
+                          handleMoveRecord(record)
+                        }}
+                        className={styles.moveBtn}
+                        title="Move to another user"
+                      >
+                        👤
+                      </button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation()
                           const title = record.title || 'Unknown Title'
                           const artist = record.artist || 'Unknown Artist'
                           const ok = window.confirm(
@@ -746,6 +850,95 @@ ${analysis.summary}
                     {parseAnalysisContent(analysis.summary)}
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Move Record Modal */}
+        {moveDialog.show && (
+          <div className={styles.moveOverlay} onClick={() => setMoveDialog(prev => ({ ...prev, show: false }))}>
+            <div className={styles.moveModal} onClick={(e) => e.stopPropagation()}>
+              <div className={styles.moveHeader}>
+                <h3>👤 Move Record to Another User</h3>
+                <button 
+                  onClick={() => setMoveDialog(prev => ({ ...prev, show: false }))}
+                  className={styles.closeModalBtn}
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className={styles.moveContent}>
+                <p className={styles.moveRecordInfo}>
+                  Moving: <strong>{moveDialog.recordTitle}</strong> by <strong>{moveDialog.recordArtist}</strong>
+                </p>
+
+                {moveDialog.error && (
+                  <p className={styles.moveError}>{moveDialog.error}</p>
+                )}
+
+                {moveDialog.isCreatingUser ? (
+                  <div className={styles.moveFormGroup}>
+                    <label htmlFor="newUserName">Create New User</label>
+                    <input
+                      id="newUserName"
+                      type="text"
+                      placeholder="Enter new user name"
+                      value={moveDialog.newUserName}
+                      onChange={(e) => setMoveDialog(prev => ({ ...prev, newUserName: e.target.value }))}
+                      className={styles.moveInput}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div className={styles.moveFormGroup}>
+                      <label htmlFor="selectedUser">Select User</label>
+                      <select
+                        id="selectedUser"
+                        value={moveDialog.selectedUser}
+                        onChange={(e) => setMoveDialog(prev => ({ ...prev, selectedUser: e.target.value }))}
+                        className={styles.moveSelect}
+                      >
+                        {moveDialog.availableUsers.map(user => (
+                          <option key={user} value={user}>
+                            {user}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <button
+                      onClick={() => setMoveDialog(prev => ({ ...prev, isCreatingUser: true, newUserName: '', selectedUser: '' }))}
+                      className={styles.createUserLink}
+                    >
+                      + Create a new user
+                    </button>
+                  </>
+                )}
+              </div>
+
+              <div className={styles.moveActions}>
+                <button
+                  onClick={() => {
+                    if (moveDialog.isCreatingUser) {
+                      setMoveDialog(prev => ({ ...prev, isCreatingUser: false, newUserName: '' }))
+                    } else {
+                      setMoveDialog(prev => ({ ...prev, show: false }))
+                    }
+                  }}
+                  className={styles.moveCancel}
+                  disabled={moveDialog.loading}
+                >
+                  {moveDialog.isCreatingUser ? 'Back' : 'Cancel'}
+                </button>
+                <button
+                  onClick={handleMoveRecordConfirm}
+                  className={styles.moveConfirm}
+                  disabled={moveDialog.loading || (!moveDialog.selectedUser && !moveDialog.newUserName)}
+                >
+                  {moveDialog.loading ? '⏳ Moving...' : '✓ Move Record'}
+                </button>
               </div>
             </div>
           </div>
