@@ -323,7 +323,7 @@ start htmlcov/index.html  # Windows
 ### 👨‍💻 For Developers
 - **[Tech Stack Guide](docs/tech-stack.md)** – Architecture and technologies
 - **[Requirements Spec](docs/requirements_en.md)** – Complete feature list
-- **[Testing Guide](TESTING_GUIDE.md)** – How to write and run tests
+- **[API Reference](http://localhost:8000/docs)** – Interactive Swagger UI (live)
 
 ### 🏗️ For Teams & Contributors
 1. **[Implementation Plan](.github/agents/implementation-plan.md)** – Project roadmap and progress
