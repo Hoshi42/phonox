@@ -1,4 +1,19 @@
 # Changelog
+## [2.0.1] - 2026-03-14 - Repository Cleanup
+
+### Removed
+- **Makefile** — redundant with `start-docker.sh`, `status.sh`, and `phonox-cli`
+- **`status.sh`** — stale Phase 1-4 development dashboard, not referenced anywhere
+- **`docker-status.sh`** — static info dump, not referenced anywhere; superseded by `phonox-cli`
+- **`API_GUIDE.md`** — duplicated by the live Swagger UI at `/docs` and the structured `docs/api/` MkDocs pages
+- **`TESTING_GUIDE.md`** — stale "ready to test" artifact from early development, no longer accurate
+
+### Changed
+- **`ARCHITECTURE.md`** — updated Register Flow (required `user_tag`), Chat Flow (collection analysis context injection), and Security section to reflect v2.0.0 changes
+- **`README.md`** — replaced broken `TESTING_GUIDE.md` link with live Swagger UI reference
+
+---
+
 ## [2.0.0] - 2026-03-14 - Collection Analysis Context Fix & Access Control
 
 ### Fixed

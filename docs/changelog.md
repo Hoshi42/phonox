@@ -12,7 +12,15 @@ Phonox uses semantic versioning: `MAJOR.MINOR.PATCH`
 
 ## Versions
 
-### v2.0.0 (Current) - 2026-03-14
+### v2.0.1 (Current) - 2026-03-14
+
+**Repository Cleanup**
+
+- Removed stale/redundant root-level files: `Makefile`, `status.sh`, `docker-status.sh`, `API_GUIDE.md`, `TESTING_GUIDE.md`
+- `ARCHITECTURE.md` updated for v2.0.0 changes (required `user_tag`, collection analysis context, security notes)
+- README API reference replaced with live Swagger UI link
+
+### v2.0.0 - 2026-03-14
 
 **Collection Analysis Context Fix & Access Control**
 

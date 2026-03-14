@@ -475,7 +475,12 @@ A: Currently manual. We're working on CSV import (see roadmap). For now, use the
 
 ---
 
-## What's New (Latest Version: 2.0.0)
+## What's New (Latest Version: 2.0.1)
+
+✨ **Version 2.0.1** (March 14, 2026)
+- Repository cleanup: removed stale Makefile, status.sh, docker-status.sh, API_GUIDE.md, and TESTING_GUIDE.md
+- ARCHITECTURE.md updated to reflect v2.0.0 security and chat changes
+- README API reference now points to live Swagger UI
 
 ✨ **Version 2.0.0** (March 14, 2026)
 - Collection analysis report is now fully visible to Claude in follow-up chat — was silently dropped from context due to `system`-role filtering
@@ -493,7 +498,7 @@ See [CHANGELOG.md](CHANGELOG.md) for complete history.
 ## Status & Roadmap
 
 **Last Updated**: 2026-03-14  
-**Current Version**: 2.0.0  
+**Current Version**: 2.0.1  
 **Status**: Production Ready ✅
 
 ### Completed Features
