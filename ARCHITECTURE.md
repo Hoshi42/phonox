@@ -114,7 +114,10 @@ User sends message in ChatPanel
 Frontend: POST /api/v1/chat or /api/v1/identify/{record_id}/chat
     ├ Record context (if record-specific)
     ├ User message
-    └ Chat history (current session)
+    └ Chat history (last 8 messages, user/assistant only)
+        Note: collection analysis is injected as a user→assistant pair
+        via addAnalysis() so it is included in the history slice sent
+        to the model on every follow-up question
     ↓
 Backend:
     ├ If message starts with "/web": Force web search
@@ -134,7 +137,7 @@ Frontend: Display message + sources + loading indicators
 User adds record to collection
     ↓
 Frontend: POST /api/register/add
-    ├ user_tag (user identifier)
+    ├ user_tag (required — user identifier)
     ├ vinyl_record_data
     └ estimated_value_eur
     ↓
@@ -147,9 +150,10 @@ Backend:
 Frontend: Update register list, show success
     ↓
 User can later:
-    ├ View register (GET /api/register?user_tag=X)
+    ├ View register (GET /api/register?user_tag=X  ← user_tag required)
     ├ Update record (PUT /api/register/{id})
     ├ Delete record (DELETE /api/register/{id})
+    ├ Move record to another user (POST /api/register/move)
     └ Switch users (loads different collection)
 ```
 
@@ -343,16 +347,17 @@ Register operations: <500ms
 
 ### Current Implementation
 
-- No authentication (open API)
+- No session authentication (user identity via `user_tag` string)
+- `GET /api/register/` requires `user_tag` — missing/blank returns HTTP 400, preventing all-users data exposure
 - File size limits (10MB per image, 100MB total)
 - Image format validation
 - Input sanitization (Pydantic models)
 
 ### Production Recommendations
 
-- [ ] Add API authentication (OAuth/JWT)
+- [ ] Add proper authentication (OAuth/JWT) — current user_tag is unauthenticated
 - [ ] Rate limiting per IP
-- [ ] CORS configuration
+- [ ] CORS configuration (currently `allow_origins=["*"]`)
 - [ ] HTTPS only
 - [ ] Input validation strictness
 - [ ] Sanitize markdown output
