@@ -1,4 +1,21 @@
 # Changelog
+## [2.0.0] - 2026-03-14 - Collection Analysis Context Fix & Access Control
+
+### Fixed
+- **Collection Analysis Not Visible to Model in Chat** (`frontend/src/components/ChatPanel.tsx`, `frontend/src/App.tsx`)
+  - Analysis report was stored as a `'system'`-role message; `handleSendMessage` explicitly filtered out all system messages before building the history sent to Claude, so follow-up questions had no context
+  - Added `addAnalysis(content)` method to `ChatPanelHandle` that inserts a proper `user → assistant` message pair (valid Anthropic alternating-role format)
+  - `App.tsx` now calls `chatPanelRef.current.addAnalysis(reportContent)` instead of `addMessage(reportContent, 'system')`
+  - Analysis content is now included in the `chat_history` on every subsequent API call, giving Claude full context when the user asks follow-up questions
+
+### Security
+- **Broken Access Control on Register Endpoint** (`backend/api/register.py`, `frontend/src/services/registerApi.ts`)
+  - `GET /api/register/` without a `user_tag` returned all records from all users (OWASP A01)
+  - `user_tag` parameter is now **required** on the backend endpoint; missing or blank value returns HTTP 400
+  - Frontend `getRegister(userTag: string)` parameter is now required (was `Optional`), eliminating the no-filter code path
+
+---
+
 ## [1.9.9] - 2026-03-13 - Chat Context Fix, UI Polish
 
 ### Fixed

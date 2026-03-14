@@ -65,6 +65,7 @@ interface ChatResponse {
 
 export interface ChatPanelHandle {
   addMessage: (content: string, role?: 'user' | 'assistant' | 'system') => void
+  addAnalysis: (content: string) => void
 }
 
 /**
@@ -192,6 +193,25 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
         timestamp: new Date().toISOString(),
       }
       setMessages(prev => enforceMessageLimit([...prev, newMessage], MAX_MESSAGES))
+    },
+    addAnalysis: (content: string) => {
+      // Insert a user framing message + assistant analysis as a proper pair so the
+      // history sent to the model alternates correctly (user→assistant).
+      const timestamp = new Date().toISOString()
+      const contextMsg: ChatMessage = {
+        role: 'user',
+        content: '📊 Here is my collection analysis — please help me explore it:',
+        timestamp,
+      }
+      const analysisMsg: ChatMessage = {
+        role: 'assistant',
+        content,
+        timestamp,
+      }
+      setMessages(prev => {
+        const withContext = enforceMessageLimit([...prev, contextMsg], MAX_MESSAGES)
+        return enforceMessageLimit([...withContext, analysisMsg], MAX_MESSAGES)
+      })
     }
   }))
 

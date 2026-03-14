@@ -475,29 +475,16 @@ A: Currently manual. We're working on CSV import (see roadmap). For now, use the
 
 ---
 
-## What's New (Latest Version: 1.9.5)
+## What's New (Latest Version: 2.0.0)
 
-✨ **Version 1.9.5** (February 22, 2026)
-- Full curses arrow-key interactive menu — ↑/↓ navigation, white-on-blue selection bar
-- Per-service status panel: Frontend / Backend / DB each with own ✔/✘ icon
-- Interactive configure with 6 masked keys (added Aggregation + Enhancement models)
-- Interactive restore: pick backup from list, confirm with `yes`
-- Collection management: rename collections directly from the CLI
+✨ **Version 2.0.0** (March 14, 2026)
+- Collection analysis report is now fully visible to Claude in follow-up chat — was silently dropped from context due to `system`-role filtering
+- Fixed broken access control: `GET /api/register/` without a user tag no longer returns all users' records (required parameter enforced on backend)
 
-✨ **Version 1.9.4** (February 22, 2026)
-- Fixed false "Could not access images" warning in backup script — replaced hardcoded container name with `docker compose cp` service name
-
-✨ **Version 1.9.3** (February 21, 2026)
-- Fixed page reload when adding multiple images on Samsung Internet Browser (Android)
-
-✨ **Version 1.9.2** (February 21, 2026)
-- DuckDuckGo now supplements sparse Tavily results (configurable threshold via `.env`)
-- Added configurable search variables: `WEBSEARCH_MAX_RESULTS`, `WEBSEARCH_MIN_RESULTS_THRESHOLD`, `WEBSEARCH_BARCODE_MAX_RESULTS`
-- Memory-first image architecture: uploaded images are now the single source of truth in the UI
-- Actionable error messages surfaced directly from the backend (including clickable billing URLs)
-- Fixed CLI restart crash and unhealthy database detection
-- Fixed Anthropic credit-balance error being masked as an image format error
-- Fixed reanalysis dead-code path when backend restarts with no client-sent images
+✨ **Version 1.9.9** (March 13, 2026)
+- Chat now includes full record context (barcode, condition, user notes, estimated value, Spotify URL) in Claude system prompt
+- Fixed chat response ending with a stray "0" when no web sources were used
+- Added blog link in header
 
 See [CHANGELOG.md](CHANGELOG.md) for complete history.
 
@@ -505,8 +492,8 @@ See [CHANGELOG.md](CHANGELOG.md) for complete history.
 
 ## Status & Roadmap
 
-**Last Updated**: 2026-02-22  
-**Current Version**: 1.9.5  
+**Last Updated**: 2026-03-14  
+**Current Version**: 2.0.0  
 **Status**: Production Ready ✅
 
 ### Completed Features

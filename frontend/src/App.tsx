@@ -506,9 +506,10 @@ function App() {
   }
 
   const handleAnalysisReport = (reportContent: string) => {
-    // Add the analysis to chat as a system context message
+    // Add the analysis as a proper user+assistant pair so it is included
+    // in the chat history sent to the model when the user asks follow-up questions.
     if (chatPanelRef.current) {
-      chatPanelRef.current.addMessage(reportContent, 'system')
+      chatPanelRef.current.addAnalysis(reportContent)
     }
     
     // Close the register modal

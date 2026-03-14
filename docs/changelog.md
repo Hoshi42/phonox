@@ -12,7 +12,22 @@ Phonox uses semantic versioning: `MAJOR.MINOR.PATCH`
 
 ## Versions
 
-### v1.9.3 (Current) - 2026-02-21
+### v2.0.0 (Current) - 2026-03-14
+
+**Collection Analysis Context Fix & Access Control**
+
+- **Collection analysis context now sent to model**: the analysis report was stored as a `system`-role message in chat, which was explicitly stripped before building the history sent to Claude. A new `addAnalysis()` method inserts it as a proper `user → assistant` pair so every follow-up question has full context.
+- **Broken access control fix**: `GET /api/register/` without a `user_tag` previously returned all users' records. The `user_tag` parameter is now required on the backend; missing values return HTTP 400. The frontend TypeScript client parameter is also now required.
+
+### v1.9.9 - 2026-03-13
+
+**Chat Context Fix, UI Polish**
+
+- Chat now injects full record context into the Claude system prompt (barcode, condition, user notes, estimated value, Spotify URL were previously missing)
+- Fixed chat response rendering a stray "0" when no web sources were used (`sourcesUsed` condition now uses `?? 0` null coalescing)
+- Blog link added to app header
+
+### v1.9.3 (Previous stable) - 2026-02-21
 
 **Samsung Internet Browser Mobile Fix**
 

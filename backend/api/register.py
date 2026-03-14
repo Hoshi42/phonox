@@ -115,11 +115,14 @@ class RegisterRecordResponse(BaseModel):
 
 
 @router.get("/", response_model=List[RegisterRecordResponse])
-async def get_register(user_tag: Optional[str] = None, db: Session = Depends(get_db)):
-    """Get all records in the user's register."""
-    query = db.query(VinylRecord).filter(VinylRecord.in_register == True)
-    if user_tag:
-        query = query.filter(VinylRecord.user_tag == user_tag)
+async def get_register(user_tag: str, db: Session = Depends(get_db)):
+    """Get all records in the user's register. user_tag is required."""
+    if not user_tag.strip():
+        raise HTTPException(status_code=400, detail="user_tag is required")
+    query = db.query(VinylRecord).filter(
+        VinylRecord.in_register == True,
+        VinylRecord.user_tag == user_tag
+    )
     records = query.all()
     
     result = []

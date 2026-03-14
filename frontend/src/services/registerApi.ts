@@ -85,10 +85,8 @@ class RegisterApiClient {
     console.log('[RegisterAPI] window.location.hostname:', typeof window !== 'undefined' ? window.location.hostname : 'N/A')
   }
 
-  async getRegister(userTag?: string, fetchOptions?: RequestInit): Promise<RegisterRecord[]> {
-    const url = userTag 
-      ? `${this.baseUrl}/?user_tag=${encodeURIComponent(userTag)}&_t=${Date.now()}`
-      : `${this.baseUrl}/?_t=${Date.now()}`
+  async getRegister(userTag: string, fetchOptions?: RequestInit): Promise<RegisterRecord[]> {
+    const url = `${this.baseUrl}/?user_tag=${encodeURIComponent(userTag)}&_t=${Date.now()}`
     
     console.log('[RegisterAPI] getRegister() - Starting request...')
     console.log('[RegisterAPI] getRegister() - URL:', url)
