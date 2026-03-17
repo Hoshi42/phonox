@@ -14,7 +14,7 @@ Phonox is an AI-powered application that helps you:
 ## ✨ Key Features
 
 ### 🤖 AI-Powered Identification
-- Upload photos of your vinyl records (1-5 images)
+- Upload photos of your vinyl records (1-10 images)
 - Get instant identification using Claude Sonnet 4 vision analysis
 - Automatic barcode detection (UPC/EAN)
 - Automatic metadata enrichment from Discogs, MusicBrainz, and Spotify

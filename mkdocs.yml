@@ -63,10 +63,20 @@ nav:
   - License: license.md
 
 extra:
+  version: "2.0.1"
   social:
     - icon: fontawesome/solid/blog
       link: https://phonox-blog.web.app/
       name: Phonox Blog
+    - icon: fontawesome/brands/github
+      link: https://github.com/your-username/phonox
+      name: GitHub
+    - icon: fontawesome/brands/python
+      link: https://www.python.org
+      name: Python
+    - icon: fontawesome/brands/react
+      link: https://react.dev
+      name: React
 
 markdown_extensions:
   - pymdownx.highlight:
@@ -85,18 +95,5 @@ markdown_extensions:
   - tables
   - attr_list
   - md_in_html
-
-extra:
-  version: "1.9.3"
-  social:
-    - icon: fontawesome/brands/github
-      link: https://github.com/your-username/phonox
-      name: GitHub
-    - icon: fontawesome/brands/python
-      link: https://www.python.org
-      name: Python
-    - icon: fontawesome/brands/react
-      link: https://react.dev
-      name: React
 
 copyright: Copyright &copy; 2026 Phonox Contributors - MIT License
