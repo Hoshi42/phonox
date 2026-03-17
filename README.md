@@ -337,55 +337,54 @@ start htmlcov/index.html  # Windows
 
 ```
 phonox/
-├── README.md (this file)
-├── requirements.txt (Python dependencies)
-├── docker-compose.yml (Local development)
-├── Dockerfile.backend (FastAPI image)
-├── Dockerfile.frontend (Vite React image)
+├── README.md
+├── ARCHITECTURE.md
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+├── docker-compose.yml
+├── Dockerfile.backend
+├── Dockerfile.frontend
+├── start-cli.sh
+├── phonox-cli
 │
-├── docs/
-│   ├── tech-stack.md
-│   ├── requirements_en.md
-│   └── .github/agents/
-│       ├── agent.md (Agent architecture)
-│       ├── architect.md (Architect role)
-│       ├── tools.md (Tool engineer role)
-│       ├── frontend.md (Frontend role)
-│       ├── deployment.md (Docker & CI/CD)
-│       ├── testing.md (Testing strategy)
-│       ├── implementation-plan.md (Roadmap)
-│       └── instructions.md (Collaboration guide)
+├── .github/
+│   └── agents/              (AI agent collaboration docs)
 │
 ├── backend/
-│   ├── main.py (FastAPI entry point)
-   ├── database.py (SQLAlchemy ORM)
-   ├── agent/
-   │   ├── state.py (State models)
-   │   ├── graph.py (LangGraph workflow)
-   │   ├── vision.py (Vision extraction)
-   │   ├── websearch.py (Web search integration)
-   │   ├── metadata.py (Metadata lookup)
-   │   └── barcode_utils.py (Barcode extraction)
-   ├── api/
-   │   ├── routes.py (Identification endpoints)
-   │   ├── register.py (Register endpoints)
-   │   └── models.py (Pydantic models)
-   ├── tools/
-   │   └── web_tools.py (Web search tools)
-   └── tests/ (unit, integration, api tests)
+│   ├── main.py              (FastAPI entry point)
+│   ├── database.py          (SQLAlchemy ORM)
+│   ├── agent/
+│   │   ├── graph.py         (LangGraph workflow)
+│   │   ├── vision.py        (Claude vision extraction)
+│   │   ├── websearch.py     (Tavily + DuckDuckGo)
+│   │   ├── metadata.py      (Discogs + MusicBrainz lookup)
+│   │   ├── metadata_enhancer.py
+│   │   ├── barcode_utils.py
+│   │   └── state.py         (State models)
+│   ├── api/
+│   │   ├── routes.py        (Identification + chat endpoints)
+│   │   ├── register.py      (Collection management endpoints)
+│   │   └── models.py        (Pydantic models)
+│   └── tools/
+│       └── web_tools.py
 │
-└── frontend/
-    ├── src/
-    │   ├── components/
-    │   │   ├── ImageUpload.tsx
-    │   │   ├── ResultsView.tsx
-    │   │   ├── ReviewForm.tsx
-    │   │   ├── ChatPanel.tsx
-    │   │   ├── VinylCard.tsx
-    │   │   ├── VinylRegister.tsx
-    │   │   └── AnalysisModal.tsx
-    │   └── App.tsx
-    └── package.json
+├── frontend/
+│   └── src/
+│       ├── App.tsx
+│       ├── components/
+│       │   ├── VinylCard.tsx
+│       │   ├── VinylRegister.tsx
+│       │   ├── ChatPanel.tsx
+│       │   ├── ImageUpload.tsx
+│       │   ├── UserManager.tsx
+│       │   └── ...
+│       ├── api/             (API client)
+│       └── services/        (Register API client)
+│
+├── tests/                   (unit, integration, api)
+├── docs/                    (MkDocs documentation)
+├── scripts/                 (backup, restore, CLI)
+└── backups/                 (local backups)
 ```
 
 
@@ -394,56 +393,27 @@ phonox/
 
 ---
 
-## Architecture Overview (Technical Details)
+## Architecture Overview
 
-### How It Works
+React PWA → FastAPI backend → LangGraph AI agent → PostgreSQL, with multi-source metadata enrichment (Discogs, MusicBrainz, Tavily/DuckDuckGo).
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ Frontend (React)                                        │
-│ - Upload images                                         │
-│ - View collection                                       │
-│ - Chat with AI agent                                    │
-└────────────────────┬────────────────────────────────────┘
-                     │ HTTP
-                     ▼
-┌─────────────────────────────────────────────────────────┐
-│ Backend (FastAPI)                                       │
-│ - AI Agent (LangGraph)                                  │
-│ - Image Recognition                                     │
-│ - Metadata Lookup                                       │
-└────────────────────┬────────────────────────────────────┘
-                     │
-        ┌────────────┼────────────┐
-        ▼            ▼            ▼
-    Database    Discogs API   MusicBrainz
-   (PostgreSQL)  (Metadata)    (Metadata)
-```
-
-### Key Components
-
-- **Agent** – AI decision-maker using LangGraph orchestration
-- **Tools** – Plugins for Discogs, MusicBrainz, image extraction, web search
-- **Database** – PostgreSQL stores your vinyl collection
-- **API** – FastAPI provides endpoints for the frontend
-- **Frontend** – React PWA for mobile and desktop browsers
+→ Full data flows, component diagrams, security and scaling notes: [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ---
 
 ## Tech Stack
 
-- **Backend**: Python 3.12, FastAPI, LangGraph, Pydantic v2, SQLAlchemy
-- **Frontend**: React (Vite), PWA, TypeScript
-- **Database**: PostgreSQL 16
-- **Cache/Queue**: Redis 7
-- **API Sources**: Discogs, MusicBrainz
-    - Websearch: Tavily (if configured) + DuckDuckGo fallback
-- **ML Models**: ViT-base (image embeddings), Tesseract (OCR)
-- **DevOps**: Docker, Docker Compose, GitHub Actions
+| Layer | Technology |
+|-------|------------|
+| Backend | Python 3.12, FastAPI, LangGraph, Pydantic v2, SQLAlchemy |
+| Frontend | React 18, TypeScript, Vite, PWA |
+| Database | PostgreSQL 16 |
+| AI / Vision | Claude (Anthropic) — multimodal identification and chat |
+| Web Search | Tavily + DuckDuckGo fallback |
+| Metadata | Discogs API, MusicBrainz API, Spotify API |
+| Infrastructure | Docker, Docker Compose |
 
-See [Tech Stack Guide](docs/tech-stack.md) for details.
-
----
+See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed component breakdown and data flows.
 
 ---
 
@@ -455,7 +425,7 @@ See [Tech Stack Guide](docs/tech-stack.md) for details.
 A: No, Claude API is required. Get a free tier key at [console.anthropic.com](https://console.anthropic.com).
 
 **Q: Can I use Phonox without Docker?**  
-A: Not recommended. Docker ensures all dependencies work correctly. If you must, install: Python 3.12, PostgreSQL 16, Redis 7, Node.js 18.
+A: Not recommended. Docker ensures all dependencies work correctly. If you must, install: Python 3.12, PostgreSQL 16, Node.js 20.
 
 **Q: How do I backup my vinyl collection?**  
 A: Run `./phonox-cli backup` weekly. Backups are stored in `./backups/`.
