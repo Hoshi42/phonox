@@ -12,7 +12,13 @@ Phonox uses semantic versioning: `MAJOR.MINOR.PATCH`
 
 ## Versions
 
-### v2.0.1 (Current) - 2026-03-14
+### v2.0.2 (Current) - 2026-03-17
+
+**TypeScript Type Fix**
+
+- `metadataUpdateTimeoutRef` in `App.tsx` was typed as `NodeJS.Timeout` (a Node.js type), causing a TypeScript compile error in the browser environment. Changed to `ReturnType<typeof setTimeout>`.
+
+### v2.0.1 - 2026-03-14
 
 **Repository Cleanup**
 

@@ -1,4 +1,13 @@
 # Changelog
+## [2.0.2] - 2026-03-17 - TypeScript Type Fix
+
+### Fixed
+- **`NodeJS.Timeout` type error in `App.tsx`** (`frontend/src/App.tsx`)
+  - `metadataUpdateTimeoutRef` was typed as `useRef<NodeJS.Timeout | null>` — a Node.js-specific type not available in browser environments
+  - Changed to `useRef<ReturnType<typeof setTimeout> | null>`, which resolves correctly in both browser and Node.js contexts and eliminates the TypeScript compile error
+
+---
+
 ## [2.0.1] - 2026-03-14 - Repository Cleanup
 
 ### Removed

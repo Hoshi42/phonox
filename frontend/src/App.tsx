@@ -90,7 +90,7 @@ function App() {
   const [isCheckingValue, setIsCheckingValue] = useState(false)
   const [chatExpanded, setChatExpanded] = useState(false) // Mobile panel expand/collapse
   const [cardExpanded, setCardExpanded] = useState(false) // Mobile panel expand/collapse
-  const metadataUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const metadataUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const chatInputRef = useRef<HTMLTextAreaElement | null>(null)
 
   const handleUpload = async (files: File[]) => {
