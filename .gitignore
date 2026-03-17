@@ -100,3 +100,6 @@ data/uploads/*
 # Keep the directory structure but ignore contents
 !data/postgres/.gitkeep
 !data/uploads/.gitkeep
+
+# MkDocs build output
+site/
