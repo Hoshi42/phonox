@@ -1,4 +1,14 @@
 # Changelog
+## [2.0.3] - 2026-03-17 - VinylCard Panel Clipping Fix
+
+### Fixed
+- **VinylCard panel cut off when record loaded from Register** (`frontend/src/components/VinylCard.module.css`)
+  - `.card` was using `max-height: calc(100vh - 120px)`, making it 56px taller than its parent `.cardContainer` (`calc(100vh - 176px)`)
+  - The parent's `overflow: hidden` clipped the bottom of the card, hiding the Update button when only one image was present
+  - Fixed by changing to `height: 100%; max-height: 100%` so the card fills and scrolls within its container bounds
+
+---
+
 ## [2.0.2] - 2026-03-17 - TypeScript Type Fix
 
 ### Fixed

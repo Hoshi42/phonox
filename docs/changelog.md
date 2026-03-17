@@ -12,7 +12,13 @@ Phonox uses semantic versioning: `MAJOR.MINOR.PATCH`
 
 ## Versions
 
-### v2.0.2 (Current) - 2026-03-17
+### v2.0.3 (Current) - 2026-03-17
+
+**VinylCard Panel Clipping Fix**
+
+- VinylCard bottom was cut off (Update button not visible) when a record with one image was loaded from the Register. `.card` had `max-height: calc(100vh - 120px)`, overflowing its parent container. Fixed by setting `height: 100%; max-height: 100%`.
+
+### v2.0.2 - 2026-03-17
 
 **TypeScript Type Fix**
 
