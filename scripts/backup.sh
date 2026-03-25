@@ -124,10 +124,42 @@ fi
 echo ""
 print_header "Cleanup"
 
-# Keep only last 7 days of backups
-print_info "Cleaning old backups (>7 days)..."
-DELETED_DB=$(find "${BACKUP_DIR}" -name "phonox_db_*.sql" -type f -mtime +7 -delete -print | wc -l)
-DELETED_UPLOADS=$(find "${BACKUP_DIR}" -name "phonox_uploads_*.tar.gz" -type f -mtime +7 -delete -print | wc -l)
+# Policy: always keep the last 4 backups; only delete backups older than 7 days
+# beyond that minimum of 4.
+KEEP_MIN=4
+MAX_AGE_DAYS=7
+
+cleanup_backups() {
+    local pattern="$1"
+    local deleted=0
+    local now
+    now=$(date +%s)
+    local cutoff=$(( now - MAX_AGE_DAYS * 86400 ))
+
+    # Collect files sorted newest-first
+    mapfile -t files < <(find "${BACKUP_DIR}" -maxdepth 1 -name "${pattern}" -type f \
+        -printf '%T@ %p\n' | sort -rn | awk '{print $2}')
+
+    local total=${#files[@]}
+    for (( i=0; i<total; i++ )); do
+        file="${files[$i]}"
+        # Always keep the most-recent KEEP_MIN backups
+        if (( i < KEEP_MIN )); then
+            continue
+        fi
+        # Delete older-than-MAX_AGE files beyond the minimum
+        file_mtime=$(stat -c '%Y' "${file}" 2>/dev/null || echo "$now")
+        if (( file_mtime < cutoff )); then
+            rm -f "${file}"
+            (( deleted++ )) || true
+        fi
+    done
+    echo "$deleted"
+}
+
+print_info "Cleaning old backups (keep last ${KEEP_MIN}; remove >=${MAX_AGE_DAYS} days beyond that)..."
+DELETED_DB=$(cleanup_backups "phonox_db_*.sql")
+DELETED_UPLOADS=$(cleanup_backups "phonox_uploads_*.tar.gz")
 
 if [ "$DELETED_DB" -gt 0 ] || [ "$DELETED_UPLOADS" -gt 0 ]; then
     print_success "Old backups removed"
