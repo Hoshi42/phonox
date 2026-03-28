@@ -10,6 +10,7 @@ Note: Requires internet connectivity; handles timeouts gracefully
 """
 
 import logging
+import os
 import requests
 from typing import Dict, List, Optional, Any, Tuple
 from urllib.parse import quote
@@ -18,6 +19,17 @@ logger = logging.getLogger(__name__)
 
 # API endpoints
 DISCOGS_API_BASE = "https://api.discogs.com"
+
+
+def _discogs_headers() -> Dict[str, str]:
+    """Build Discogs request headers. Adds auth token if DISCOGS_TOKEN is set."""
+    headers = {
+        "User-Agent": "Phonox/1.0 (vinyl identification app; contact: https://github.com/hoshhie/phonox)"
+    }
+    token = os.getenv("DISCOGS_TOKEN", "").strip()
+    if token:
+        headers["Authorization"] = f"Discogs token={token}"
+    return headers
 MUSICBRAINZ_API_BASE = "https://musicbrainz.org/ws/2"
 
 # Headers for MusicBrainz API (required)
@@ -75,9 +87,7 @@ def lookup_discogs_metadata(
             search_url,
             params=params,
             timeout=API_TIMEOUT,
-            headers={
-                "User-Agent": "Phonox/1.0 (vinyl identification app; contact: https://github.com/hoshhie/phonox)"
-            },
+            headers=_discogs_headers(),
         )
         response.raise_for_status()
 
@@ -106,9 +116,7 @@ def lookup_discogs_metadata(
         detail_response = requests.get(
             release_url,
             timeout=API_TIMEOUT,
-            headers={
-                "User-Agent": "Phonox/1.0 (vinyl identification app; contact: https://github.com/hoshhie/phonox)"
-            },
+            headers=_discogs_headers(),
         )
         detail_response.raise_for_status()
 
@@ -225,8 +233,9 @@ def lookup_metadata_from_both(
 ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
     """
     Lookup metadata from both Discogs and MusicBrainz.
-    
-    Note: Discogs API now requires authentication, so we skip it for now.
+
+    Discogs is queried unauthenticated (25 req/min) or with a token if
+    DISCOGS_TOKEN is set in the environment (60 req/min).
 
     Args:
         artist: Artist or group name
@@ -234,12 +243,8 @@ def lookup_metadata_from_both(
 
     Returns:
         Tuple of (discogs_result, musicbrainz_result)
-        discogs_result will be None due to authentication requirement
     """
-    # Skip Discogs due to authentication requirement
-    logger.info(f"Skipping Discogs lookup (requires auth) for {artist} - {title}")
-    discogs_result = None
-    
+    discogs_result = lookup_discogs_metadata(artist, title, fallback_on_error=True)
     musicbrainz_result = lookup_musicbrainz_metadata(artist, title, fallback_on_error=True)
 
     return discogs_result, musicbrainz_result

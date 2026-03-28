@@ -55,6 +55,7 @@ export interface VinylRecord {
     estimated_value_usd?: number
     condition?: string
     image_urls?: string[]
+    user_notes?: string | null
   }
   created_at?: string
   updated_at?: string

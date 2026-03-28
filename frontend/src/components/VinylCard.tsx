@@ -77,7 +77,8 @@ export default function VinylCard({
     barcode: '',
     genres: '',
     condition: 'Good',
-    estimated_value_eur: '' // ADD estimated_value_eur
+    estimated_value_eur: '',
+    notes: '',
   })
 
   const [webValue, setWebValue] = useState<string | null>(null)
@@ -86,6 +87,7 @@ export default function VinylCard({
   const [lastRecordIdWithResults, setLastRecordIdWithResults] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isUpdatingRegister, setIsUpdatingRegister] = useState(false)
+  const [isNotesExpanded, setIsNotesExpanded] = useState(false)
   
   // Use ref to track if we've already sent this message (prevents double-send in StrictMode)
   const sentIntermediateResultsRef = useRef<string | null>(null)
@@ -212,6 +214,7 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
           ? (record.metadata?.genres || record.genres)?.join(', ') || ''
           : '',
         condition: record.metadata?.condition || record.condition || 'Good',
+        notes: record.metadata?.user_notes || record.user_notes || '',
       })
       setIsEditing(true)
     }
@@ -231,6 +234,7 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
         genres: editData.genres ? editData.genres.split(',').map(g => g.trim()).filter(Boolean) : undefined,
         condition: editData.condition || undefined,
         estimated_value_eur: editData.estimated_value_eur ? parseFloat(editData.estimated_value_eur) : null,  // Allow deletion
+        user_notes: editData.notes ?? null,
       }
       onMetadataUpdate(updatedMetadata)
       console.log('VinylCard: Metadata saved locally (will be persisted when adding/updating in register):', updatedMetadata)
@@ -397,7 +401,7 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
           genres: isEditing ? (editData.genres ? editData.genres.split(',').map(g => g.trim()).filter(Boolean) : undefined) : (record.metadata?.genres || record.genres || undefined),
           estimated_value_eur: estimatedValue,
           condition: condition,
-          user_notes: `Condition: ${condition} - Updated ${new Date().toLocaleDateString()}`,
+          user_notes: isEditing ? (editData.notes ?? '') : (record.metadata?.user_notes || record.user_notes || ''),
           spotify_url: spotifyUrlToSave,
           user_tag: currentUser,
           image_urls: allImageUrls  // Use the newly uploaded URLs
@@ -435,7 +439,7 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
           genres: isEditing ? (editData.genres ? editData.genres.split(',').map(g => g.trim()).filter(Boolean) : undefined) : (record.metadata?.genres || record.genres || undefined),
           estimated_value_eur: estimatedValue,
           condition: condition,
-          user_notes: `Condition: ${condition} - Added ${new Date().toLocaleDateString()}`,
+          user_notes: isEditing ? (editData.notes ?? '') : (record.metadata?.user_notes || record.user_notes || ''),
           spotify_url: spotifyUrlToSave,
           user_tag: currentUser
         }
@@ -479,7 +483,7 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
 
   const handleCancel = () => {
     setIsEditing(false)
-    setEditData({ artist: '', title: '', year: '', label: '', spotify_url: '', catalog_number: '', barcode: '', genres: '', condition: 'Good', estimated_value_eur: '' })
+    setEditData({ artist: '', title: '', year: '', label: '', spotify_url: '', catalog_number: '', barcode: '', genres: '', condition: 'Good', estimated_value_eur: '', notes: '' })
     setAppliedWebValue(null)
     setWebValue(null)
   }
@@ -692,6 +696,19 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
                 {record?.metadata?.condition || 'Not analyzed'}
               </span>
             </div>
+            {(record.metadata?.user_notes || record.user_notes) && (
+              <div className={styles.notesField}>
+                <div className={styles.notesHeader} onClick={() => setIsNotesExpanded(p => !p)}>
+                  <label>Notes</label>
+                  <span className={styles.notesToggle}>{isNotesExpanded ? '▲' : '▼'}</span>
+                </div>
+                {isNotesExpanded && (
+                  <p className={styles.notesText}>
+                    {record.metadata?.user_notes || record.user_notes}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <div className={styles.metadataEdit}>
@@ -787,6 +804,16 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
                 <option value="Mint">Mint</option>
               </select>
             </div>
+            <div className={`${styles.field} ${styles.notesEditField}`}>
+              <label>Notes</label>
+              <textarea
+                className={styles.notesTextarea}
+                value={editData.notes}
+                onChange={(e) => setEditData(prev => ({...prev, notes: e.target.value}))}
+                placeholder="Analysis reasoning or personal notes about this record…"
+                rows={4}
+              />
+            </div>
           </div>
         )}
       </div>
@@ -794,77 +821,41 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
       {/* Value Assessment */}
       {getEstimatedValue() > 0 && (
         <div className={styles.valueSection}>
-          <h4>
-            💰 Estimated Value
-            <button 
+          <div className={styles.valueRow}>
+            <span className={styles.valueAmount}>
+              💰 €{appliedWebValue !== null ? appliedWebValue : getEstimatedValue()}
+            </span>
+            <button
               onClick={recheckValue}
               disabled={isCheckingValue || !record?.artist || !record?.title}
               className={styles.recheckBtn}
-              title="Search web for current market prices (optional)"
+              title="Search web for current market prices"
             >
-              {isCheckingValue ? '🔄 Searching...' : '🔍 Web Search'}
+              {isCheckingValue ? '🔄' : '🔍 Web Search'}
             </button>
-          </h4>
-          <div className={styles.valueContent}>
-            <div className={styles.valueAmount}>
-              €{appliedWebValue !== null ? appliedWebValue : getEstimatedValue()}
-              {webValue && !webValue.includes('Error') && webValue !== 'No price found' && (
-                <div className={styles.webValue}>
-                  <small>Web: {webValue}</small>
-                  <button
-                    onClick={applyWebValue}
-                    className={styles.applyBtn}
-                    title="Apply this value to the record"
-                  >
-                    ✓ Apply
-                  </button>
-                </div>
-              )}
-              {webValue && (webValue.includes('Error') || webValue === 'No price found') && (
-                <div className={styles.webValue}>
-                  <small style={{ color: '#ff6b6b' }}>{webValue}</small>
-                </div>
-              )}
-            </div>
-            <div className={styles.valueScale}>
-              <div className={styles.scaleBar}>
-                {(() => {
-                  const value = getEstimatedValue() || 5
-                  const position = Math.min(Math.max(((value - 5) / 95 * 100), 0), 100)
-                  return (
-                    <div 
-                      className={styles.scaleIndicator}
-                      style={{ 
-                        left: `${position}%`
-                      }}
-                    />
-                  )
-                })()}
-              </div>
-              <div className={styles.scaleLabels}>
-                <span style={{ left: '0%' }}>€5</span>
-                <span style={{ left: '21%' }}>€25</span>
-                <span style={{ left: '47%' }}>€50</span>
-                <span style={{ left: '100%' }}>€100+</span>
-              </div>
-            </div>
-            {record?.metadata?.condition && (
-              <div className={styles.conditionBadge}>
-                <span 
-                  className={styles.conditionLabel}
-                  style={{ color: getConditionColor() }}
-                >
-                  ● {isEditing ? editData.condition : record?.metadata?.condition}
-                </span>
-                <small>{isEditing ? 'Editing' : 'From image analysis'}</small>
-              </div>
-            )}
-            <div className={styles.valueDisclaimer}>
-              <small>
-                ⚠️ Estimated value based on available data. Actual market value may vary significantly.
-              </small>
-            </div>
           </div>
+          <div className={styles.scaleBar}>
+            {(() => {
+              const value = getEstimatedValue() || 5
+              const position = Math.min(Math.max(((value - 5) / 95 * 100), 0), 100)
+              return <div className={styles.scaleIndicator} style={{ left: `${position}%` }} />
+            })()}
+          </div>
+          <div className={styles.scaleLabels}>
+            <span style={{ left: '0%' }}>€5</span>
+            <span style={{ left: '21%' }}>€25</span>
+            <span style={{ left: '47%' }}>€50</span>
+            <span style={{ left: '100%' }}>€100+</span>
+          </div>
+          {webValue && !webValue.includes('Error') && webValue !== 'No price found' && (
+            <div className={styles.webValue}>
+              <small>Web: {webValue}</small>
+              <button onClick={applyWebValue} className={styles.applyBtn} title="Apply this value">✓ Apply</button>
+            </div>
+          )}
+          {webValue && (webValue.includes('Error') || webValue === 'No price found') && (
+            <small style={{ color: '#ff6b6b', fontSize: '0.78rem' }}>{webValue}</small>
+          )}
         </div>
       )}
 

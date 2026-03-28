@@ -149,12 +149,15 @@ Focus on HIGH CONFIDENCE enhancements only."""
             # Merge with existing metadata (only update non-null new values)
             merged_metadata = existing_metadata.copy()
             applied_changes = []
+            change_index = 0
 
             for field, value in enhanced.items():
                 if value is not None and value != existing_metadata.get(field):
                     merged_metadata[field] = value
                     confidence = field_confidences.get(field, 0.7)
-                    applied_changes.append(f"{field}: {changes[0] if changes else 'Updated'} (confidence: {confidence:.0%})")
+                    description = changes[change_index] if change_index < len(changes) else f"{field}: Updated"
+                    applied_changes.append(f"{field}: {description} (confidence: {confidence:.0%})")
+                    change_index += 1
 
             # Calculate new overall confidence
             # Boost confidence if metadata was consistent between old and new

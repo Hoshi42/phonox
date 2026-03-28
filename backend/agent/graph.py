@@ -1,13 +1,14 @@
 """
 LangGraph workflow builder for vinyl record identification.
 
-Implements a 6-node agent graph:
+Implements a 7-node agent graph:
 1. validate_images: Check image format, count, size
 2. extract_features: Extract image features (embeddings, colors, etc.)
-3. vision_extraction: Claude 3 multimodal analysis of album artwork
+3. vision_extraction: Claude Sonnet multimodal analysis of album artwork
 4. lookup_metadata: Query Discogs/MusicBrainz APIs
 5. websearch_fallback: Tavily websearch when primary sources fail
-6. confidence_gate: Calculate confidence and route to auto-commit or review
+6. metadata_synthesis: Claude Opus – merge external evidence with vision data
+7. confidence_gate: Calculate confidence and route to auto-commit or review
 
 Phase 1.1 Implementation (Weeks 2-3)
 """
@@ -25,6 +26,7 @@ from backend.agent.state import VinylState, Evidence, EvidenceType
 from backend.agent.vision import extract_vinyl_metadata, extract_vinyl_metadata_with_retry
 from backend.agent.metadata import lookup_metadata_from_both
 from backend.agent.websearch import search_vinyl_metadata, search_vinyl_by_barcode, search_spotify_album
+from backend.agent.metadata_enhancer import MetadataEnhancer
 
 logger = logging.getLogger(__name__)
 
@@ -681,6 +683,86 @@ def websearch_fallback_node(state: VinylState) -> VinylState:
     return state
 
 
+def metadata_synthesis_node(state: VinylState) -> VinylState:
+    """
+    Synthesize vision extraction results with external evidence (Discogs/MusicBrainz).
+
+    Uses Claude Opus via MetadataEnhancer to intelligently merge:
+    - External evidence (authoritative for artist/title/year/label)
+    - Vision extraction (authoritative for condition/barcode/catalog_number)
+
+    Skips if no external evidence is available.
+
+    Returns:
+        VinylState: Updated state with synthesized vision_extraction
+    """
+    vision_data = state.get("vision_extraction", {})
+    evidence_chain = state.get("evidence_chain", [])
+
+    # Find best external evidence: Discogs > MusicBrainz > websearch
+    best_external: Dict[str, Any] = {}
+    for source_priority in [EvidenceType.DISCOGS, EvidenceType.MUSICBRAINZ, EvidenceType.WEBSEARCH]:
+        for evidence in evidence_chain:
+            src = evidence.get("source")
+            src_enum = EvidenceType(src) if isinstance(src, str) else src
+            if src_enum == source_priority:
+                data = evidence.get("data", {})
+                # Only use if it has meaningful artist/title
+                if data.get("artist") and data.get("title"):
+                    best_external = data
+                    logger.info(
+                        f"metadata_synthesis: Using {source_priority.value} as external reference "
+                        f"({data.get('artist')} / {data.get('title')})"
+                    )
+                    break
+        if best_external:
+            break
+
+    if not best_external:
+        logger.info("metadata_synthesis: No external evidence found – skipping synthesis")
+        return state
+
+    # Skip synthesis if vision extraction failed
+    if vision_data.get("artist") in ("ERROR", "Unknown", None):
+        logger.info("metadata_synthesis: Vision extraction incomplete – skipping synthesis")
+        return state
+
+    try:
+        enhancer = MetadataEnhancer()
+        # existing_metadata = external source (authoritative for discographic fields)
+        # new_metadata = vision data (fills in physical attributes: barcode, condition)
+        enhanced, new_confidence, changes = enhancer.enhance_metadata(
+            existing_metadata=best_external,
+            new_metadata=vision_data,
+            existing_confidence=best_external.get("confidence", 0.8),
+        )
+
+        if changes:
+            logger.info(f"metadata_synthesis: Applied {len(changes)} enhancement(s): {changes}")
+        else:
+            logger.info("metadata_synthesis: No changes from synthesis (data consistent)")
+
+        # Preserve vision-only fields that external evidence never provides
+        for field in ("condition", "condition_notes", "all_visible_text", "reasoning",
+                      "image_results", "processed_images", "all_barcodes", "all_catalog_numbers",
+                      "spotify_url", "_quality_issues"):
+            if vision_data.get(field) is not None and enhanced.get(field) is None:
+                enhanced[field] = vision_data[field]
+
+        # Keep vision confidence if it's higher (vision was more certain)
+        enhanced["confidence"] = max(
+            vision_data.get("confidence", 0.0),
+            enhanced.get("confidence", 0.0),
+        )
+
+        state["vision_extraction"] = enhanced
+
+    except Exception as e:
+        logger.error(f"metadata_synthesis: Enhancement failed ({e}), keeping vision data")
+
+    return state
+
+
 def confidence_gate_node(state: VinylState) -> VinylState:
     """
     Calculate overall confidence using 4-way weighting.
@@ -754,7 +836,7 @@ def confidence_gate_node(state: VinylState) -> VinylState:
 
 def build_agent_graph():
     """
-    Build the 6-node LangGraph workflow.
+    Build the 7-node LangGraph workflow.
 
     Graph Structure:
         START
@@ -763,12 +845,14 @@ def build_agent_graph():
           ↓
     extract_features
           ↓
-    vision_extraction
+    vision_extraction  (Claude Sonnet – per image + multi-image aggregation)
           ↓
-    lookup_metadata
+    lookup_metadata    (Discogs + MusicBrainz + Spotify)
           ↓
     [if confidence < 0.75]
-    websearch_fallback
+    websearch_fallback (Tavily / DuckDuckGo)
+          ↓
+    metadata_synthesis (Claude Opus – merge external evidence with vision data)
           ↓
     confidence_gate
           ↓
@@ -782,12 +866,13 @@ def build_agent_graph():
     """
     graph = StateGraph(VinylState)
 
-    # Add all 6 nodes
+    # Add all nodes
     graph.add_node("validate_images", validate_images_node)
     graph.add_node("extract_features", extract_features_node)
     graph.add_node("vision_extraction", vision_extraction_node)
     graph.add_node("lookup_metadata", lookup_metadata_node)
     graph.add_node("websearch_fallback", websearch_fallback_node)
+    graph.add_node("metadata_synthesis", metadata_synthesis_node)
     graph.add_node("confidence_gate", confidence_gate_node)
 
     # Add edges
@@ -796,12 +881,12 @@ def build_agent_graph():
     graph.add_edge("extract_features", "vision_extraction")
     graph.add_edge("vision_extraction", "lookup_metadata")
 
-    # Conditional edge: lookup_metadata → confidence_gate or websearch_fallback
-    def route_from_lookup(state: VinylState) -> Literal["confidence_gate", "websearch_fallback"]:
+    # Conditional edge: lookup_metadata → metadata_synthesis or websearch_fallback
+    def route_from_lookup(state: VinylState) -> Literal["metadata_synthesis", "websearch_fallback"]:
         """
         Route based on evidence confidence.
         If confidence < 0.75, try websearch fallback.
-        Otherwise, go straight to confidence_gate.
+        Otherwise, go straight to metadata_synthesis.
         """
         # Skip websearch if vision extraction failed (artist/title are ERROR)
         vision_data = state.get("vision_extraction", {})
@@ -810,7 +895,7 @@ def build_agent_graph():
         
         if artist == "ERROR" or title == "ERROR":
             logger.info("route_from_lookup: Vision extraction failed (ERROR), skipping websearch")
-            return "confidence_gate"
+            return "metadata_synthesis"
         
         evidence_chain = state.get("evidence_chain", [])
 
@@ -831,14 +916,17 @@ def build_agent_graph():
         else:
             logger.info(
                 f"route_from_lookup: Preliminary confidence {preliminary_confidence:.2f} >= 0.75, "
-                "routing to confidence_gate"
+                "routing to metadata_synthesis"
             )
-            return "confidence_gate"
+            return "metadata_synthesis"
 
     graph.add_conditional_edges("lookup_metadata", route_from_lookup)
 
-    # websearch_fallback always goes to confidence_gate
-    graph.add_edge("websearch_fallback", "confidence_gate")
+    # websearch_fallback always goes to metadata_synthesis
+    graph.add_edge("websearch_fallback", "metadata_synthesis")
+
+    # metadata_synthesis always goes to confidence_gate
+    graph.add_edge("metadata_synthesis", "confidence_gate")
 
     # Conditional edge: confidence_gate → auto_commit or needs_review
     def route_from_confidence_gate(state: VinylState) -> Literal["auto_commit", "needs_review"]:

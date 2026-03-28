@@ -1,4 +1,23 @@
 # Changelog
+## [2.0.4] - 2026-03-28 - Analysis Notes, Discogs Re-enable, UI Improvements
+
+### Added
+- **Per-record Notes field** — initial analysis writes vision reasoning to `user_notes`; re-analysis appends timestamped Claude valuation explanation. Shown in view mode (collapsible, click to expand) and editable in edit mode. Only persisted to DB on user-triggered Update.
+- **Discogs metadata lookup re-enabled** (`backend/agent/metadata.py`) — `lookup_metadata_from_both()` now actually calls `lookup_discogs_metadata()`. Optional `DISCOGS_TOKEN` env var for authenticated requests (25→60 req/min).
+- **`DISCOGS_TOKEN`** added to `.env.example` with setup instructions.
+- **Expandable Notes section** in VinylCard view mode — collapsed by default with ▲/▼ toggle.
+
+### Fixed
+- **MetadataEnhancer changelog descriptions** (`backend/agent/metadata_enhancer.py`) — all change entries were always showing the first change description; added `change_index` counter to correctly map each field to its own description.
+- **Re-analysis `NameError`** (`backend/api/routes.py`) — `vinyl_record` was not defined in the reanalysis scope; corrected to use `existing_record`.
+- **Multi-line EXPLANATION capture** in reanalysis valuation — single-line regex now replaced with `split('EXPLANATION:', 1)` to capture full Claude explanation.
+
+### Changed
+- **Value section compacted** — replaced multi-block layout (header, large amount, condition badge, disclaimer) with a single compact row `💰 €XX [🔍 Web Search]` + slim 6 px scale bar.
+- **Condition removed from value row** — already displayed in the Details list above, no longer duplicated.
+
+---
+
 ## [2.0.3] - 2026-03-17 - VinylCard Panel Clipping Fix
 
 ### Fixed

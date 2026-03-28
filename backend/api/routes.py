@@ -41,6 +41,7 @@ from backend.api.models import (
 from backend.agent.graph import build_agent_graph
 from backend.agent.state import VinylState
 from backend.agent.metadata import estimate_vinyl_value
+from backend.agent.metadata_enhancer import MetadataEnhancer
 from backend.tools import EnhancedChatTools
 
 logger = logging.getLogger(__name__)
@@ -208,6 +209,7 @@ async def identify_vinyl(
                 vinyl_record.spotify_url = vision_data.get("spotify_url") or vision_data.get("spotify_link")
                 vinyl_record.catalog_number = vision_data.get("catalog_number")
                 vinyl_record.barcode = vision_data.get("barcode")  # Store barcode from vision extraction
+                vinyl_record.condition = vision_data.get("condition")  # Condition assessed from images
                 if vision_data.get("genres"):
                     vinyl_record.set_genres(vision_data["genres"])
                 
@@ -391,6 +393,10 @@ EXPLANATION: [brief explanation]"""
             # (The agent analyzes physical condition from the images)
             if not vinyl_record.condition and vision_data:
                 vinyl_record.condition = vision_data.get("condition")
+
+            # Auto-populate notes with the analysis reasoning from the vision agent
+            if vision_data and vision_data.get("reasoning"):
+                vinyl_record.user_notes = vision_data["reasoning"]
 
             # Handle errors
             if result_state.get("error"):
@@ -1242,11 +1248,56 @@ async def reanalyze_vinyl(
                     error="Image analysis could not produce confidence score. Check that valid vinyl record images were provided.",
                 )
             
-            # STEP 3: Use the analyzed metadata directly
-            # Since we analyze ALL uploaded images together, the LLM aggregation already merged them
-            # No need for further enhancement - this IS the enhanced result
-            enhanced_metadata = new_metadata
-            new_confidence = analysis_confidence
+            # STEP 3: Merge new analysis results with existing DB metadata via MetadataEnhancer (Opus)
+            # Preserves user-validated fields; fills gaps from the fresh analysis
+            existing_metadata: Dict[str, Any] = {}
+            if current_record:
+                try:
+                    current_record_data = json.loads(current_record)
+                    meta = current_record_data.get("metadata", {})
+                    existing_metadata = {
+                        "artist": meta.get("artist"),
+                        "title": meta.get("title"),
+                        "year": meta.get("year"),
+                        "label": meta.get("label"),
+                        "catalog_number": meta.get("catalog_number"),
+                        "barcode": meta.get("barcode"),
+                        "genres": meta.get("genres", []),
+                        "condition": meta.get("condition"),
+                        "spotify_url": meta.get("spotify_url"),
+                    }
+                    # Fetch existing confidence from DB record if available
+                    existing_record = db.query(VinylRecord).filter(VinylRecord.id == record_id).first()
+                    existing_confidence_val = existing_record.confidence if existing_record else 0.5
+                except Exception as e:
+                    logger.warning(f"Could not parse current_record for MetadataEnhancer: {e}")
+                    existing_confidence_val = 0.5
+            else:
+                existing_confidence_val = 0.5
+
+            # Only run MetadataEnhancer if we have meaningful existing metadata to merge with
+            if existing_metadata.get("artist") and existing_metadata.get("title"):
+                try:
+                    logger.info("Running MetadataEnhancer (Opus) to merge existing DB metadata with new analysis")
+                    enhancer = MetadataEnhancer()
+                    enhanced_metadata, new_confidence, changes = enhancer.enhance_metadata(
+                        existing_metadata=existing_metadata,
+                        new_metadata=new_metadata,
+                        existing_confidence=existing_confidence_val,
+                    )
+                    if changes:
+                        logger.info(f"MetadataEnhancer applied changes: {changes}")
+                    else:
+                        logger.info("MetadataEnhancer: no changes – metadata consistent between old and new")
+                except Exception as e:
+                    logger.error(f"MetadataEnhancer failed ({e}), using raw new_metadata")
+                    enhanced_metadata = new_metadata
+                    new_confidence = analysis_confidence
+            else:
+                # No existing metadata to merge with – use graph result directly
+                enhanced_metadata = new_metadata
+                new_confidence = analysis_confidence
+
             logger.info(f"✅ Analysis complete with {len(files)} images (confidence: {new_confidence:.2f})")
             
             # Preserve existing Spotify URL if the graph didn't find a new one
@@ -1382,7 +1433,12 @@ EXPLANATION: [brief explanation]"""
                                 factors_text = line.replace('FACTORS:', '').strip()
                                 valuation_factors = [f.strip() for f in factors_text.split(',')]
                             elif line.startswith('EXPLANATION:'):
+                                # Capture only the first-line portion here; multi-line handled below
                                 explanation = line.replace('EXPLANATION:', '').strip()
+                        
+                        # Capture full multi-line explanation (everything after EXPLANATION:)
+                        if 'EXPLANATION:' in valuation_text:
+                            explanation = valuation_text.split('EXPLANATION:', 1)[1].strip()
                         
                         # Fallback if parsing fails
                         if estimated_value_eur is None:
@@ -1401,7 +1457,17 @@ EXPLANATION: [brief explanation]"""
                 logger.error(f"Error during web search valuation in reanalysis: {e}")
                 # Continue without valuation
             
-            # STEP 4: Build response with analyzed metadata
+            # STEP 4: Build timestamped note (returned in response only — DB write happens on user UPDATE)
+            from datetime import datetime as _dt
+            _timestamp = _dt.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+            if explanation:
+                note_entry = f"[{_timestamp}]\n{explanation}"
+                existing_notes = existing_record.user_notes if existing_record else None
+                new_notes = (existing_notes + "\n\n" + note_entry) if existing_notes else note_entry
+            else:
+                new_notes = existing_record.user_notes if existing_record else None
+
+            # STEP 5: Build response with analyzed metadata
             # Create intermediate results for display in chat panel
             reanalysis_intermediate_results = None
             if search_query:
@@ -1436,7 +1502,7 @@ EXPLANATION: [brief explanation]"""
                 auto_commit=result_state.get("auto_commit", False),
                 needs_review=result_state.get("needs_review", True),
                 error=result_state.get("error"),
-                user_notes=None,
+                user_notes=new_notes,
                 intermediate_results=reanalysis_intermediate_results,
             )
             

@@ -450,12 +450,111 @@
   padding: 8px;
 }
 
+/* Notes field – view mode */
+.notesField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.notesHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+.notesHeader:hover label {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.notesToggle {
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.4);
+  line-height: 1;
+}
+
+.notesField label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+}
+
+.notesText {
+  margin: 0;
+  font-size: 0.82rem;
+  color: rgba(224, 231, 255, 0.75);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Notes field – edit mode */
+.notesEditField {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.notesEditField label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  width: auto;
+  min-width: unset;
+  margin-bottom: 4px;
+}
+
+.notesTextarea {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 6px 8px;
+  color: #e0e7ff;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  resize: vertical;
+  width: 100%;
+  min-height: 80px;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.notesTextarea:focus {
+  outline: none;
+  border-color: rgba(102, 126, 234, 0.4);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.notesTextarea::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+  font-style: italic;
+}
+
 .valueSection {
   margin-bottom: 12px;
-  padding: 12px;
+  padding: 8px 10px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* single-row: value + condition dot + web-search button */
+.valueRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .valueSection h4 {
@@ -473,19 +572,17 @@
   border: 1px solid rgba(59, 130, 246, 0.3);
   color: #60a5fa;
   border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 0.8rem;
+  padding: 4px 9px;
+  font-size: 0.75rem;
   cursor: pointer;
   transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  white-space: nowrap;
+  margin-left: auto;
 }
 
 .recheckBtn:hover:not(:disabled) {
   background: rgba(59, 130, 246, 0.2);
   border-color: rgba(59, 130, 246, 0.5);
-  transform: translateY(-1px);
 }
 
 .recheckBtn:disabled {
@@ -500,41 +597,44 @@
 }
 
 .valueAmount {
-  font-size: 2rem;
+  font-size: 1.35rem;
   font-weight: 700;
   color: #10b981;
-  text-align: center;
-  margin-bottom: 8px;
+  white-space: nowrap;
+}
+
+.conditionInline {
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .webValue {
-  margin-top: 8px;
-  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
   background: rgba(16, 185, 129, 0.1);
   border: 1px solid rgba(16, 185, 129, 0.2);
-  border-radius: 6px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: center;
+  border-radius: 4px;
 }
 
 .webValue small {
   color: #34d399;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   font-weight: 500;
 }
 
 .applyBtn {
-  padding: 4px 12px;
+  padding: 2px 8px;
   background: #10b981;
   color: white;
   border: none;
   border-radius: 4px;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   cursor: pointer;
   transition: background 0.2s;
+  white-space: nowrap;
 }
 
 .applyBtn:hover {
@@ -553,7 +653,7 @@
 
 .scaleBar {
   position: relative;
-  height: 8px;
+  height: 6px;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 4px;
   overflow: visible;
@@ -576,7 +676,7 @@
   top: 50%;
   transform: translate(-50%, -50%);
   width: 3px;
-  height: 20px;
+  height: 14px;
   background: #e0e7ff;
   border-radius: 2px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
@@ -586,10 +686,10 @@
 .scaleLabels {
   display: flex;
   justify-content: space-between;
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.45);
   position: relative;
-  height: 1.5em;
+  height: 1.2em;
 }
 
 .scaleLabels span {
