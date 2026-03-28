@@ -29,14 +29,15 @@ Phonox is a full-stack AI-powered vinyl record identification system with these 
 │  /api/register/*   ─→ Collection management                  │
 │                                                              │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │     LangGraph Agent Workflow (6-node graph)         │   │
-│  ├──────────────────────────────────────────────────────┤   │
-│  │ 1. validate_images      │ Check format, size, count  │   │
-│  │ 2. extract_features     │ Image analysis (future)     │   │
-│  │ 3. vision_extraction    │ Claude 3 multimodal        │   │
-│  │ 4. lookup_metadata      │ Discogs + MusicBrainz      │   │
-│  │ 5. websearch_fallback   │ Tavily + DuckDuckGo        │   │
-│  │ 6. confidence_gate      │ Route to auto/review       │   │
+  │  │     LangGraph Agent Workflow (7-node graph)         │   │
+  │  ├──────────────────────────────────────────────────────┤   │
+  │  │ 1. validate_images      │ Check format, size, count  │   │
+  │  │ 2. extract_features     │ Feature pre-processing     │   │
+  │  │ 3. vision_extraction    │ Claude Sonnet 4 multimodal │   │
+  │  │ 4. lookup_metadata      │ Discogs + MusicBrainz      │   │
+  │  │ 5. websearch_fallback   │ Tavily + DuckDuckGo        │   │
+  │  │ 6. metadata_synthesis   │ Merge & verify metadata    │   │
+  │  │ 7. confidence_gate      │ Route to auto/review       │   │
 │  └──────────────────────────────────────────────────────┘   │
 │                                                              │
 │  ┌──────────────────────────────────────────────────────┐   │
@@ -70,20 +71,24 @@ Frontend: POST /api/v1/identify
     ↓
 Backend: Create temp record, start analysis
     ↓
-LangGraph Agent starts 6-node workflow:
+LangGraph Agent starts 7-node workflow:
     
     ├→ validate_images
     │   ├ Check format (JPEG, PNG, WebP, GIF)
     │   ├ Check size (<10MB each, <100MB total)
     │   └ Check count (1-10 images)
     │
+    ├→ extract_features
+    │   └ Pre-process image data for vision pipeline
+    │
     ├→ vision_extraction
-    │   ├ Claude 3 Sonnet multimodal analysis
-    │   ├ Extract: artist, title, year, label, genres, barcode
+    │   ├ Claude Sonnet 4 multimodal analysis
+    │   ├ Extract: artist, title, year, label, genres, barcode, condition
+    │   ├ Auto-populate user_notes with vision reasoning
     │   └ Generate confidence scores per field
     │
     ├→ lookup_metadata
-    │   ├ Query Discogs API (catalog lookup)
+    │   ├ Query Discogs API (catalog lookup, optional token for 60 req/min)
     │   ├ Query MusicBrainz API (fingerprinting)
     │   ├ Merge results, rank by confidence
     │   └ Enrich with: Spotify URL, condition tips
@@ -94,11 +99,15 @@ LangGraph Agent starts 6-node workflow:
     │   ├ DuckDuckGo fallback if Tavily unavailable
     │   └ Citation tracking (sources)
     │
+    ├→ metadata_synthesis
+    │   └ Merge & verify all sources into final metadata
+    │
     └→ confidence_gate
         ├ If confidence > 0.85: Auto-commit to register
         ├ If 0.65-0.85: Send for user review
         └ If < 0.65: Request manual input
 
+    Post-graph: web search + Claude Haiku market valuation → estimated_value_eur
     Save to database with metadata + images
     ↓
 Frontend: Poll /api/v1/identify/{record_id}
@@ -197,7 +206,7 @@ CREATE TABLE vinyl_records (
   id UUID PRIMARY KEY,
   
   -- Identification
-  status VARCHAR (pending | analyzed | complete | error),
+  status VARCHAR (temporary | analyzed | complete | failed),  -- temporary = in-progress, not yet saved by user
   confidence FLOAT (0.0-1.0),
   
   -- Metadata

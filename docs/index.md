@@ -33,8 +33,8 @@ Phonox is an AI-powered application that helps you:
 - Web search integration for current information
 
 ### 📊 Value Estimation
-- Automatic market price estimation
-- Based on real Discogs market data
+- Automatic market price estimation during identification
+- Web search (Tavily/DuckDuckGo) + Claude Haiku analysis of live market data
 - Supports multiple currencies (EUR, USD)
 
 ### 📱 Mobile-Friendly
