@@ -18,28 +18,28 @@ Phonox is a full-stack AI-powered vinyl record identification system with these 
 │                    FRONTEND (React/Vite)                    │
 ├─────────────────────────────────────────────────────────────┤
 │  App.tsx → VinylCard + ChatPanel + VinylRegister            │
-│           ↓ (Form + Chat inputs)                             │
+│           ↓ (Form + Chat inputs)                            │
 └─────────────────────────────────────────────────────────────┘
                            ↓ REST API
 ┌─────────────────────────────────────────────────────────────┐
-│                   BACKEND (FastAPI)                          │
+│                   BACKEND (FastAPI)                         │
 ├─────────────────────────────────────────────────────────────┤
-│  /api/v1/identify  ─→ Upload images                          │
-│  /api/v1/chat      ─→ AI chat with web search                │
-│  /api/register/*   ─→ Collection management                  │
-│                                                              │
+│  /api/v1/identify  ─→ Upload images                         │
+│  /api/v1/chat      ─→ AI chat with web search               │
+│  /api/register/*   ─→ Collection management                 │
+│                                                             │
 │  ┌──────────────────────────────────────────────────────┐   │
-  │  │     LangGraph Agent Workflow (7-node graph)         │   │
-  │  ├──────────────────────────────────────────────────────┤   │
-  │  │ 1. validate_images      │ Check format, size, count  │   │
-  │  │ 2. extract_features     │ Feature pre-processing     │   │
-  │  │ 3. vision_extraction    │ Claude Sonnet 4 multimodal │   │
-  │  │ 4. lookup_metadata      │ Discogs + MusicBrainz      │   │
-  │  │ 5. websearch_fallback   │ Tavily + DuckDuckGo        │   │
-  │  │ 6. metadata_synthesis   │ Merge & verify metadata    │   │
-  │  │ 7. confidence_gate      │ Route to auto/review       │   │
+│  │     LangGraph Agent Workflow (7-node graph)          │   │
+│  ├──────────────────────────────────────────────────────┤   │
+│  │ 1. validate_images      │ Check format, size, count  │   │
+│  │ 2. extract_features     │ Feature pre-processing     │   │
+│  │ 3. vision_extraction    │ Claude Sonnet 4 multimodal │   │
+│  │ 4. lookup_metadata      │ Discogs + MusicBrainz      │   │
+│  │ 5. websearch_fallback   │ Tavily + DuckDuckGo        │   │
+│  │ 6. metadata_synthesis   │ Merge & verify metadata    │   │
+│  │ 7. confidence_gate      │ Route to auto/review       │   │
 │  └──────────────────────────────────────────────────────┘   │
-│                                                              │
+│                                                             │
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │        External Data Sources                         │   │
 │  ├──────────────────────────────────────────────────────┤   │
@@ -52,11 +52,11 @@ Phonox is a full-stack AI-powered vinyl record identification system with these 
 └─────────────────────────────────────────────────────────────┘
                            ↓
 ┌─────────────────────────────────────────────────────────────┐
-│               PostgreSQL Database                            │
+│               PostgreSQL Database                           │
 ├─────────────────────────────────────────────────────────────┤
-│  VinylRecord (main records)                                  │
-│  VinylImage (uploaded images)                                │
-│  User collections (register)                                 │
+│  VinylRecord (main records)                                 │
+│  VinylImage (uploaded images)                               │
+│  User collections (register)                                │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -170,10 +170,10 @@ User can later:
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│                      App.tsx                              │
-│  - Global state: record, register, user                   │
-│  - API calls orchestration                                │
-│  - Polling logic for long-running jobs                    │
+│                      App.tsx                             │
+│  - Global state: record, register, user                  │
+│  - API calls orchestration                               │
+│  - Polling logic for long-running jobs                   │
 └──────────────────────────────────────────────────────────┘
          ↙         ↓              ↘
     ┌─────────┐  ┌──────────┐  ┌──────────────┐
