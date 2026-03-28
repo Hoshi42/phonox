@@ -94,6 +94,7 @@ The `.env` file contains all configuration. Key variables:
 |----------|----------|-------------|
 | `ANTHROPIC_API_KEY` | ✅ Yes | Claude AI API key from [console.anthropic.com](https://console.anthropic.com) |
 | `TAVILY_API_KEY` | ⚠️ Optional | Web search API key from [tavily.com](https://tavily.com) |
+| `DISCOGS_TOKEN` | ⚠️ Optional | Discogs personal access token – raises rate limit from 25 → 60 req/min |
 | `DATABASE_URL` | ✅ Pre-configured | PostgreSQL connection (auto-configured for Docker) |
 
 For all configuration options, see [`.env.example`](./.env.example)

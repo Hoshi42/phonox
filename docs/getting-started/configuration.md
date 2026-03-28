@@ -32,6 +32,14 @@ nano .env
 - **Get it from**: [tavily.com](https://tavily.com)
 - **Example**: `TAVILY_API_KEY=tvly-xxxxxxxx...`
 
+### Discogs API (Optional)
+
+**`DISCOGS_TOKEN`**
+- **Required**: No
+- **Description**: Personal access token for authenticated Discogs requests — raises the rate limit from 25 to 60 requests per minute and improves metadata lookup reliability
+- **Get it from**: [discogs.com/settings/developers](https://www.discogs.com/settings/developers) → *Generate new token*
+- **Example**: `DISCOGS_TOKEN=abcXYZ123...`
+
 ---
 
 ## Database Configuration
