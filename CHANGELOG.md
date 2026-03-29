@@ -1,4 +1,16 @@
 # Changelog
+## [2.0.8] - 2026-03-29 - Image Persistence Fix & UI Cleanup
+
+### Fixed
+- **Image disappears from register after add → reanalyze → delete → update flow** — the previous implementation re-uploaded *all* in-memory images (including the already-persisted original) as new DB entries on every "Update in Register" action. If the re-upload of a fetched File failed (e.g. empty `blob.type` returned by Vite proxy), `allImageUrls` was empty and the backend's keep-list purged every image for that record. Fixed by introducing a `registeredImageUrls` state (parallel array to `uploadedImages`) that tracks the DB URL for each already-persisted image. `handleRegisterAction` now only uploads genuinely new images and sends `[...existingDbUrls, ...newlyUploadedUrls]` as the keep-list, leaving pre-existing images untouched.
+- **Empty `blob.type` causing upload rejection** (`frontend/src/App.tsx`) — `File` objects reconstructed from register images via `fetch()` could have `blob.type = ""` when the Vite proxy response lacked a `Content-Type` header. The backend upload endpoint rejected these. Fixed with `blob.type || 'image/jpeg'` fallback.
+
+### Changed
+- **`registeredImageUrls` state added** (`frontend/src/App.tsx`) — populated on register load, kept in sync on image deletion and after saves. Passed to `VinylCard` as a new prop.
+- **`COMPLETE` status badge removed** (`frontend/src/components/VinylCard.tsx`) — the uppercase status text below the panel title was not meaningful to users and has been removed. The confidence bar remains.
+
+---
+
 ## [2.0.6] - 2026-03-29 - Reanalysis Crash Fix
 
 ### Fixed

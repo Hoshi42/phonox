@@ -82,6 +82,10 @@ function App() {
   // Number of images that came from the register at load time.
   // Memory-first: UI decisions use uploadedImages, not image_urls metadata.
   const [registeredImageCount, setRegisteredImageCount] = useState(0)
+  // DB URLs for each image that was loaded from the register (parallel to uploadedImages[0..registeredImageUrls.length-1]).
+  // Kept in sync with uploadedImages deletions so handleRegisterAction knows which files
+  // are already in DB (keep their URL) vs truly new (must be uploaded first).
+  const [registeredImageUrls, setRegisteredImageUrls] = useState<string[]>([])
   // True while images are being fetched from the backend after selecting a register record.
   const [imagesLoading, setImagesLoading] = useState(false)
   const [vinylRegister, setVinylRegister] = useState<RegisterRecord[]>([])
@@ -117,6 +121,7 @@ function App() {
       setRecordId(newRecordId)
       setUploadedImages(files)
       setRegisteredImageCount(0) // fresh analysis – no images come from the register
+      setRegisteredImageUrls([])  // no DB URLs for a fresh analysis
 
       // If already analyzed/complete from initial response, use it
       if (response.status === 'analyzed' || response.status === 'complete') {
@@ -276,10 +281,11 @@ function App() {
         clearTimeout(metadataUpdateTimeoutRef.current)
       }
       
-      // If the save flow updated image_urls (new DB URLs after upload), sync registeredImageCount
-      // so the "new images" detection stays accurate after saving.
+      // If the save flow updated image_urls (new DB URLs after upload), sync both
+      // registeredImageCount and registeredImageUrls so the next update cycle is accurate.
       if (metadata.image_urls !== undefined) {
         setRegisteredImageCount(metadata.image_urls.length)
+        setRegisteredImageUrls(metadata.image_urls)
       }
       
       // Debounce metadata updates by 300ms to prevent excessive re-renders during editing
@@ -328,6 +334,11 @@ function App() {
     // Keep registeredImageCount in sync: removing an image that came from the register shrinks the baseline
     if (index < registeredImageCount) {
       setRegisteredImageCount(prev => prev - 1)
+    }
+    // Keep registeredImageUrls in sync: if a registered file (one that has a DB URL) is deleted,
+    // remove its URL so it's no longer included in the keep-list on the next "Update in DB".
+    if (index < registeredImageUrls.length) {
+      setRegisteredImageUrls(prev => prev.filter((_, i) => i !== index))
     }
     setUploadedImages(prev => prev.filter((_, i) => i !== index))
   }
@@ -483,22 +494,34 @@ function App() {
           }
           const blob = await response.blob()
           const filename = url.split('/').pop() || 'image.jpg'
-          return new File([blob], filename, { type: blob.type })
+          // Use blob.type if available; fall back to image/jpeg so upload validation never
+          // rejects the file due to a missing Content-Type from the proxy response.
+          return new File([blob], filename, { type: blob.type || 'image/jpeg' })
         })
       )
       const validFiles = results
         .filter((r): r is PromiseFulfilledResult<File | null> => r.status === 'fulfilled')
         .map(r => r.value)
         .filter((f): f is File => f !== null)
+      // Build the parallel URL list in a single pass so validFiles[i] ↔ loadedUrls[i].
+      const sourceUrls = registerRecord.image_urls || []
+      const loadedUrls: string[] = []
+      results.forEach((r, i) => {
+        if (r.status === 'fulfilled' && r.value !== null) {
+          loadedUrls.push(sourceUrls[i])
+        }
+      })
       console.log(`App: Loaded ${validFiles.length}/${registerRecord.image_urls?.length || 0} images into memory`)
       setUploadedImages(validFiles)
       // registeredImageCount = how many images came from the register at load time
-      // Used by VinylCard to distinguish original vs newly added images (memory-first, no image_urls lookup)
+      // registeredImageUrls = corresponding DB URLs (parallel array) for upload deduplication
       setRegisteredImageCount(validFiles.length)
+      setRegisteredImageUrls(loadedUrls)
     } catch (error) {
       console.error('App: Error loading images into memory:', error)
       setUploadedImages([])
       setRegisteredImageCount(0)
+      setRegisteredImageUrls([])
     } finally {
       setImagesLoading(false)
     }
@@ -731,6 +754,7 @@ function App() {
             record={record}
             uploadedImages={uploadedImages}
             registeredImageCount={registeredImageCount}
+            registeredImageUrls={registeredImageUrls}
             imagesLoading={imagesLoading}
             onMetadataUpdate={handleMetadataUpdate}
             onImageAdd={handleImageAdd}

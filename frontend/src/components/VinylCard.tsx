@@ -45,6 +45,10 @@ interface VinylCardProps {
   // Memory-first: registeredImageCount is the authoritative count of images that came
   // from the register at load time – avoids reading image_urls from metadata for UI decisions.
   registeredImageCount?: number
+  // DB URLs for the images already saved in the database (parallel to uploadedImages[0..registeredImageUrls.length-1]).
+  // Used by handleRegisterAction to avoid re-uploading already-persisted files and to build
+  // the correct image_urls keep-list for the backend PUT /update.
+  registeredImageUrls?: string[]
   // True while images are being fetched from the backend after selecting a register record.
   imagesLoading?: boolean
 }
@@ -65,6 +69,7 @@ export default function VinylCard({
   isCheckingValue = false,
   onSetIsCheckingValue,
   registeredImageCount = 0,
+  registeredImageUrls = [],
   imagesLoading = false,}: VinylCardProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editData, setEditData] = useState({
@@ -377,18 +382,25 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
     console.log('VinylCard: record.metadata?.condition =', record.metadata?.condition)
         try {
       if (isInRegister) {
-        // Upload current images from uploadedImages
-        // This replaces any deleted images - user controls what to keep via UI
-        let allImageUrls: string[] = []
-        
-        if (uploadedImages.length > 0) {
-          console.log(`VinylCard: Uploading ${uploadedImages.length} images`)
-          const uploadResponse = await registerApiClient.uploadImages(record.record_id, uploadedImages)
-          allImageUrls = uploadResponse.uploaded_images.map((img: any) => img.url)
-          console.log('VinylCard: Uploaded images:', allImageUrls)
+        // Upload only genuinely new images (those without an existing DB URL).
+        // Images at uploadedImages[0..registeredImageUrls.length-1] are already in the
+        // database – send their existing URLs directly.  Only images beyond that slice
+        // need to be uploaded as new DB entries.
+        const newImages = uploadedImages.slice(registeredImageUrls.length)
+        let newImageUrls: string[] = []
+
+        if (newImages.length > 0) {
+          console.log(`VinylCard: Uploading ${newImages.length} new image(s) (${registeredImageUrls.length} already in DB)`)
+          const uploadResponse = await registerApiClient.uploadImages(record.record_id, newImages)
+          newImageUrls = uploadResponse.uploaded_images.map((img: any) => img.url)
+          console.log('VinylCard: Newly uploaded image URLs:', newImageUrls)
         } else {
-          console.log('VinylCard: No images to upload')
+          console.log('VinylCard: No new images to upload – all images already in DB')
         }
+
+        // Combine existing DB URLs with any newly uploaded ones.
+        const allImageUrls: string[] = [...registeredImageUrls, ...newImageUrls]
+        console.log('VinylCard: Final image_urls for update:', allImageUrls)
         
         const updateRequest = {
           record_id: record.record_id,
@@ -537,9 +549,6 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
 
       {/* Status */}
       <div className={styles.status}>
-        <span className={`${styles.statusBadge} ${styles[record.status]}`}>
-          {record.status.toUpperCase()}
-        </span>
         <div className={styles.confidence}>
           <span>Confidence: {Math.round(record.confidence * 100)}%</span>
           <div className={styles.confidenceBar}>
