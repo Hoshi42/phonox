@@ -1,4 +1,13 @@
 # Changelog
+## [2.0.5] - 2026-03-29 - Mobile Header & User Switcher Improvements
+
+### Changed
+- **User switcher replaced with dropdown** (`frontend/src/components/UserManager.tsx`) — individual user buttons in the header are replaced by a compact `<select>` dropdown in all views (desktop and mobile). Active user is pre-selected; switching still triggers a register reload.
+- **My Register button height aligned** (`frontend/src/App.module.css`) — on mobile breakpoints (`≤768px`, `≤480px`) the button now uses explicit `height: 32px` with `display: flex; align-items: center`, matching the user dropdown and `+` button.
+- **Header right side made non-wrapping on mobile** — `headerRight` uses `flex-wrap: nowrap` so the My Register button never gets pushed off-screen regardless of the number of users.
+
+---
+
 ## [2.0.4] - 2026-03-28 - Analysis Notes, Discogs Re-enable, UI Improvements
 
 ### Added

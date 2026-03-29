@@ -1,4 +1,6 @@
 # Managing Your Collection
+> **Update (v2.0.5):** The user switcher in the header is now a compact dropdown in all views. The My Register button height is aligned with the other header controls on mobile.
+
 > **Update (v1.9.6):** The VinylRegister modal now uses a taller layout and vertical scrolling, ensuring all records and action buttons (like 'Add to Register' and 'Update') are always visible, even with large collections.
 
 Learn how to manage, organize, and maintain your vinyl collection in Phonox.

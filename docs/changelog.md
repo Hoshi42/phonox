@@ -12,7 +12,23 @@ Phonox uses semantic versioning: `MAJOR.MINOR.PATCH`
 
 ## Versions
 
-### v2.0.3 (Current) - 2026-03-17
+### v2.0.5 (Current) - 2026-03-29
+
+**Mobile Header & User Switcher Improvements**
+
+- Individual header user buttons replaced with a compact `<select>` dropdown in all views (desktop and mobile). Active user is pre-selected; switching still triggers a register reload.
+- My Register button now uses `height: 32px` on mobile breakpoints, matching the user dropdown and `+` button heights.
+- `headerRight` set to `flex-wrap: nowrap` on mobile so the My Register button stays fully visible regardless of the number of users in the database.
+
+### v2.0.4 - 2026-03-28
+
+**Analysis Notes, Discogs Re-enable, UI Improvements**
+
+- Per-record Notes field — initial analysis writes vision reasoning to `user_notes`; re-analysis appends timestamped valuation explanation. Shown collapsed in view mode, editable in edit mode.
+- Discogs metadata lookup re-enabled in `metadata.py`; optional `DISCOGS_TOKEN` env var for higher rate limits.
+- Value section compacted to a single row; expandable Notes section added to VinylCard view mode.
+
+### v2.0.3 - 2026-03-17
 
 **VinylCard Panel Clipping Fix**
 

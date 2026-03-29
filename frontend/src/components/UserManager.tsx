@@ -368,47 +368,33 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-      <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.9rem' }}>
-        👤 {username}
-      </span>
-      
-      {/* Always visible user list for mobile */}
+    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'nowrap' }}>
+      {/* User switcher: dropdown in all views */}
       {existingUsers.length > 0 && (
-        <div style={{ display: 'flex', gap: isMobile ? '4px' : '5px', flexWrap: 'wrap' }}>
+        <select
+          value={username}
+          onChange={(e) => handleUserSwitch(e.target.value)}
+          style={{
+            background: 'rgba(102, 126, 234, 0.15)',
+            border: '1px solid rgba(102, 126, 234, 0.4)',
+            color: '#e0e7ff',
+            padding: '6px 8px',
+            borderRadius: '10px',
+            fontSize: '0.8rem',
+            cursor: 'pointer',
+            maxWidth: '150px',
+            minWidth: '70px',
+            flexShrink: 1,
+            height: '32px',
+            boxSizing: 'border-box',
+          }}
+        >
           {existingUsers.map(user => (
-            <button
-              key={user}
-              onClick={() => handleUserSwitch(user)}
-              style={{
-                background: user === username ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'rgba(255, 255, 255, 0.05)',
-                border: user === username ? 'none' : '1px solid rgba(102, 126, 234, 0.3)',
-                color: user === username ? 'white' : 'rgba(255, 255, 255, 0.8)',
-                padding: isMobile ? '6px 8px' : '6px 10px',
-                borderRadius: '10px',
-                fontSize: isMobile ? '0.75rem' : '0.8rem',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                fontWeight: user === username ? 600 : 500,
-                boxShadow: user === username ? '0 2px 8px rgba(102, 126, 234, 0.3)' : 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (user !== username) {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
-                  e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.5)'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (user !== username) {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-                  e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.3)'
-                }
-              }}
-            >
-              {user}
-            </button>
+            <option key={user} value={user} style={{ background: '#1a1a2e', color: '#e0e7ff' }}>
+              👤 {user}
+            </option>
           ))}
-        </div>
+        </select>
       )}
       
       {/* Always visible Add User button */}
@@ -439,7 +425,7 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
           e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.5)'
         }}
       >
-        + New
+        {isMobile ? '+' : '+ New'}
       </button>
 
       {showNewUserForm && createPortal(

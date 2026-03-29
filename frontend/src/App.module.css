@@ -145,14 +145,22 @@
     gap: 6px;
     order: 2;
     margin-left: auto;
+    flex-wrap: nowrap;
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
   }
 
   .registerButton {
-    padding: 6px 10px;
+    padding: 0 10px;
     font-size: 0.7rem;
     white-space: nowrap;
-    flex-shrink: 1;
+    flex-shrink: 0;
     min-width: 0;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
   }
 }
 
@@ -181,13 +189,21 @@
     gap: 4px;
     order: 2;
     margin-left: auto;
+    flex-wrap: nowrap;
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
   }
 
   .registerButton {
-    padding: 5px 8px;
+    padding: 0 8px;
     font-size: 0.65rem;
     white-space: nowrap;
-    flex-shrink: 1;
+    flex-shrink: 0;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
   }
 }
 
