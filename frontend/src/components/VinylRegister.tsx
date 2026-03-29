@@ -697,6 +697,8 @@ ${analysis.summary}
                         src={`${API_BASE}${record.image_urls[0]}`} 
                         alt={`${record.title || 'Record'} cover`}
                         className={styles.thumbnailImage}
+                        loading="lazy"
+                        decoding="async"
                       />
                     </div>
                   ) : (

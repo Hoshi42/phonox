@@ -1,4 +1,11 @@
 # Changelog
+## [2.0.9] - 2026-03-29 - Lazy Image Loading in Register
+
+### Changed
+- **Register thumbnails now load lazily** (`frontend/src/components/VinylRegister.tsx`) — added `loading="lazy"` and `decoding="async"` to every cover `<img>` in the grid/list view. The browser now only fetches thumbnails as cards enter (or approach) the viewport instead of firing all image requests at once on open. For a collection of 50 records, this reduces initial HTTP requests from ~50 to ~6–12, improving perceived open time and reducing backend load. No JavaScript involved — native browser feature, compatible with all modern browsers.
+
+---
+
 ## [2.0.8] - 2026-03-29 - Image Persistence Fix & UI Cleanup
 
 ### Fixed
