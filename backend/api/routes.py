@@ -1251,6 +1251,7 @@ async def reanalyze_vinyl(
             # STEP 3: Merge new analysis results with existing DB metadata via MetadataEnhancer (Opus)
             # Preserves user-validated fields; fills gaps from the fresh analysis
             existing_metadata: Dict[str, Any] = {}
+            existing_record = None  # initialised here so STEP 4 always has a reference
             if current_record:
                 try:
                     current_record_data = json.loads(current_record)
@@ -1314,6 +1315,7 @@ async def reanalyze_vinyl(
             search_results_count = 0
             valuation_text = None
             search_sources = []
+            explanation = ""  # initialised here so STEP 4 always has a reference
             try:
                 if enhanced_metadata.get("artist") and enhanced_metadata.get("title"):
                     logger.info(f"Performing web search for value estimation during reanalysis: {enhanced_metadata.get('artist')} - {enhanced_metadata.get('title')}")

@@ -1,4 +1,12 @@
 # Changelog
+## [2.0.6] - 2026-03-29 - Reanalysis Crash Fix
+
+### Fixed
+- **Backend `NameError` crash on reanalysis** (`backend/api/routes.py`) — `explanation` and `existing_record` were only assigned inside nested `try`/`if` blocks in `reanalyze_vinyl`. If the Anthropic API call failed or `current_record` was absent, STEP 4 referenced undefined variables. Both are now initialised to safe defaults (`explanation = ""`, `existing_record = None`) before their conditional blocks.
+- **Frontend: `registeredImageCount` not reset after reanalysis** (`frontend/src/App.tsx`) — after a successful re-analysis response, `registeredImageCount` was never advanced. The "📸 Analyze N new images" button therefore kept showing the same count, allowing the user to re-trigger reanalysis of already-analyzed images. Fixed by calling `setRegisteredImageCount(originalUploadedImages.length)` on successful reanalysis completion.
+
+---
+
 ## [2.0.5] - 2026-03-29 - Mobile Header & User Switcher Improvements
 
 ### Changed

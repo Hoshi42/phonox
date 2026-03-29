@@ -374,6 +374,9 @@ function App() {
         const updatedRecord = response as unknown as VinylRecord
         setRecord(updatedRecord)
         // Keep uploaded images in memory (memory-first architecture)
+        // Mark ALL currently uploaded images as "registered baseline" so the
+        // "Analyze N new images" button resets after a successful reanalysis.
+        setRegisteredImageCount(originalUploadedImages.length)
         console.log('App: Re-analysis completed successfully, keeping', originalUploadedImages.length, 'images in memory')
         console.log('App: Updated record metadata:', updatedRecord.metadata)
         

@@ -12,7 +12,14 @@ Phonox uses semantic versioning: `MAJOR.MINOR.PATCH`
 
 ## Versions
 
-### v2.0.5 (Current) - 2026-03-29
+### v2.0.6 (Current) - 2026-03-29
+
+**Reanalysis Crash Fix**
+
+- Backend `NameError` crash fixed in `reanalyze_vinyl`: `explanation` and `existing_record` were only assigned inside nested `try`/`if` blocks. If the Anthropic API call failed or `current_record` was absent, STEP 4 referenced undefined variables, returning `status="failed"`. Both variables are now initialised to safe defaults before their conditional blocks.
+- Frontend: after a successful reanalysis, `registeredImageCount` is now advanced to the full image count. Previously it was never updated, so the "📸 Analyze N new images" button kept reappearing after reanalysis.
+
+### v2.0.5 - 2026-03-29
 
 **Mobile Header & User Switcher Improvements**
 
