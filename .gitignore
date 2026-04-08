@@ -103,3 +103,6 @@ data/uploads/*
 
 # MkDocs build output
 site/
+
+# AI agent working documents (internal tooling, not project artifacts)
+.github/agents/

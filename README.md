@@ -327,10 +327,9 @@ start htmlcov/index.html  # Windows
 - **[API Reference](http://localhost:8000/docs)** – Interactive Swagger UI (live)
 
 ### 🏗️ For Teams & Contributors
-1. **[Implementation Plan](.github/agents/implementation-plan.md)** – Project roadmap and progress
-2. **[Contributing Guide](CONTRIBUTING.md)** – How to contribute code
-3. **[Agent Collaboration Instructions](.github/agents/instructions.md)** – Team workflow
-4. **[Deployment Guide](.github/agents/deployment.md)** – Production setup
+1. **[Contributing Guide](CONTRIBUTING.md)** – How to contribute code
+2. **[Agent Collaboration Instructions](.github/agents/instructions.md)** – Team workflow
+3. **[Deployment Guide](.github/agents/deployment.md)** – Production setup
 
 ---
 
@@ -446,48 +445,9 @@ A: Currently manual. We're working on CSV import (see roadmap). For now, use the
 
 ---
 
-## What's New (Latest Version: 2.0.1)
+## What's New
 
-✨ **Version 2.0.1** (March 14, 2026)
-- Repository cleanup: removed stale Makefile, status.sh, docker-status.sh, API_GUIDE.md, and TESTING_GUIDE.md
-- ARCHITECTURE.md updated to reflect v2.0.0 security and chat changes
-- README API reference now points to live Swagger UI
-
-✨ **Version 2.0.0** (March 14, 2026)
-- Collection analysis report is now fully visible to Claude in follow-up chat — was silently dropped from context due to `system`-role filtering
-- Fixed broken access control: `GET /api/register/` without a user tag no longer returns all users' records (required parameter enforced on backend)
-
-✨ **Version 1.9.9** (March 13, 2026)
-- Chat now includes full record context (barcode, condition, user notes, estimated value, Spotify URL) in Claude system prompt
-- Fixed chat response ending with a stray "0" when no web sources were used
-- Added blog link in header
-
-See [CHANGELOG.md](CHANGELOG.md) for complete history.
-
----
-
-## Status & Roadmap
-
-**Last Updated**: 2026-03-14  
-**Current Version**: 2.0.1  
-**Status**: Production Ready ✅
-
-### Completed Features
-- ✅ Image-based vinyl identification
-- ✅ Metadata lookup (Discogs, MusicBrainz)
-- ✅ AI-powered valuation
-- ✅ Web-based UI (mobile + desktop)
-- ✅ Spotify integration
-- ✅ Enhanced web search
-
-### Planned Features
-- 🔄 CSV import/export
-- 🔄 Barcode printing
-- 🔄 Collection insurance reports
-- 🔄 Social sharing
-- 🔄 Mobile app (iOS/Android)
-
-See [Implementation Plan](.github/agents/implementation-plan.md) for details.
+See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
 ---
 
