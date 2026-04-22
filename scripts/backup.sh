@@ -127,8 +127,8 @@ echo ""
 print_info "Backing up image uploads..."
 log "Checking /app/uploads in backend container"
 if docker compose exec -T backend test -d /app/uploads >> "${LOG_FILE}" 2>&1; then
-    # Create temporary directory for uploads
-    TEMP_UPLOADS=$(mktemp -d)
+    # Create temporary directory inside BACKUP_DIR (real disk, not tmpfs /tmp)
+    TEMP_UPLOADS=$(mktemp -d -p "${BACKUP_DIR}")
     
     # Pre-flight: check available space in /tmp against uploads size
     UPLOADS_BYTES=$(docker compose exec -T backend du -sb /app/uploads 2>/dev/null | awk '{print $1}')
@@ -143,7 +143,7 @@ if docker compose exec -T backend test -d /app/uploads >> "${LOG_FILE}" 2>&1; th
             log_error "Disk space check failed: need ${UPLOADS_BYTES}B, have ${TMPDIR_AVAIL}B in $(dirname "${TEMP_UPLOADS}")"
             rm -rf "${TEMP_UPLOADS}"
             # Create empty placeholder archive so later cleanup logic still works
-            TEMP_EMPTY=$(mktemp -d)
+            TEMP_EMPTY=$(mktemp -d -p "${BACKUP_DIR}")
             mkdir -p "${TEMP_EMPTY}/uploads"
             tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_EMPTY}" uploads/ 2>/dev/null
             rm -rf "${TEMP_EMPTY}"
@@ -258,7 +258,7 @@ if docker compose exec -T backend test -d /app/uploads >> "${LOG_FILE}" 2>&1; th
 else
     print_warning "Backend container not running, creating empty image archive"
     log_warn "Backend container not running — /app/uploads not accessible"
-    TEMP_UPLOADS=$(mktemp -d)
+    TEMP_UPLOADS=$(mktemp -d -p "${BACKUP_DIR}")
     mkdir -p "${TEMP_UPLOADS}/uploads"
     tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_UPLOADS}" uploads/ 2>>"${LOG_FILE}"
     rm -rf "${TEMP_UPLOADS}"
