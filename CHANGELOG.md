@@ -1,4 +1,14 @@
 # Changelog
+## [2.0.10] - 2026-04-22 - Backup Script Improvements
+
+### Fixed
+- **`docker compose cp` failure path produced silently full archive** (`scripts/backup.sh`) — when `cp` returned non-zero the old `else` branch ran `mkdir -p` (no-op if files were already partially copied) and then `tar`'d all the data while logging "Empty image archive created". Fixed by checking the actual file count in the temp directory after a failed copy: if files are present they are archived and logged as "partial/recovered"; only a genuinely empty temp directory now produces the empty-archive message.
+
+### Changed
+- **Live progress output during image extraction and packing** (`scripts/backup.sh`) — the two slow operations (`docker compose cp` and `tar`) previously produced no output. Added `start_progress` / `stop_progress` helpers that run a background spinner showing a rotating character, elapsed seconds, and the growing size of the watched path/file (e.g. `→   Packing archive... (1.1G) [/] 28s`). The line is cleared and replaced by the normal success/error message when the operation finishes.
+
+---
+
 ## [2.0.9] - 2026-03-29 - Lazy Image Loading in Register
 
 ### Changed

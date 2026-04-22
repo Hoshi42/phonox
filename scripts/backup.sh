@@ -49,6 +49,41 @@ print_info() {
     echo -e "${CYAN}→ $1${NC}"
 }
 
+# Live spinner that also shows the growing size of a file/directory.
+# Usage: start_progress "message" "/path/to/watch"
+_spinner_pid=""
+start_progress() {
+    local msg="$1"
+    local watch="$2"
+    local start_epoch
+    start_epoch=$(date +%s)
+    local spin='-\|/'
+    (
+        i=0
+        while true; do
+            now=$(date +%s)
+            elapsed=$(( now - start_epoch ))
+            extra=""
+            if [[ -n "$watch" && -e "$watch" ]]; then
+                extra=" ($(du -sh "$watch" 2>/dev/null | cut -f1))"
+            fi
+            printf "\r${CYAN}→   ${msg}${NC}${extra} [${spin:$((i % 4)):1}] ${elapsed}s  "
+            (( i++ )) || true
+            sleep 0.4
+        done
+    ) &
+    _spinner_pid=$!
+}
+
+stop_progress() {
+    if [[ -n "$_spinner_pid" ]]; then
+        kill "$_spinner_pid" 2>/dev/null
+        wait "$_spinner_pid" 2>/dev/null
+        _spinner_pid=""
+        printf "\r%-80s\r" ""
+    fi
+}
+
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BACKUP_DIR="${ROOT_DIR}/backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
@@ -82,7 +117,11 @@ if docker compose exec -T backend test -d /app/uploads > /dev/null 2>&1; then
     
     # Copy uploads from container to temp location
     print_info "  Extracting images from container..."
-    if docker compose cp backend:/app/uploads/. "${TEMP_UPLOADS}/uploads/" 2>/dev/null; then
+    start_progress "Extracting images from container..." "${TEMP_UPLOADS}/uploads"
+    docker compose cp backend:/app/uploads/. "${TEMP_UPLOADS}/uploads/" 2>/dev/null
+    _cp_rc=$?
+    stop_progress
+    if [ $_cp_rc -eq 0 ]; then
         # Count files
         IMAGE_COUNT=$(find "${TEMP_UPLOADS}/uploads" -type f 2>/dev/null | wc -l)
         
@@ -91,7 +130,11 @@ if docker compose exec -T backend test -d /app/uploads > /dev/null 2>&1; then
             print_info "  Creating archive..."
             
             # Create tar archive from temp location
-            if tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_UPLOADS}" uploads/ 2>/dev/null; then
+            start_progress "Packing archive..." "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz"
+            tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_UPLOADS}" uploads/ 2>/dev/null
+            _tar_rc=$?
+            stop_progress
+            if [ $_tar_rc -eq 0 ]; then
                 UPLOADS_SIZE=$(du -h "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" | cut -f1)
                 print_success "Image backup completed"
                 print_info "  File: phonox_uploads_${TIMESTAMP}.tar.gz"
@@ -105,10 +148,30 @@ if docker compose exec -T backend test -d /app/uploads > /dev/null 2>&1; then
             print_success "Empty image archive created"
         fi
     else
-        print_warning "Could not access images in container, creating empty archive..."
-        mkdir -p "${TEMP_UPLOADS}/uploads"
-        tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_UPLOADS}" uploads/ 2>/dev/null
-        print_success "Empty image archive created"
+        # docker compose cp may have copied files even if it returned non-zero
+        # (e.g. permission error on individual files). Check what was actually copied.
+        RECOVERED_COUNT=$(find "${TEMP_UPLOADS}/uploads" -type f 2>/dev/null | wc -l)
+        if [ "$RECOVERED_COUNT" -gt 0 ]; then
+            print_warning "docker compose cp exited with errors but $RECOVERED_COUNT file(s) were recovered"
+            print_info "  Creating archive from recovered files..."
+            start_progress "Packing recovered files..." "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz"
+            tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_UPLOADS}" uploads/ 2>/dev/null
+            _tar_rc=$?
+            stop_progress
+            if [ $_tar_rc -eq 0 ]; then
+                UPLOADS_SIZE=$(du -h "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" | cut -f1)
+                print_success "Image backup completed (partial/recovered)"
+                print_info "  File: phonox_uploads_${TIMESTAMP}.tar.gz"
+                print_info "  Size: $UPLOADS_SIZE"
+            else
+                print_error "Failed to create image archive"
+            fi
+        else
+            print_warning "Could not access images in container, creating empty archive..."
+            mkdir -p "${TEMP_UPLOADS}/uploads"
+            tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_UPLOADS}" uploads/ 2>/dev/null
+            print_success "Empty image archive created"
+        fi
     fi
     
     rm -rf "${TEMP_UPLOADS}"
