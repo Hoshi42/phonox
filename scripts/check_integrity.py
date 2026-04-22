@@ -1,4 +1,13 @@
 #!/usr/bin/env python3
+# Re-exec with the project venv Python if dependencies are missing.
+import os as _os, sys as _sys
+_venv_py = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), ".venv", "bin", "python3")
+if _os.path.exists(_venv_py) and _os.path.realpath(_sys.executable) != _os.path.realpath(_venv_py):
+    try:
+        import sqlalchemy  # noqa: F401
+    except ImportError:
+        _os.execv(_venv_py, [_venv_py] + _sys.argv)
+
 """
 check_integrity.py — Phonox data integrity checker.
 
