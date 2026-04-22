@@ -312,14 +312,18 @@ async def update_register_record(
         # Delete images that are not in the keep list
         for image in record.images:
             if image.id not in image_ids_to_keep:
-                try:
-                    # Delete file from disk
-                    if os.path.exists(image.file_path):
+                # Delete file from disk — must succeed before row is removed
+                if image.file_path and os.path.exists(image.file_path):
+                    try:
                         os.remove(image.file_path)
-                except Exception as e:
-                    print(f"Warning: Could not delete file {image.file_path}: {e}")
-                
-                # Delete from database
+                    except OSError as e:
+                        # Log with enough detail to diagnose later; don't silently swallow
+                        import logging as _log
+                        _log.getLogger(__name__).error(
+                            "Failed to delete image file %s (image_id=%s): %s",
+                            image.file_path, image.id, e
+                        )
+                # Always remove the DB row — an unreachable file is useless
                 db.delete(image)
         
         db.flush()  # Ensure deletes are processed before updating record
