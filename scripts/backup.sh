@@ -87,6 +87,15 @@ stop_progress() {
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BACKUP_DIR="${ROOT_DIR}/backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+LOG_FILE="${BACKUP_DIR}/phonox_backup_${TIMESTAMP}.log"
+
+# ---------- logging helpers ----------
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "${LOG_FILE}"
+}
+log_warn() { log "WARNING: $*"; }
+log_error() { log "ERROR:   $*"; }
+# -------------------------------------
 
 print_header "Phonox Backup"
 print_info "Backup timestamp: $TIMESTAMP"
@@ -94,16 +103,21 @@ echo ""
 
 echo "Creating backup directory..."
 mkdir -p "${BACKUP_DIR}"
+log "=== Phonox Backup started (timestamp: ${TIMESTAMP}) ==="
 
 # Backup database
 print_info "Backing up PostgreSQL database..."
-if docker compose exec -T db pg_dump -U phonox --no-comments phonox > "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql" 2>/dev/null; then
+log "Starting database backup (pg_dump)"
+if docker compose exec -T db pg_dump -U phonox --no-comments phonox > "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql" 2>>"${LOG_FILE}"; then
     DB_SIZE=$(du -h "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql" | cut -f1)
     print_success "Database backup completed"
     print_info "  File: phonox_db_${TIMESTAMP}.sql"
     print_info "  Size: $DB_SIZE"
+    log "Database backup OK — phonox_db_${TIMESTAMP}.sql (${DB_SIZE})"
 else
     print_error "Database backup failed"
+    log_error "pg_dump exited non-zero — see lines above for details"
+    log "=== Backup FAILED ==="
     exit 1
 fi
 
@@ -111,27 +125,31 @@ echo ""
 
 # Backup image uploads
 print_info "Backing up image uploads..."
-if docker compose exec -T backend test -d /app/uploads > /dev/null 2>&1; then
+log "Checking /app/uploads in backend container"
+if docker compose exec -T backend test -d /app/uploads >> "${LOG_FILE}" 2>&1; then
     # Create temporary directory for uploads
     TEMP_UPLOADS=$(mktemp -d)
     
     # Copy uploads from container to temp location
     print_info "  Extracting images from container..."
+    log "Running: docker compose cp backend:/app/uploads/. ${TEMP_UPLOADS}/uploads/"
     start_progress "Extracting images from container..." "${TEMP_UPLOADS}/uploads"
-    docker compose cp backend:/app/uploads/. "${TEMP_UPLOADS}/uploads/" 2>/dev/null
+    docker compose cp backend:/app/uploads/. "${TEMP_UPLOADS}/uploads/" 2>>"${LOG_FILE}"
     _cp_rc=$?
     stop_progress
     if [ $_cp_rc -eq 0 ]; then
         # Count files
         IMAGE_COUNT=$(find "${TEMP_UPLOADS}/uploads" -type f 2>/dev/null | wc -l)
+        log "docker compose cp OK — ${IMAGE_COUNT} file(s) in temp dir"
         
         if [ "$IMAGE_COUNT" -gt 0 ]; then
             print_info "  Found $IMAGE_COUNT image files"
             print_info "  Creating archive..."
+            log "Creating tar archive from ${IMAGE_COUNT} files"
             
             # Create tar archive from temp location
             start_progress "Packing archive..." "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz"
-            tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_UPLOADS}" uploads/ 2>/dev/null
+            tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_UPLOADS}" uploads/ 2>>"${LOG_FILE}"
             _tar_rc=$?
             stop_progress
             if [ $_tar_rc -eq 0 ]; then
@@ -139,23 +157,28 @@ if docker compose exec -T backend test -d /app/uploads > /dev/null 2>&1; then
                 print_success "Image backup completed"
                 print_info "  File: phonox_uploads_${TIMESTAMP}.tar.gz"
                 print_info "  Size: $UPLOADS_SIZE"
+                log "Image backup OK — phonox_uploads_${TIMESTAMP}.tar.gz (${UPLOADS_SIZE})"
             else
                 print_error "Failed to create image archive"
+                log_error "tar exited non-zero (rc=${_tar_rc}) — see lines above for details"
             fi
         else
             print_warning "No image files found, creating empty archive..."
-            tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_UPLOADS}" uploads/ 2>/dev/null
+            log_warn "No image files found in temp dir; creating empty archive"
+            tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_UPLOADS}" uploads/ 2>>"${LOG_FILE}"
             print_success "Empty image archive created"
         fi
     else
         # docker compose cp may have copied files even if it returned non-zero
         # (e.g. permission error on individual files). Check what was actually copied.
         RECOVERED_COUNT=$(find "${TEMP_UPLOADS}/uploads" -type f 2>/dev/null | wc -l)
+        log_warn "docker compose cp exited with rc=${_cp_rc}; ${RECOVERED_COUNT} file(s) recovered — see lines above"
         if [ "$RECOVERED_COUNT" -gt 0 ]; then
             print_warning "docker compose cp exited with errors but $RECOVERED_COUNT file(s) were recovered"
             print_info "  Creating archive from recovered files..."
+            log "Creating tar archive from ${RECOVERED_COUNT} recovered file(s)"
             start_progress "Packing recovered files..." "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz"
-            tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_UPLOADS}" uploads/ 2>/dev/null
+            tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_UPLOADS}" uploads/ 2>>"${LOG_FILE}"
             _tar_rc=$?
             stop_progress
             if [ $_tar_rc -eq 0 ]; then
@@ -163,13 +186,16 @@ if docker compose exec -T backend test -d /app/uploads > /dev/null 2>&1; then
                 print_success "Image backup completed (partial/recovered)"
                 print_info "  File: phonox_uploads_${TIMESTAMP}.tar.gz"
                 print_info "  Size: $UPLOADS_SIZE"
+                log "Image backup OK (partial/recovered) — phonox_uploads_${TIMESTAMP}.tar.gz (${UPLOADS_SIZE})"
             else
                 print_error "Failed to create image archive"
+                log_error "tar exited non-zero (rc=${_tar_rc}) — see lines above for details"
             fi
         else
             print_warning "Could not access images in container, creating empty archive..."
+            log_warn "No files recovered; creating empty archive"
             mkdir -p "${TEMP_UPLOADS}/uploads"
-            tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_UPLOADS}" uploads/ 2>/dev/null
+            tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_UPLOADS}" uploads/ 2>>"${LOG_FILE}"
             print_success "Empty image archive created"
         fi
     fi
@@ -177,9 +203,10 @@ if docker compose exec -T backend test -d /app/uploads > /dev/null 2>&1; then
     rm -rf "${TEMP_UPLOADS}"
 else
     print_warning "Backend container not running, creating empty image archive"
+    log_warn "Backend container not running — /app/uploads not accessible"
     TEMP_UPLOADS=$(mktemp -d)
     mkdir -p "${TEMP_UPLOADS}/uploads"
-    tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_UPLOADS}" uploads/ 2>/dev/null
+    tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_UPLOADS}" uploads/ 2>>"${LOG_FILE}"
     rm -rf "${TEMP_UPLOADS}"
     print_success "Empty image archive created"
 fi
@@ -223,20 +250,27 @@ cleanup_backups() {
 print_info "Cleaning old backups (keep last ${KEEP_MIN}; remove >=${MAX_AGE_DAYS} days beyond that)..."
 DELETED_DB=$(cleanup_backups "phonox_db_*.sql")
 DELETED_UPLOADS=$(cleanup_backups "phonox_uploads_*.tar.gz")
+DELETED_LOGS=$(cleanup_backups "phonox_backup_*.log")
 
-if [ "$DELETED_DB" -gt 0 ] || [ "$DELETED_UPLOADS" -gt 0 ]; then
+if [ "$DELETED_DB" -gt 0 ] || [ "$DELETED_UPLOADS" -gt 0 ] || [ "$DELETED_LOGS" -gt 0 ]; then
     print_success "Old backups removed"
-    print_info "  Deleted: $DELETED_DB database backups, $DELETED_UPLOADS upload archives"
+    print_info "  Deleted: $DELETED_DB database backups, $DELETED_UPLOADS upload archives, $DELETED_LOGS logs"
+    log "Cleanup: removed ${DELETED_DB} db backup(s), ${DELETED_UPLOADS} upload archive(s), ${DELETED_LOGS} log(s)"
 else
     print_info "  No old backups to remove"
+    log "Cleanup: nothing to remove"
 fi
 
 echo ""
 print_header "Backup Complete"
 print_success "Backup finished successfully!"
+log "=== Backup completed successfully ==="
 echo ""
 print_info "Backup files:"
 ls -lh "${BACKUP_DIR}"/phonox_db_${TIMESTAMP}.sql "${BACKUP_DIR}"/phonox_uploads_${TIMESTAMP}.tar.gz 2>/dev/null | awk '{print "  " $9 " (" $5 ")"}'
+echo ""
+print_info "Log file:"
+echo "  ${LOG_FILE}"
 echo ""
 print_info "To restore this backup, run:"
 print_info "  ./scripts/restore.sh $TIMESTAMP"
