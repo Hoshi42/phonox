@@ -59,7 +59,9 @@ docker compose cp "${SCRIPT_DIR}/check_integrity.py" "backend:${REMOTE_SCRIPT}"
 # ─── Run inside container ──────────────────────────────────────────────────────
 info "Running integrity check inside ${CONTAINER}..."
 echo ""
-docker compose exec backend python3 "${REMOTE_SCRIPT}" "${FORWARD_ARGS[@]+"${FORWARD_ARGS[@]}"}"
+docker compose exec backend python3 "${REMOTE_SCRIPT}" \
+    --uploads-dir /app/uploads \
+    "${FORWARD_ARGS[@]+"${FORWARD_ARGS[@]}"}"
 RC=$?
 
 # ─── Copy report back to host if --output was requested ───────────────────────
