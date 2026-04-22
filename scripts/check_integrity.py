@@ -1,12 +1,25 @@
 #!/usr/bin/env python3
-# Re-exec with the project venv Python if dependencies are missing.
+# Bootstrap: re-exec under the project venv if sqlalchemy is not importable.
 import os as _os, sys as _sys
-_venv_py = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), ".venv", "bin", "python3")
-if _os.path.exists(_venv_py) and _os.path.realpath(_sys.executable) != _os.path.realpath(_venv_py):
-    try:
-        import sqlalchemy  # noqa: F401
-    except ImportError:
+try:
+    import sqlalchemy as _sa_chk  # noqa: F401
+except ImportError:
+    _venv_py = _os.path.join(
+        _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
+        ".venv", "bin", "python3",
+    )
+    if _os.path.exists(_venv_py) and _os.path.realpath(_sys.executable) != _os.path.realpath(_venv_py):
         _os.execv(_venv_py, [_venv_py] + _sys.argv)
+    # venv not found or re-exec already happened — give a clear message
+    print(
+        "Error: 'sqlalchemy' is not installed.\n"
+        "  Option 1 – activate the project venv first:\n"
+        "    source <repo>/.venv/bin/activate\n"
+        "  Option 2 – install the required packages:\n"
+        "    pip install sqlalchemy psycopg2-binary pillow",
+        file=_sys.stderr,
+    )
+    _sys.exit(2)
 
 """
 check_integrity.py — Phonox data integrity checker.
