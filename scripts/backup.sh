@@ -131,12 +131,30 @@ if docker compose exec -T backend test -d /app/uploads >> "${LOG_FILE}" 2>&1; th
     TEMP_UPLOADS=$(mktemp -d)
     
     # Copy uploads from container to temp location
+    # Retry up to 3 times — transient Docker daemon I/O errors or files-in-flight
+    # can cause a non-zero exit on the first attempt.
     print_info "  Extracting images from container..."
-    log "Running: docker compose cp backend:/app/uploads/. ${TEMP_UPLOADS}/uploads/"
-    start_progress "Extracting images from container..." "${TEMP_UPLOADS}/uploads"
-    docker compose cp backend:/app/uploads/. "${TEMP_UPLOADS}/uploads/" 2>>"${LOG_FILE}"
-    _cp_rc=$?
-    stop_progress
+    _CP_MAX_TRIES=3
+    _cp_rc=1
+    for (( _try=1; _try<=_CP_MAX_TRIES; _try++ )); do
+        if [ $_try -gt 1 ]; then
+            print_info "  Retrying copy (attempt ${_try}/${_CP_MAX_TRIES})..."
+            log "docker compose cp attempt ${_try}/${_CP_MAX_TRIES}"
+            sleep 3
+        else
+            log "Running: docker compose cp backend:/app/uploads/. ${TEMP_UPLOADS}/uploads/ (attempt 1/${_CP_MAX_TRIES})"
+        fi
+        start_progress "Extracting images from container (attempt ${_try})..." "${TEMP_UPLOADS}/uploads"
+        docker compose cp backend:/app/uploads/. "${TEMP_UPLOADS}/uploads/" 2>>"${LOG_FILE}"
+        _cp_rc=$?
+        stop_progress
+        if [ $_cp_rc -eq 0 ]; then
+            log "docker compose cp succeeded on attempt ${_try}"
+            break
+        else
+            log_warn "docker compose cp failed on attempt ${_try} (rc=${_cp_rc})"
+        fi
+    done
     if [ $_cp_rc -eq 0 ]; then
         # Count files
         IMAGE_COUNT=$(find "${TEMP_UPLOADS}/uploads" -type f 2>/dev/null | wc -l)

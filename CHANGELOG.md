@@ -1,4 +1,11 @@
 # Changelog
+## [2.0.12] - 2026-04-22 - Backup cp retry
+
+### Changed
+- **`docker compose cp` retried up to 3 times** (`scripts/backup.sh`) — transient Docker daemon I/O errors, files-in-flight during an upload, or socket timeouts on a loaded small server can cause the copy to fail on the first attempt. The script now retries with a 3-second pause between attempts before falling back to the partial-recovery path. Each attempt and its result is recorded in the backup log.
+
+---
+
 ## [2.0.11] - 2026-04-22 - Data Integrity Checker
 
 ### Added
