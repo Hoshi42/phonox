@@ -1,4 +1,15 @@
 # Changelog
+## [2.0.11] - 2026-04-22 - Data Integrity Checker
+
+### Added
+- **`scripts/check_integrity.py`** — standalone read-only integrity checker that compares the PostgreSQL database against the uploads directory and produces a human-readable report. Six checks are performed: (1) DB→disk — image rows whose `file_path` no longer exists on disk; (2) Disk→DB — files in the uploads directory with no referencing DB row; (3) register records with `in_register=TRUE` but zero associated images; (4) broken foreign keys (`vinyl_images.record_id` pointing to a missing `vinyl_records` row); (5) `content_type` mismatches between the stored MIME type and the actual file extension; (6) zero-byte or unreadable (corrupt) image files.
+- **`--fix` flag** — applies all safe fixes in a single DB transaction (rolled back on any error): deletes broken `vinyl_images` rows, removes orphaned disk files, sets `in_register=FALSE` for image-less register records, updates mismatched `content_type` values, deletes corrupt files.
+- **`--output FILE`** flag — writes the plain-text (ANSI-stripped) report to a file in addition to stdout.
+- **`--db-url` / `--uploads-dir`** flags — override the `DATABASE_URL` / `UPLOAD_DIR` env vars; useful for running the checker against a restored backup on a different host.
+- Exit code `0` = clean (or all issues fixed), `1` = issues found, `2` = unexpected error.
+
+---
+
 ## [2.0.10] - 2026-04-22 - Backup Script Improvements
 
 ### Fixed
