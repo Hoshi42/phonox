@@ -130,12 +130,38 @@ if docker compose exec -T backend test -d /app/uploads >> "${LOG_FILE}" 2>&1; th
     # Create temporary directory for uploads
     TEMP_UPLOADS=$(mktemp -d)
     
+    # Pre-flight: check available space in /tmp against uploads size
+    UPLOADS_BYTES=$(docker compose exec -T backend du -sb /app/uploads 2>/dev/null | awk '{print $1}')
+    TMPDIR_AVAIL=$(df -B1 --output=avail "$(dirname "${TEMP_UPLOADS}")" 2>/dev/null | tail -1 | tr -d ' ')
+    if [[ -n "$UPLOADS_BYTES" && -n "$TMPDIR_AVAIL" ]]; then
+        log "Space check: uploads=${UPLOADS_BYTES} bytes; available in $(dirname "${TEMP_UPLOADS}")=${TMPDIR_AVAIL} bytes"
+        if (( UPLOADS_BYTES > TMPDIR_AVAIL )); then
+            NEEDED_H=$(numfmt --to=iec-i --suffix=B "${UPLOADS_BYTES}" 2>/dev/null || echo "${UPLOADS_BYTES} bytes")
+            AVAIL_H=$(numfmt --to=iec-i --suffix=B "${TMPDIR_AVAIL}" 2>/dev/null || echo "${TMPDIR_AVAIL} bytes")
+            print_error "Not enough disk space for image backup"
+            print_info "  Needed : ${NEEDED_H}  —  Available: ${AVAIL_H}"
+            log_error "Disk space check failed: need ${UPLOADS_BYTES}B, have ${TMPDIR_AVAIL}B in $(dirname "${TEMP_UPLOADS}")"
+            rm -rf "${TEMP_UPLOADS}"
+            # Create empty placeholder archive so later cleanup logic still works
+            TEMP_EMPTY=$(mktemp -d)
+            mkdir -p "${TEMP_EMPTY}/uploads"
+            tar -czf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_EMPTY}" uploads/ 2>/dev/null
+            rm -rf "${TEMP_EMPTY}"
+            print_warning "Empty placeholder archive created (re-run backup when space is freed)"
+            echo ""
+            # Skip to cleanup — do not attempt the copy
+            _cp_skipped=1
+        fi
+    fi
+
+    if [[ "${_cp_skipped:-0}" == "0" ]]; then
     # Copy uploads from container to temp location
     # Retry up to 3 times — transient Docker daemon I/O errors or files-in-flight
     # can cause a non-zero exit on the first attempt.
     print_info "  Extracting images from container..."
     _CP_MAX_TRIES=3
     _cp_rc=1
+    _CP_ERR=$(mktemp)
     for (( _try=1; _try<=_CP_MAX_TRIES; _try++ )); do
         if [ $_try -gt 1 ]; then
             print_info "  Retrying copy (attempt ${_try}/${_CP_MAX_TRIES})..."
@@ -145,16 +171,24 @@ if docker compose exec -T backend test -d /app/uploads >> "${LOG_FILE}" 2>&1; th
             log "Running: docker compose cp backend:/app/uploads/. ${TEMP_UPLOADS}/uploads/ (attempt 1/${_CP_MAX_TRIES})"
         fi
         start_progress "Extracting images from container (attempt ${_try})..." "${TEMP_UPLOADS}/uploads"
-        docker compose cp backend:/app/uploads/. "${TEMP_UPLOADS}/uploads/" 2>>"${LOG_FILE}"
+        docker compose cp backend:/app/uploads/. "${TEMP_UPLOADS}/uploads/" 2>"${_CP_ERR}"
         _cp_rc=$?
         stop_progress
+        cat "${_CP_ERR}" >> "${LOG_FILE}"
         if [ $_cp_rc -eq 0 ]; then
             log "docker compose cp succeeded on attempt ${_try}"
             break
-        else
-            log_warn "docker compose cp failed on attempt ${_try} (rc=${_cp_rc})"
         fi
+        # No space left — retrying won't help
+        if grep -qi "no space left" "${_CP_ERR}"; then
+            AVAIL_H=$(df -h "$(dirname "${TEMP_UPLOADS}")" 2>/dev/null | awk 'NR==2{print $4}')
+            print_error "No space left on device — cannot store images (available: ${AVAIL_H:-unknown})"
+            log_error "Aborting retries: 'no space left on device' — free disk space and re-run"
+            break
+        fi
+        log_warn "docker compose cp failed on attempt ${_try} (rc=${_cp_rc})"
     done
+    rm -f "${_CP_ERR}"
     if [ $_cp_rc -eq 0 ]; then
         # Count files
         IMAGE_COUNT=$(find "${TEMP_UPLOADS}/uploads" -type f 2>/dev/null | wc -l)
@@ -217,6 +251,8 @@ if docker compose exec -T backend test -d /app/uploads >> "${LOG_FILE}" 2>&1; th
             print_success "Empty image archive created"
         fi
     fi
+
+    fi # end _cp_skipped guard
     
     rm -rf "${TEMP_UPLOADS}"
 else

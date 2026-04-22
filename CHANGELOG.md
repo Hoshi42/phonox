@@ -1,4 +1,12 @@
 # Changelog
+## [2.0.13] - 2026-04-22 - Backup space check & no-space-left guard
+
+### Changed
+- **Pre-flight disk space check** (`scripts/backup.sh`) — before attempting `docker compose cp`, the script now compares the size of `/app/uploads` inside the container against available space in the temp directory. If there is not enough space, it logs a clear error with human-readable sizes, creates an empty placeholder archive, and skips the copy entirely rather than failing mid-transfer.
+- **`no space left on device` detected mid-copy** — stderr of each `docker compose cp` attempt is now captured to a temp file and inspected. If the error contains "no space left", the retry loop aborts immediately (retrying a full-disk error is pointless) and prints an actionable message with the available space.
+
+---
+
 ## [2.0.12] - 2026-04-22 - Backup cp retry
 
 ### Changed
