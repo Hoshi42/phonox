@@ -2,6 +2,17 @@
 
 All notable changes to Phonox are documented here.
 
+## Versions
+
+### v2.0.14 - 2026-06-06
+
+**Restore: stream images directly, clear before restore, fix verification count**
+
+- **`no space left on device` on restore fixed** — the restore script no longer extracts the image archive to a host temp directory before copying it to the container. The `.tar.gz` is now streamed directly from the backup file into the container (`docker exec -i … tar -xzf - -C /app`), using zero host temp space. Fixes restore failures on Raspberry Pi and other low-disk hosts.
+- **Old uploads cleared before restore** — `rm -rf /app/uploads/*` is run inside the container before streaming the new archive, removing orphaned files and freeing volume space.
+- **Restore verification count fixed** — post-copy file count was always reported as 0 due to an invalid `-T` flag on `docker exec` (only valid for `docker compose exec`). Removed.
+- **Progress bar divide-by-zero fixed** — guarded `show_progress` call against `IMAGE_COUNT=0`.
+
 ## Versioning
 
 Phonox uses semantic versioning: `MAJOR.MINOR.PATCH`

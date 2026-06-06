@@ -115,7 +115,6 @@ print_success "Database prepared"
 # Create a temp SQL file with \restrict line removed to avoid restricted mode
 print_info "Processing backup file..."
 TEMP_SQL=$(mktemp)
-TOTAL_LINES=$(wc -l < "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql")
 sed '/^\\restrict/d' "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql" > "${TEMP_SQL}"
 print_success "Backup file processed"
 
@@ -137,11 +136,6 @@ print_header "Image Restoration"
 if [ -f "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" ]; then
     IMAGES_SIZE=$(du -h "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" | cut -f1)
     print_info "Image backup size: $IMAGES_SIZE"
-    
-    print_info "Extracting image files..."
-    TEMP_UPLOADS=$(mktemp -d)
-    tar -xzf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" -C "${TEMP_UPLOADS}" 2>/dev/null
-    print_success "Image files extracted"
     
     print_info "Starting remaining containers..."
     docker compose up -d > /dev/null 2>&1
@@ -165,36 +159,36 @@ if [ -f "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" ]; then
         print_warning "Backend did not start within 60 seconds, but continuing..."
     fi
     
-    # Copy uploads into the container's volume with progress
-    if [ -d "${TEMP_UPLOADS}/uploads" ]; then
-        IMAGE_COUNT=$(find "${TEMP_UPLOADS}/uploads" -type f | wc -l)
-        UPLOAD_SIZE=$(du -sh "${TEMP_UPLOADS}/uploads" 2>/dev/null | cut -f1)
-        print_info "Copying $IMAGE_COUNT image files ($UPLOAD_SIZE) to container..."
+    # Clear existing uploads to free space and ensure a clean restore
+    print_info "Clearing existing uploads in container..."
+    docker exec phonox_backend sh -c "rm -rf /app/uploads/* /app/uploads/.[!.]* 2>/dev/null; mkdir -p /app/uploads" > /dev/null 2>&1
+    print_success "Existing uploads cleared"
+
+    # Stream archive directly into container — no temp extraction, saves disk space on the host
+    IMAGE_COUNT=$(tar -tzf "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" 2>/dev/null | grep -c '[^/]$' || echo 0)
+    ARCHIVE_SIZE=$(du -sh "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" 2>/dev/null | cut -f1)
+    print_info "Copying $IMAGE_COUNT image files ($ARCHIVE_SIZE compressed) to container..."
+    
+    if docker exec -i phonox_backend tar -xzf - -C /app \
+       < "${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz" 2>/dev/null; then
         
-        # Use tar to copy files efficiently (extract to /app so uploads/ becomes /app/uploads/)
-        if tar -C "${TEMP_UPLOADS}" -cf - uploads/ 2>/dev/null | \
-           docker exec -i phonox_backend tar -xf - -C /app 2>/dev/null; then
-            
-            # Verify copy was successful
-            CONTAINER_FILE_COUNT=$(docker exec -T phonox_backend find /app/uploads -type f 2>/dev/null | wc -l)
-            
-            # Show progress completion
+        # Verify copy was successful
+        CONTAINER_FILE_COUNT=$(docker exec phonox_backend find /app/uploads -type f 2>/dev/null | wc -l)
+        
+        # Show progress completion
+        if [ "$IMAGE_COUNT" -gt 0 ]; then
             show_progress "$IMAGE_COUNT" "$IMAGE_COUNT" "Copying images"
             echo ""
-            
-            if [ "$CONTAINER_FILE_COUNT" -eq "$IMAGE_COUNT" ]; then
-                print_success "Image uploads restored successfully! ($CONTAINER_FILE_COUNT files)"
-            else
-                print_warning "$CONTAINER_FILE_COUNT of $IMAGE_COUNT image files were copied"
-            fi
+        fi
+        
+        if [ "$CONTAINER_FILE_COUNT" -eq "$IMAGE_COUNT" ]; then
+            print_success "Image uploads restored successfully! ($CONTAINER_FILE_COUNT files)"
         else
-            print_error "Failed to copy image files to container"
+            print_warning "$CONTAINER_FILE_COUNT of $IMAGE_COUNT image files were copied"
         fi
     else
-        print_warning "No uploads directory found in backup"
+        print_error "Failed to copy image files to container"
     fi
-    
-    rm -rf "${TEMP_UPLOADS}"
 else
     print_warning "Image backup not found: ${BACKUP_DIR}/phonox_uploads_${TIMESTAMP}.tar.gz"
     print_warning "Starting all containers without images..."

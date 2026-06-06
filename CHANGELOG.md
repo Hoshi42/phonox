@@ -1,4 +1,17 @@
 # Changelog
+## [2.0.14] - 2026-06-06 - Restore: stream images directly, clear before restore, fix verification count
+
+### Fixed
+- **`no space left on device` on restore** (`scripts/restore.sh`) — the previous restore flow extracted the image archive to a `mktemp -d` directory (typically `/tmp`) before piping it into the container. On low-disk hosts (e.g. Raspberry Pi) this consumed up to 1.9 G of host temp space, filling `/tmp` and causing the OCI runtime to fail when it tried to write its own process file (`/tmp/runc-process*`). The extraction step is now removed entirely: the `.tar.gz` is streamed directly from the backup file into the container via `docker exec -i … tar -xzf - -C /app`, using zero host temp space.
+- **Restore verification always reported 0 files copied** (`scripts/restore.sh`) — the post-copy file count used `docker exec -T`, which is not a valid flag for `docker exec` (it is a `docker compose exec` flag). Docker silently failed, stderr was swallowed by `2>/dev/null`, and `wc -l` returned 0. Removed the invalid `-T` flag.
+- **Divide-by-zero in progress bar** (`scripts/restore.sh`) — `show_progress 0 0` caused a bash arithmetic error (`$((0 * 100 / 0))`). The call is now guarded with `[ "$IMAGE_COUNT" -gt 0 ]`.
+
+### Changed
+- **Old uploads cleared before restore** (`scripts/restore.sh`) — before streaming the backup archive, the script now runs `rm -rf /app/uploads/*` inside the container. This removes orphaned files from previous restores and frees volume space before the new images arrive.
+- **Removed unused `TOTAL_LINES` variable** (`scripts/restore.sh`) — `TOTAL_LINES` was computed but never referenced.
+
+---
+
 ## [2.0.13] - 2026-04-22 - Backup space check & no-space-left guard
 
 ### Changed

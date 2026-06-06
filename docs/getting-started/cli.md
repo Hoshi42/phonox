@@ -235,7 +235,7 @@ A curses menu lists all available backups sorted newest-first:
   Cancel
 ```
 
-Select a backup, then type `yes` to confirm. The CLI then restores the PostgreSQL database from the SQL dump and extracts the image archive.
+Select a backup, then type `yes` to confirm. The CLI restores the PostgreSQL database from the SQL dump and streams the image archive directly into the container — no temporary extraction on the host, so it works safely on low-disk machines like a Raspberry Pi. Existing uploads are cleared first to ensure a clean restore.
 
 **⚠️ Warning:** This overwrites current data. Always create a backup first!
 
