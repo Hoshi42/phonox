@@ -1,6 +1,8 @@
 # Core framework
 langchain>=0.1.0
-langgraph>=0.0.40
+langchain-anthropic>=0.3.0
+langgraph>=0.2.0
+langgraph-checkpoint-postgres>=2.0.0
 pydantic>=2.0.0
 
 # FastAPI & Web
@@ -9,6 +11,7 @@ uvicorn>=0.23.0
 sqlalchemy>=2.0.0
 python-multipart>=0.0.6
 psycopg2-binary>=2.9.9
+psycopg[binary]>=3.1.1
 Pillow>=10.1.0
 
 # LLM & AI APIs

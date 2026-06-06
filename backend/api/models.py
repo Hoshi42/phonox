@@ -214,8 +214,9 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     """Chat message request."""
     message: str = Field(..., min_length=1, max_length=150000)  # Increased for large collection analysis JSON with full prompt
+    thread_id: Optional[str] = None  # Client-supplied thread ID; scopes LangGraph checkpoint memory
     metadata: Optional[Dict[str, str]] = None  # e.g. {"pressing": "first", "condition": "VG+"}
-    chat_history: Optional[List[Dict[str, str]]] = None  # Previous messages for context: [{"role": "user"/"assistant", "content": "..."}]
+    chat_history: Optional[List[Dict[str, str]]] = None  # Legacy: still accepted for collection_analysis path
     collection_analysis: bool = Field(default=False, description="Skip web search for collection analysis")
 
     class Config:

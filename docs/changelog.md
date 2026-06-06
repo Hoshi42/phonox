@@ -4,6 +4,21 @@ All notable changes to Phonox are documented here.
 
 ## Versions
 
+### v2.1.0 - 2026-06-07
+
+**LangGraph ReAct agent, quiz tool, agentic chat UI**
+
+- **LangGraph ReAct chat agent** — the chat backend now uses a full `StateGraph` (START → agent ↔ tools → END). The agent decides autonomously which tools to call. Replaces the previous keyword-triggered direct Claude calls.
+- **PostgresSaver memory** — conversation history persisted per thread in PostgreSQL. Record chats keep context per record; general chat sessions persist across page refreshes via a browser-local UUID.
+- **Three agent tools**: `query_collection` (query your vinyl DB), `web_search` (vinyl info / history), `search_vinyl_prices` (Discogs market pricing).
+- **Quiz tool** (`quiz_collection`) — generates interactive multiple-choice quizzes from your collection. Four question types (year, label, genre, artist), three difficulty levels, answer keys embedded for scoring.
+- **Agentic chat UI** — markdown rendering, cycling loading status, 🔍 web-search badge, collapsible sources, clear-conversation button, thread-based persistence.
+- **New quick actions** — 🎯 Quiz My Collection button; upload button renamed to "+ Add Record".
+- **Sort by Date Added** in the vinyl register dropdown.
+- **Bug fix**: `estimated_value_usd` AttributeError in record chat response serialization.
+
+---
+
 ### v2.0.14 - 2026-06-06
 
 **Restore: stream images directly, clear before restore, fix verification count**

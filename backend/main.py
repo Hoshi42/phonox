@@ -74,7 +74,11 @@ async def lifespan(app: FastAPI):
         # Create tables
         Base.metadata.create_all(bind=engine)
         logger.info("✅ Database tables created/verified")
-        
+
+        # Initialize LangGraph chat agent (creates checkpoint tables, compiles graph)
+        from backend.agent.chat_agent import init_chat_agent
+        init_chat_agent(DATABASE_URL)
+
     except Exception as e:
         logger.critical(f"❌ Failed to initialize database: {e}")
         logger.critical("Application startup failed. Database connection is required.")

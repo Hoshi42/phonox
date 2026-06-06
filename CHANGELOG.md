@@ -1,4 +1,31 @@
 # Changelog
+## [2.1.0] - 2026-06-07 - LangGraph ReAct agent, quiz tool, agentic chat UI
+
+### Added
+- **LangGraph ReAct chat agent** (`backend/agent/chat_agent.py`) — replaces the previous keyword-triggered direct Claude calls with a full `StateGraph` (START → agent ↔ tools → END). The agent decides autonomously which tools to call based on the user's intent. Recursion limit is 6 tool calls per turn.
+- **PostgresSaver memory** — conversation history is persisted per thread in PostgreSQL via `langgraph-checkpoint-postgres`. Record chats use `thread_id = record_{id}`; general chat sessions use a browser-local UUID, surviving page refreshes.
+- **`query_collection` tool** — lets the agent query the user's `vinyl_records` table with filters for artist, genre, year range, and user tag. The DB session is injected per-request via `RunnableConfig`; never stored in the checkpoint.
+- **`web_search` tool** — Tavily/DuckDuckGo search for vinyl history, pressings, labels, and collecting tips.
+- **`search_vinyl_prices` tool** — comprehensive Discogs/market pricing lookup for any artist + title.
+- **`quiz_collection` tool** — generates interactive multiple-choice quizzes from the user's collection. Supports four question types (year, label, genre, artist), three difficulty levels (easy/medium/hard), and 1–10 questions. Answer keys are embedded in the tool result so the agent can score responses without revealing answers during the quiz.
+- **Token budget** — `trim_messages` with a 24K-token budget (≈4 chars/token) keeps every LLM call within limits regardless of thread length.
+- **Message cap** — thread history is capped at 40 messages in Postgres to keep checkpoint rows small.
+- **Agentic chat UI** (`frontend/src/components/ChatPanel.tsx`) — new features: cycling loading status text, markdown rendering via `react-markdown`, collapsible sources panel, 🔍 web-search badge on agent messages that used tools, clear-conversation button (🗑️), and `thread_id`-based persistence replacing the old `chat_history` payload.
+- **Quick-action buttons updated** — removed `/web` prefixes (now handled automatically by the agent); added **🎯 Quiz My Collection** button (purple accent); renamed Upload to **📸 Add Record**.
+- **Sort by Date Added** (`frontend/src/components/VinylRegister.tsx`) — new sort option in the register dropdown, ordered by `created_at` descending.
+- **Dropdown option styling** (`frontend/src/components/VinylRegister.module.css`) — sort and genre `<select>` options now render with the dark theme background (`#1e1e3a`) instead of the browser default white.
+
+### Fixed
+- **`estimated_value_usd` AttributeError** (`backend/api/routes.py`) — three `VinylMetadataModel` constructions referenced `vinyl_record.estimated_value_usd`, which does not exist on the `VinylRecord` model (the column is `estimated_value_eur`). All three now pass `None`.
+- **`recursion_limit` compile error** — `StateGraph.compile()` does not accept a `recursion_limit` keyword; moved to invocation config.
+- **Blank chat window** — `ReactMarkdown` v10.1.0 does not accept a `className` prop directly; wrapped in `<div className={styles.markdown}>` instead.
+
+### Changed
+- **New Python dependencies** added to `requirements.txt`: `langchain-anthropic>=0.3.0`, `langgraph>=0.2.0`, `langgraph-checkpoint-postgres>=2.0.0`, `psycopg[binary]>=3.1.1`.
+- **System prompts** are injected fresh on every invocation via `RunnableConfig` and are never stored in the checkpoint, keeping metadata always current.
+
+---
+
 ## [2.0.14] - 2026-06-06 - Restore: stream images directly, clear before restore, fix verification count
 
 ### Fixed

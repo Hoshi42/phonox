@@ -29,6 +29,19 @@ import styles from './ChatPanel.module.css'
 const MAX_MESSAGE_PAIRS = 10 // Keep last 10 message pairs (prompt + response)
 const MAX_MESSAGES = MAX_MESSAGE_PAIRS * 2 // 20 total messages max
 const CHAT_HISTORY_STORAGE_KEY = 'phonox_chat_history'
+const GENERAL_CHAT_THREAD_KEY = 'phonox_general_chat_thread_id'
+
+/** Generate or reuse a stable session ID for the general chat thread. */
+function getOrCreateSessionId(): string {
+  let id = localStorage.getItem(GENERAL_CHAT_THREAD_KEY)
+  if (!id) {
+    id = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2) + Date.now().toString(36)
+    localStorage.setItem(GENERAL_CHAT_THREAD_KEY, id)
+  }
+  return id
+}
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
@@ -156,8 +169,24 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
   
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loadingStep, setLoadingStep] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const LOADING_STEPS = [
+    'Thinking…',
+    'Checking knowledge…',
+    'Researching…',
+    'Crafting response…',
+  ]
+
+  // Cycle loading text while waiting
+  useEffect(() => {
+    if (!loading) { setLoadingStep(0); return }
+    const timer = setInterval(() => setLoadingStep(s => (s + 1) % LOADING_STEPS.length), 2000)
+    return () => clearInterval(timer)
+  }, [loading])
 
   // Save chat history whenever messages change
   useEffect(() => {
@@ -214,6 +243,25 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
       })
     }
   }))
+
+  const clearChat = () => {
+    const greeting: ChatMessage = {
+      role: 'assistant',
+      content: initialGreeting,
+      timestamp: new Date().toISOString(),
+    }
+    setMessages([greeting])
+    if (record?.record_id) {
+      localStorage.removeItem(`${CHAT_HISTORY_STORAGE_KEY}_${record.record_id}`)
+    }
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value)
+    // Auto-resize
+    e.target.style.height = 'auto'
+    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
+  }
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -277,26 +325,26 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
       
       // Choose endpoint based on whether we have a record
       if (record) {
-        // Record-specific chat with integrated web search
+        // Record-specific chat — server manages memory via thread_id
         response = await fetchWithTimeout(`/api/v1/identify/${record.record_id}/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             message: userMessage.content,
-            chat_history: chatHistoryForContext
+            thread_id: record.record_id,
           }),
-          timeout: TIMEOUT_PRESETS.NORMAL // 30s
+          timeout: TIMEOUT_PRESETS.NORMAL
         })
       } else {
-        // General chat with web search capabilities
+        // General chat — server manages memory via session thread_id
         response = await fetchWithTimeout('/api/v1/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             message: userMessage.content,
-            chat_history: chatHistoryForContext
+            thread_id: getOrCreateSessionId(),
           }),
-          timeout: TIMEOUT_PRESETS.NORMAL // 30s
+          timeout: TIMEOUT_PRESETS.NORMAL
         })
       }
 
@@ -394,12 +442,20 @@ The vinyl card has been updated with all the details. You can edit any informati
       <div className={styles.header}>
         <h2>🎵 Vinyl Assistant</h2>
         <div className={styles.headerActions}>
+          <button
+            onClick={clearChat}
+            className={styles.clearBtn}
+            title="Clear conversation"
+            disabled={loading}
+          >
+            🗑️
+          </button>
           <button 
             onClick={() => fileInputRef.current?.click()}
             className={styles.uploadBtn}
             title="Upload images"
           >
-            📷 Upload
+            + Add Record
           </button>
         </div>
       </div>
@@ -458,51 +514,23 @@ The vinyl card has been updated with all the details. You can edit any informati
               )}
               {(message.role === 'assistant' || message.role === 'system') ? (
                 <>
-                  <div className={styles.markdown} dangerouslySetInnerHTML={{
-                    __html: message.content
-                      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                      .replace(/\n/g, '<br>')
-                      .replace(/^(📅|🏷️|📋|🎵|✅)/gm, '<br>$1')
-                  }} />
-                  {(message.sourcesUsed ?? 0) > 0 && (
-                    <div style={{ 
-                      fontSize: '0.75rem', 
-                      marginTop: '12px', 
-                      padding: '8px',
-                      backgroundColor: 'rgba(160, 174, 192, 0.1)',
-                      borderRadius: '4px',
-                      borderLeft: '3px solid #a0aec0'
-                    }}>
-                      <div style={{ 
-                        fontWeight: 'bold', 
-                        marginBottom: '4px',
-                        color: '#a0aec0'
-                      }}>
-                        📄 Sources ({message.sourcesUsed})
-                      </div>
-                      {message.searchResults && message.searchResults.length > 0 && (
-                        <div style={{ fontSize: '0.7rem' }}>
-                          {message.searchResults.map((source, idx) => (
-                            <div key={idx} style={{ marginBottom: '4px' }}>
-                              <a 
-                                href={source.url} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                style={{ 
-                                  color: '#4299e1',
-                                  textDecoration: 'none'
-                                }}
-                                onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
-                                onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
-                              >
-                                {idx + 1}. {source.title}
-                              </a>
-                            </div>
-                          ))}
+                  <div className={styles.markdown}>
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                  </div>
+                  {message.webEnhanced && (
+                    <div className={styles.toolBadge}>🔍 Used web search</div>
+                  )}
+                  {(message.sourcesUsed ?? 0) > 0 && message.searchResults && message.searchResults.length > 0 && (
+                    <details className={styles.sources}>
+                      <summary>📄 {message.sourcesUsed} source{message.sourcesUsed !== 1 ? 's' : ''}</summary>
+                      {message.searchResults.map((source, idx) => (
+                        <div key={idx}>
+                          <a href={source.url} target="_blank" rel="noopener noreferrer">
+                            {idx + 1}. {source.title}
+                          </a>
                         </div>
-                      )}
-                    </div>
+                      ))}
+                    </details>
                   )}
                 </>
               ) : (
@@ -519,12 +547,10 @@ The vinyl card has been updated with all the details. You can edit any informati
             </div>
             <div className={styles.messageContent}>
               <div className={styles.loadingDots}>
-                <span></span>
-                <span></span>
-                <span></span>
+                <span></span><span></span><span></span>
               </div>
-              <div style={{ fontSize: '0.8rem', marginTop: '4px', opacity: 0.7 }}>
-                {record ? 'Thinking...' : 'Searching the web...'}
+              <div className={styles.loadingStatus}>
+                {LOADING_STEPS[loadingStep]}
               </div>
             </div>
           </div>
@@ -539,12 +565,12 @@ The vinyl card has been updated with all the details. You can edit any informati
           <textarea
             ref={chatInputRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={handleInputChange}
             onKeyPress={handleKeyPress}
             placeholder={
               record 
-                ? "Ask about this record, its value, history... (use /web to force web search)"
-                : "Ask about vinyl records, prices, artists, collecting tips... (use /web to force web search)"
+                ? "Ask about this record — value, history, pressings, condition…"
+                : "Ask about vinyl records, prices, artists, collecting tips…"
             }
             className={styles.input}
             rows={1}
@@ -561,55 +587,18 @@ The vinyl card has been updated with all the details. You can edit any informati
         </div>
         
         <div className={styles.quickActions}>
-          <button 
-            onClick={() => fileInputRef.current?.click()}
-            className={styles.quickActionBtn}
-          >
-            📷 Upload Images
-          </button>
           {record ? (
-            // Record-specific quick actions
             <>
-              <button 
-                onClick={() => setInput("What's the current market value?")}
-                className={styles.quickActionBtn}
-              >
-                💰 Check Value
-              </button>
-              <button 
-                onClick={() => setInput("/web Tell me about this pressing")}
-                className={styles.quickActionBtn}
-              >
-                🌐 Web Search
-              </button>
-              <button 
-                onClick={() => setInput("What should I know about condition?")}
-                className={styles.quickActionBtn}
-              >
-                🔍 Condition Guide
-              </button>
+              <button onClick={() => setInput("What's the current market value of this record?")} className={styles.quickActionBtn}>💰 Market Value</button>
+              <button onClick={() => setInput("Is this a first pressing? How can I tell?")} className={styles.quickActionBtn}>🔍 First Pressing?</button>
+              <button onClick={() => setInput("What similar records should I look for?")} className={styles.quickActionBtn}>🎵 Similar Records</button>
             </>
           ) : (
-            // General vinyl quick actions
             <>
-              <button 
-                onClick={() => setInput("What are the most valuable vinyl records?")}
-                className={styles.quickActionBtn}
-              >
-                💎 Valuable Records
-              </button>
-              <button 
-                onClick={() => setInput("/web How do I start collecting vinyl?")}
-                className={styles.quickActionBtn}
-              >
-                🌐 Web Search
-              </button>
-              <button 
-                onClick={() => setInput("What should I look for when buying vinyl?")}
-                className={styles.quickActionBtn}
-              >
-                🛒 Buying Tips
-              </button>
+              <button onClick={() => setInput("What makes a vinyl pressing valuable?")} className={styles.quickActionBtn}>💎 What Makes Value?</button>
+              <button onClick={() => setInput("How do I grade vinyl condition accurately?")} className={styles.quickActionBtn}>📋 Grading Guide</button>
+              <button onClick={() => setInput("What are the most sought-after vinyl genres?")} className={styles.quickActionBtn}>🎶 Sought-After Genres</button>
+              <button onClick={() => setInput("Quiz me on my vinyl collection!")} className={`${styles.quickActionBtn} ${styles.quickActionBtnQuiz}`}>🎯 Quiz My Collection</button>
             </>
           )}
         </div>

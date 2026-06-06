@@ -420,3 +420,100 @@
   transform: translateY(-1px);
 }
 
+.quickActionBtnQuiz {
+  border-color: rgba(167, 139, 250, 0.4);
+  color: #c4b5fd;
+}
+
+.quickActionBtnQuiz:hover {
+  background: rgba(167, 139, 250, 0.15);
+  border-color: rgba(167, 139, 250, 0.6);
+  color: #ddd6fe;
+}
+
+/* ── Clear button ───────────────────────────────── */
+.clearBtn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.clearBtn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.clearBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Tool-use badge ─────────────────────────────── */
+.toolBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 3px 8px;
+  background: rgba(102, 126, 234, 0.15);
+  border: 1px solid rgba(102, 126, 234, 0.3);
+  border-radius: 10px;
+  font-size: 0.7rem;
+  color: #a5b4fc;
+}
+
+/* ── Sources collapsible ────────────────────────── */
+.sources {
+  margin-top: 10px;
+  font-size: 0.75rem;
+  color: #a0aec0;
+}
+
+.sources summary {
+  cursor: pointer;
+  padding: 4px 0;
+  list-style: none;
+  color: #a0aec0;
+  user-select: none;
+}
+
+.sources summary:hover {
+  color: #e0e7ff;
+}
+
+.sources a {
+  display: block;
+  padding: 2px 0 2px 12px;
+  color: #4299e1;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sources a:hover {
+  text-decoration: underline;
+}
+
+/* ── Cycling loading status ─────────────────────── */
+.loadingStatus {
+  font-size: 0.78rem;
+  margin-top: 6px;
+  opacity: 0.65;
+  animation: fadeStatus 0.4s ease-in-out;
+}
+
+@keyframes fadeStatus {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 0.65; transform: translateY(0); }
+}
+

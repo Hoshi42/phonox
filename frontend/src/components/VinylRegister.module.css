@@ -301,6 +301,11 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+.sortSelect option, .genreSelect option {
+  background: #1e1e3a;
+  color: #e0e7ff;
+}
+
 .recordsContainer {
   flex: 1;
   overflow-y: auto;

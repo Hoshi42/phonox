@@ -52,7 +52,7 @@ export default function VinylRegister({
   onAnalysisReport
 }: VinylRegisterProps) {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid')
-  const [sortBy, setSortBy] = useState<'artist' | 'title' | 'year' | 'value'>('artist')
+  const [sortBy, setSortBy] = useState<'artist' | 'title' | 'year' | 'value' | 'added'>('artist')
   const [filterGenre, setFilterGenre] = useState<string>('')
   const [searchText, setSearchText] = useState<string>('')
   const [analysis, setAnalysis] = useState<CollectionAnalysis>({
@@ -102,6 +102,8 @@ export default function VinylRegister({
         return (b.year || 0) - (a.year || 0)
       case 'value':
         return getRecordValue(b) - getRecordValue(a)
+      case 'added':
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
       default:
         return 0
     }
@@ -660,6 +662,7 @@ ${analysis.summary}
               <option value="title">Sort by Title</option>
               <option value="year">Sort by Year</option>
               <option value="value">Sort by Value</option>
+              <option value="added">Sort by Date Added</option>
             </select>
 
             <select 
