@@ -29,6 +29,7 @@ Config keys (passed per invocation, never stored in checkpoint):
 
 import logging
 import os
+from datetime import datetime, timezone
 from typing import Annotated, Optional
 
 from langchain_anthropic import ChatAnthropic
@@ -409,10 +410,17 @@ _TOOLS = [web_search, search_vinyl_prices, query_collection, quiz_collection]
 
 
 # ── System prompts ────────────────────────────────────────────────────────
+def _now_str() -> str:
+    """Current date and time in local timezone, formatted for the system prompt."""
+    return datetime.now(timezone.utc).astimezone().strftime("%A, %Y-%m-%d %H:%M %Z")
+
+
 def _record_system_prompt(meta: dict) -> str:
     value_str = f"€{meta['estimated_value_eur']:.2f}" if meta.get("estimated_value_eur") else "Unknown"
     genres_str = ", ".join(meta.get("genres") or []) or "Unknown"
     return (
+        f"Current date and time: {_now_str()}\n\n"
+        "Always reply in the same language the user writes in.\n\n"
         "You are a helpful vinyl record assistant with access to web search and collection tools.\n\n"
         "Use tools when the user asks about:\n"
         "- Current prices / market value → use search_vinyl_prices\n"
@@ -444,6 +452,8 @@ def _record_system_prompt(meta: dict) -> str:
 
 def _general_system_prompt() -> str:
     return (
+        f"Current date and time: {_now_str()}\n\n"
+        "Always reply in the same language the user writes in.\n\n"
         "You are a knowledgeable vinyl record expert assistant with access to tools.\n\n"
         "Available tools:\n"
         "- web_search: find information about any vinyl-related topic\n"
