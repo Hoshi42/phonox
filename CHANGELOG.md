@@ -1,4 +1,24 @@
 # Changelog
+## [2.1.3] - 2026-06-07 - Fix misleading web-search badge; add collection badge
+
+### Fixed
+- **Misleading "web-enhanced" badge** (`backend/api/routes.py`, `frontend/src/components/ChatPanel.tsx`) — `web_enhanced` was set to `True` whenever *any* tool was called, including `query_collection`. The badge now only appears when `web_search` or `search_vinyl_prices` was actually invoked. Tool detection was moved from `ToolMessage` presence to inspecting `AIMessage.tool_calls[].name`.
+
+### Added
+- **`collection_queried` response flag** (`backend/api/routes.py`) — new boolean in the API response, `True` when `query_collection` or `quiz_collection` was called.
+- **🗃 collection badge** (`frontend/src/components/ChatPanel.tsx`) — displayed independently from the web badge when the agent queried the local DB. Both badges can appear simultaneously if the agent used both tool types in one turn.
+
+---
+
+## [2.1.2] - 2026-06-07 - Inject current datetime + language-mirror into system prompts
+
+### Added
+- **`_now_str()` helper** (`backend/agent/chat_agent.py`) — formats the current local date/time (e.g. `Sunday, 2026-06-07 21:45 CEST`) on every invocation.
+- **Datetime injection** — both `_record_system_prompt` and `_general_system_prompt` now open with `Current date and time: …`, ensuring the agent always knows the current date without web lookup.
+- **Language-mirror instruction** — `Always reply in the same language the user writes in.` added to both prompts, preventing the agent from defaulting to English when the user writes German or another language.
+
+---
+
 ## [2.1.1] - 2026-06-07 - query_collection tool: full-schema filtering, sorting, count_only
 
 ### Changed

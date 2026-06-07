@@ -105,8 +105,10 @@ Response: { status, artist, title, confidence, ... }
 
 ```bash
 POST /api/v1/chat
-Body: { message: string }
-Response: { message, web_enhanced?, sources_used?, search_results? }
+Body: { message: string, thread_id?: string }
+Response: { message, web_enhanced?, collection_queried?, sources_used?, search_results? }
+# web_enhanced=true  — web_search or search_vinyl_prices was called
+# collection_queried=true — query_collection or quiz_collection was called
 ```
 
 ### Register (Collection Management)
