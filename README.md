@@ -52,7 +52,7 @@ Before you start, make sure you have:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/phonox.git
+git clone https://github.com/Hoshi42/phonox.git
 cd phonox
 ```
 
