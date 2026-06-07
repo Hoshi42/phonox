@@ -49,6 +49,7 @@ interface ChatMessage {
   timestamp: string
   images?: File[]
   webEnhanced?: boolean
+  collectionQueried?: boolean
   sourcesUsed?: number
   searchResults?: Array<{
     title: string
@@ -68,6 +69,7 @@ interface ChatPanelProps {
 interface ChatResponse {
   message: string
   web_enhanced?: boolean
+  collection_queried?: boolean
   sources_used?: number
   search_results?: Array<{
     title: string
@@ -368,6 +370,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
         content: data.message,
         timestamp: new Date().toISOString(),
         webEnhanced: data.web_enhanced,
+        collectionQueried: data.collection_queried,
         sourcesUsed: data.sources_used || 0,
         searchResults: data.search_results || []
       }
@@ -481,7 +484,12 @@ The vinyl card has been updated with all the details. You can edit any informati
                   🤖 Assistant
                   {message.webEnhanced && (
                     <span style={{ fontSize: '0.7rem', marginLeft: '6px', opacity: 0.8 }}>
-                      🌐 web-enhanced
+                      🌐 web search
+                    </span>
+                  )}
+                  {message.collectionQueried && (
+                    <span style={{ fontSize: '0.7rem', marginLeft: '6px', opacity: 0.8 }}>
+                      🗃 collection
                     </span>
                   )}
                 </span>

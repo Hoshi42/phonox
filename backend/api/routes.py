@@ -697,11 +697,16 @@ async def chat_with_agent(
         # Extract response — last message is the agent's text reply
         agent_response = result["messages"][-1].content
 
-        # Detect if any tool calls were made (presence of ToolMessage in new messages)
-        from langchain_core.messages import ToolMessage
-        tool_calls_made = any(
-            isinstance(m, ToolMessage) for m in result["messages"]
-        )
+        # Detect which tools were called
+        from langchain_core.messages import ToolMessage, AIMessage
+        _web_tools = {"web_search", "search_vinyl_prices"}
+        _collection_tools = {"query_collection", "quiz_collection"}
+        _tool_names_used = set()
+        for m in result["messages"]:
+            if isinstance(m, AIMessage) and m.tool_calls:
+                _tool_names_used.update(tc["name"] for tc in m.tool_calls)
+        tool_calls_made = bool(_tool_names_used & _web_tools)
+        collection_queried = bool(_tool_names_used & _collection_tools)
 
         # Apply explicit metadata corrections if provided in request
         confidence_increment = 0.05
@@ -762,6 +767,7 @@ async def chat_with_agent(
             "requires_review": vinyl_record.needs_review,
             "chat_history": [],
             "web_enhanced": tool_calls_made,
+            "collection_queried": collection_queried,
             "sources_used": 0,
             "search_results": [],
         }
@@ -841,14 +847,20 @@ async def general_chat(
 
         agent_response = result["messages"][-1].content
 
-        from langchain_core.messages import ToolMessage
-        tool_calls_made = any(isinstance(m, ToolMessage) for m in result["messages"])
+        from langchain_core.messages import AIMessage
+        _web_tools = {"web_search", "search_vinyl_prices"}
+        _collection_tools = {"query_collection", "quiz_collection"}
+        _tool_names_used = set()
+        for m in result["messages"]:
+            if isinstance(m, AIMessage) and m.tool_calls:
+                _tool_names_used.update(tc["name"] for tc in m.tool_calls)
 
         return {
             "message": agent_response,
             "search_results": [],
             "sources_used": 0,
-            "web_enhanced": tool_calls_made,
+            "web_enhanced": bool(_tool_names_used & _web_tools),
+            "collection_queried": bool(_tool_names_used & _collection_tools),
         }
 
     except Exception as e:
