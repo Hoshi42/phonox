@@ -627,6 +627,7 @@ The vinyl card has been updated with all the details. You can edit any informati
               <button onClick={() => setInput("What's the current market value of this record?")} className={styles.quickActionBtn}>💰 Market Value</button>
               <button onClick={() => setInput("Is this a first pressing? How can I tell?")} className={styles.quickActionBtn}>🔍 First Pressing?</button>
               <button onClick={() => setInput("What similar records should I look for?")} className={styles.quickActionBtn}>🎵 Similar Records</button>
+              <button onClick={() => setInput("Quiz me on my vinyl collection!")} className={`${styles.quickActionBtn} ${styles.quickActionBtnQuiz}`}>🎯 Quiz My Collection</button>
             </>
           ) : (
             <>
