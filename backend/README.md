@@ -123,20 +123,58 @@ DELETE /api/register/{record_id}
 Response: { success: true }
 ```
 
+## Chat Agent (`agent/chat_agent.py`)
+
+A separate **LangGraph ReAct agent** handles the `/api/v1/chat` endpoint. It runs a `START → agent ↔ tools → END` graph with `PostgresSaver` memory (one thread per record or session).
+
+### Chat Tools
+
+| Tool | Purpose |
+|------|---------|
+| `web_search` | Tavily/DuckDuckGo search for vinyl history, pressings, labels |
+| `search_vinyl_prices` | Market pricing lookup for a specific artist + title |
+| `query_collection` | Query `vinyl_records` table — full-schema filtering, sorting, count/stats |
+| `quiz_collection` | Generate multiple-choice quizzes from the user's collection |
+
+### `query_collection` parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `artist`, `title`, `genre`, `label`, `catalog_number` | `str` | Partial match (ilike) |
+| `barcode` | `str` | Exact match |
+| `condition` | `str` | `poor`/`fair`/`good`/`excellent`/`near_mint` |
+| `notes` | `str` | Full-text search in `user_notes` |
+| `needs_review` | `bool` | Filter pending/reviewed records |
+| `user_tag` | `str` | Exact match |
+| `year_from`, `year_to` | `int` | Year range |
+| `value_min`, `value_max` | `float` | Estimated value range (EUR) |
+| `sort_by` | `str` | `value`\|`year`\|`artist`\|`title`\|`label`\|`created_at` |
+| `sort_order` | `str` | `asc`\|`desc` |
+| `limit` | `int` | 1–50, hard-capped at 50 |
+| `count_only` | `bool` | Returns aggregated stats only (count, total/avg/max value) |
+
+### Limits
+
+- **Token budget**: 24K tokens per LLM call (`trim_messages`)
+- **Message cap**: 40 messages per thread in Postgres
+- **Result cap**: 50 records per `query_collection` call
+
+---
+
 ## Database Models
 
 ### VinylRecord
 
 ```python
 - id: UUID (primary key)
-- status: pending | analyzed | complete | error
+- status: pending | processing | complete | failed
 - artist, title, year, label, catalog_number, barcode
-- genres: List[str]
-- confidence: 0.0-1.0
-- metadata: JSON (spotify_url, estimated_value_eur, condition, etc.)
-- image_urls: List[str] (persisted image URLs)
+- genres: JSON array (stored as Text)
+- confidence: float
+- spotify_url, estimated_value_eur, condition, user_tag, user_notes
+- in_register: bool
+- needs_review, auto_commit, validation_passed: bool
 - created_at, updated_at: DateTime
-- user_tag: str (for register filtering)
 ```
 
 ### VinylImage

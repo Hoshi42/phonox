@@ -96,6 +96,24 @@ Get pricing insights:
 - "What affects vinyl record values?"
 - "Are picture discs worth collecting?"
 
+## Querying Your Collection
+
+The AI can search your vinyl register with natural language. Examples:
+
+| Question | What it does |
+|----------|--------------|
+| "How many records do I have?" | Returns total count + estimated total/avg/max value |
+| "Show me my jazz records" | Filters by genre |
+| "What are my most valuable records?" | Lists top 10 by estimated value |
+| "Do I have any Blue Note records?" | Filters by label |
+| "Show me records from the 1970s" | Filters by year range |
+| "Which records are in near mint condition?" | Filters by condition |
+| "Which records still need review?" | Filters by needs_review flag |
+| "Find records where I noted 'signed'" | Full-text search in your notes |
+| "Show me records sorted by year, oldest first" | Custom sort |
+
+Filters can be combined freely: *"Show me jazz records from the 80s in excellent condition worth over €50"*.
+
 ## Chat Integration
 
 ### From VinylCard

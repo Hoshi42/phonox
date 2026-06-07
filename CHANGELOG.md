@@ -1,4 +1,18 @@
 # Changelog
+## [2.1.1] - 2026-06-07 - query_collection tool: full-schema filtering, sorting, count_only
+
+### Changed
+- **`query_collection` tool expanded** (`backend/agent/chat_agent.py`) — the agent tool now supports filtering on every user-facing field in `vinyl_records`:
+  - New filter parameters: `title` (ilike), `label` (ilike), `catalog_number` (ilike), `barcode` (exact), `condition` (ilike), `notes` (full-text ilike search in `user_notes`), `needs_review` (boolean), `value_min`/`value_max` (estimated value range)
+  - New sort parameters: `sort_by` (`value` | `year` | `artist` | `title` | `label` | `created_at`, default `value`) and `sort_order` (`asc` | `desc`, default `desc`)
+  - **`count_only=True`** mode — returns a compact stats block (total count, total/average/max estimated value) using a single SQL aggregation query; no records are fetched. Use for "how many" questions.
+  - **Hard cap at 50 results** (`_QUERY_COLLECTION_MAX_LIMIT`) to protect the LLM token budget; `limit` parameter is clamped server-side. A truncation hint is appended to the header when results exceed the cap.
+  - Output rows now include `label`, `catalog_number`, `condition`, `needs_review` flag (⚠), `user_notes` (first 120 chars, 📝) and `spotify_url` (🎵) when present.
+- **System prompts updated** (`_record_system_prompt`, `_general_system_prompt`) — both prompts now include a *query_collection usage guidelines* section documenting `count_only=True`, all available filter and sort parameters, and the 50-result cap. This teaches the agent to use the tool optimally without trial-and-error tool calls.
+- **Module docstring updated** — reflects the new parameter set.
+
+---
+
 ## [2.1.0] - 2026-06-07 - LangGraph ReAct agent, quiz tool, agentic chat UI
 
 ### Added

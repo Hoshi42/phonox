@@ -13,7 +13,12 @@ Memory:
 Tools:
     web_search            — Tavily/DuckDuckGo web search
     search_vinyl_prices   — comprehensive pricing + market info
-    query_collection      — query the vinyl_records DB table
+    query_collection      — query the vinyl_records DB table; filters: artist,
+                            title, genre, label, catalog_number, barcode,
+                            condition, notes (user_notes text search),
+                            needs_review, year/value range, user_tag;
+                            sort_by/sort_order; count_only for stats;
+                            hard-capped at 50 results
                             (db session injected per-request via RunnableConfig)
 
 Config keys (passed per invocation, never stored in checkpoint):
@@ -103,25 +108,53 @@ def search_vinyl_prices(artist: str, title: str, config: RunnableConfig) -> str:
         return f"Price lookup unavailable: {e}"
 
 
+_QUERY_COLLECTION_MAX_LIMIT = 50  # hard cap to protect LLM token budget
+
+
 @tool
 def query_collection(
     user_tag: str = "",
     artist: str = "",
+    title: str = "",
     genre: str = "",
+    label: str = "",
+    catalog_number: str = "",
+    barcode: str = "",
+    condition: str = "",
+    notes: str = "",
+    needs_review: Optional[bool] = None,
     year_from: int = 0,
     year_to: int = 0,
+    value_min: float = 0.0,
+    value_max: float = 0.0,
+    sort_by: str = "value",
+    sort_order: str = "desc",
     limit: int = 10,
+    count_only: bool = False,
     config: RunnableConfig = None,  # type: ignore[assignment]
 ) -> str:
     """Query the user's vinyl collection database.
     Use to answer questions like 'how many records do I have',
     'what jazz records are in my collection', 'what are my most valuable records',
-    'show me records from the 1970s', or 'which records are by Miles Davis'.
-    All parameters are optional — combine them to filter results."""
+    'show me records from the 1970s', 'which records are by Miles Davis',
+    'do I have any Blue Note records', 'show me records in mint condition',
+    'find the record with barcode 1234567890', 'which records need review',
+    or 'find records where I noted signed copy'.
+    All parameters are optional — combine them to filter results.
+
+    condition values: poor, fair, good, excellent, near_mint
+    sort_by values: value, year, artist, title, label, created_at (default: value)
+    sort_order values: asc, desc (default: desc)
+    needs_review: true = only records pending review, false = only reviewed records
+    notes: full-text search in user_notes field
+    count_only: set true for 'how many' questions — returns count + stats without listing records
+    limit: max records to return (1–50, default 10)
+    """
     db = (config or {}).get("configurable", {}).get("db")
     if db is None:
         return "Collection database not available in this context."
     try:
+        from sqlalchemy import func
         from backend.database import VinylRecord
 
         q = db.query(VinylRecord).filter(VinylRecord.in_register.is_(True))
@@ -129,30 +162,87 @@ def query_collection(
             q = q.filter(VinylRecord.user_tag == user_tag)
         if artist:
             q = q.filter(VinylRecord.artist.ilike(f"%{artist}%"))
+        if title:
+            q = q.filter(VinylRecord.title.ilike(f"%{title}%"))
         if genre:
             q = q.filter(VinylRecord.genres.ilike(f"%{genre}%"))
+        if label:
+            q = q.filter(VinylRecord.label.ilike(f"%{label}%"))
+        if catalog_number:
+            q = q.filter(VinylRecord.catalog_number.ilike(f"%{catalog_number}%"))
+        if barcode:
+            q = q.filter(VinylRecord.barcode == barcode)
+        if condition:
+            q = q.filter(VinylRecord.condition.ilike(condition))
+        if notes:
+            q = q.filter(VinylRecord.user_notes.ilike(f"%{notes}%"))
+        if needs_review is not None:
+            q = q.filter(VinylRecord.needs_review.is_(needs_review))
         if year_from:
             q = q.filter(VinylRecord.year >= year_from)
         if year_to:
             q = q.filter(VinylRecord.year <= year_to)
+        if value_min:
+            q = q.filter(VinylRecord.estimated_value_eur >= value_min)
+        if value_max:
+            q = q.filter(VinylRecord.estimated_value_eur <= value_max)
 
         total = q.count()
-        records = (
-            q.order_by(VinylRecord.estimated_value_eur.desc().nullslast())
-            .limit(limit)
-            .all()
-        )
 
-        if not records:
-            return f"No records found matching those criteria (total in collection: {total})."
+        if count_only:
+            stats = db.query(
+                func.count(VinylRecord.id).label("n"),
+                func.sum(VinylRecord.estimated_value_eur).label("total_value"),
+                func.avg(VinylRecord.estimated_value_eur).label("avg_value"),
+                func.max(VinylRecord.estimated_value_eur).label("max_value"),
+            ).filter(VinylRecord.in_register.is_(True)).one()
+            total_val = f"€{stats.total_value:.0f}" if stats.total_value else "?"
+            avg_val = f"€{stats.avg_value:.0f}" if stats.avg_value else "?"
+            max_val = f"€{stats.max_value:.0f}" if stats.max_value else "?"
+            return (
+                f"Collection stats: {stats.n} record(s) in register\n"
+                f"  Total estimated value: {total_val}\n"
+                f"  Average value: {avg_val}\n"
+                f"  Most valuable: {max_val}"
+            )
 
-        lines = [f"Found {total} record(s) (showing up to {limit}):"]
+        if total == 0:
+            return "No records found matching those criteria."
+
+        # Sorting
+        _sort_col_map = {
+            "value": VinylRecord.estimated_value_eur,
+            "year": VinylRecord.year,
+            "artist": VinylRecord.artist,
+            "title": VinylRecord.title,
+            "label": VinylRecord.label,
+            "created_at": VinylRecord.created_at,
+        }
+        sort_col = _sort_col_map.get(sort_by, VinylRecord.estimated_value_eur)
+        order_expr = sort_col.desc().nullslast() if sort_order != "asc" else sort_col.asc().nullsfirst()
+
+        capped_limit = min(max(1, limit), _QUERY_COLLECTION_MAX_LIMIT)
+        records = q.order_by(order_expr).limit(capped_limit).all()
+
+        truncated = total > capped_limit
+        header = f"Found {total} record(s)" + (f", showing first {capped_limit} — narrow your search to see more." if truncated else ":")
+        lines = [header]
         for r in records:
             value = f"€{r.estimated_value_eur:.0f}" if r.estimated_value_eur else "?"
             genres_list = r.get_genres()[:2] if hasattr(r, "get_genres") else []
             genres_str = f" [{', '.join(genres_list)}]" if genres_list else ""
             year_str = f" ({r.year})" if r.year else ""
-            lines.append(f"• {r.artist or '?'} – {r.title or '?'}{year_str}{genres_str} — {value}")
+            label_str = f" | {r.label}" if r.label else ""
+            cat_str = f" [{r.catalog_number}]" if r.catalog_number else ""
+            cond_str = f" | {r.condition}" if r.condition else ""
+            review_str = " ⚠ needs review" if r.needs_review else ""
+            notes_str = f"\n  📝 {r.user_notes[:120]}" if r.user_notes else ""
+            spotify_str = f"\n  🎵 {r.spotify_url}" if r.spotify_url else ""
+            lines.append(
+                f"• {r.artist or '?'} – {r.title or '?'}{year_str}{genres_str}"
+                f"{label_str}{cat_str}{cond_str} — {value}{review_str}"
+                f"{notes_str}{spotify_str}"
+            )
         return "\n".join(lines)
     except Exception as e:
         logger.error(f"query_collection tool error: {e}")
@@ -329,6 +419,13 @@ def _record_system_prompt(meta: dict) -> str:
         "- General info, history, pressings, labels → use web_search\n"
         "- Their collection statistics or other records → use query_collection\n"
         "- Quiz / trivia about their collection → use quiz_collection\n\n"
+        "query_collection usage guidelines:\n"
+        "- 'How many records do I have?' or any count/stats question → count_only=True\n"
+        "- Filter by any combination of: artist, title, genre, label, catalog_number,\n"
+        "  barcode, condition, notes (searches user_notes text), needs_review, user_tag,\n"
+        "  year_from/year_to, value_min/value_max\n"
+        "- Sort with sort_by (value/year/artist/title/label/created_at) + sort_order (asc/desc)\n"
+        "- Results are capped at 50 — tell the user to narrow the search if truncated\n\n"
         "Current record (always up to date — treat as ground truth):\n"
         f"- Artist: {meta.get('artist') or 'Unknown'}\n"
         f"- Title: {meta.get('title') or 'Unknown'}\n"
@@ -353,6 +450,13 @@ def _general_system_prompt() -> str:
         "- search_vinyl_prices: get current market pricing for specific records\n"
         "- query_collection: query the user's vinyl collection database\n"
         "- quiz_collection: generate a multiple-choice quiz from the collection\n\n"
+        "query_collection usage guidelines:\n"
+        "- 'How many records do I have?' or any count/stats question → count_only=True\n"
+        "- Filter by any combination of: artist, title, genre, label, catalog_number,\n"
+        "  barcode, condition, notes (searches user_notes text), needs_review, user_tag,\n"
+        "  year_from/year_to, value_min/value_max\n"
+        "- Sort with sort_by (value/year/artist/title/label/created_at) + sort_order (asc/desc)\n"
+        "- Results are capped at 50 — tell the user to narrow the search if truncated\n\n"
         "Use tools proactively when the user asks about prices, record details, "
         "or their collection. Keep responses concise and conversational."
     )
