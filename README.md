@@ -9,6 +9,8 @@
 
 **AI-powered Vinyl Collection Agent** – Cataloguing, Valuation, and Documentation
 
+> ⭐ If you find Phonox useful, please **[star the repo](https://github.com/yourusername/phonox)** — it helps others discover the project and motivates further development.
+
 ---
 
 ## What is Phonox?
@@ -83,6 +85,8 @@ The `start-cli.sh` script will:
 - **Frontend (UI)**: http://localhost:5173
 - **API Docs**: http://localhost:8000/docs
 - **Backend Health**: http://localhost:8000/health
+
+> 💬 Got it running? [Leave a ⭐ on GitHub](https://github.com/yourusername/phonox) or [open an issue](https://github.com/yourusername/phonox/issues) with feedback — it takes 10 seconds and means a lot!
 
 ---
 
@@ -322,72 +326,11 @@ start htmlcov/index.html  # Windows
 - **[Troubleshooting](#troubleshooting--maintenance)** – Common issues and fixes
 
 ### 👨‍💻 For Developers
-- **[Tech Stack Guide](docs/tech-stack.md)** – Architecture and technologies
-- **[Requirements Spec](docs/requirements_en.md)** – Complete feature list
 - **[API Reference](http://localhost:8000/docs)** – Interactive Swagger UI (live)
+- **[Architecture](ARCHITECTURE.md)** – Component diagrams and data flows
 
 ### 🏗️ For Teams & Contributors
 1. **[Contributing Guide](CONTRIBUTING.md)** – How to contribute code
-2. **[Agent Collaboration Instructions](.github/agents/instructions.md)** – Team workflow
-3. **[Deployment Guide](.github/agents/deployment.md)** – Production setup
-
----
-
-## Project Structure
-
-```
-phonox/
-├── README.md
-├── ARCHITECTURE.md
-├── CHANGELOG.md
-├── CONTRIBUTING.md
-├── docker-compose.yml
-├── Dockerfile.backend
-├── Dockerfile.frontend
-├── start-cli.sh
-├── phonox-cli
-│
-├── .github/
-│   └── agents/              (AI agent collaboration docs)
-│
-├── backend/
-│   ├── main.py              (FastAPI entry point)
-│   ├── database.py          (SQLAlchemy ORM)
-│   ├── agent/
-│   │   ├── graph.py         (LangGraph workflow)
-│   │   ├── vision.py        (Claude vision extraction)
-│   │   ├── websearch.py     (Tavily + DuckDuckGo)
-│   │   ├── metadata.py      (Discogs + MusicBrainz lookup)
-│   │   ├── metadata_enhancer.py
-│   │   ├── barcode_utils.py
-│   │   └── state.py         (State models)
-│   ├── api/
-│   │   ├── routes.py        (Identification + chat endpoints)
-│   │   ├── register.py      (Collection management endpoints)
-│   │   └── models.py        (Pydantic models)
-│   └── tools/
-│       └── web_tools.py
-│
-├── frontend/
-│   └── src/
-│       ├── App.tsx
-│       ├── components/
-│       │   ├── VinylCard.tsx
-│       │   ├── VinylRegister.tsx
-│       │   ├── ChatPanel.tsx
-│       │   ├── ImageUpload.tsx
-│       │   ├── UserManager.tsx
-│       │   └── ...
-│       ├── api/             (API client)
-│       └── services/        (Register API client)
-│
-├── tests/                   (unit, integration, api)
-├── docs/                    (MkDocs documentation)
-├── scripts/                 (backup, restore, CLI)
-└── backups/                 (local backups)
-```
-
-
 
 
 
@@ -471,6 +414,7 @@ Contributions are welcome! Please see [Contributing Guide](CONTRIBUTING.md) for 
 
 - **Issues & Feature Requests**: [GitHub Issues](https://github.com/yourusername/phonox/issues)
 - **Documentation**: See [docs/](docs/) folder for detailed technical documentation
+- **⭐ Star the repo**: If Phonox is useful to you, [a star on GitHub](https://github.com/yourusername/phonox) is the simplest way to show it
 
 ---
 
@@ -480,4 +424,15 @@ Contributions are welcome! Please see [Contributing Guide](CONTRIBUTING.md) for 
 - Uses [Tavily](https://tavily.com) for web search (with DuckDuckGo fallback)
 - Data enrichment from [MusicBrainz](https://musicbrainz.org) and [Spotify API](https://developer.spotify.com)
 - Powered by [FastAPI](https://fastapi.tiangolo.com), [React](https://react.dev), and [LangGraph](https://langchain.com/langgraph)
+
+---
+
+## ⭐ Show Your Support
+
+If you find Phonox useful, please consider:
+- **Starring the repository** on GitHub — it helps others discover the project
+- **Opening an issue** with feedback, ideas, or bug reports
+- **Sharing** it with other vinyl collectors
+
+Every star and piece of feedback is genuinely appreciated and helps drive development forward.
 
