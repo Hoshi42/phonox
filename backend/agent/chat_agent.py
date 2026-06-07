@@ -333,8 +333,9 @@ def quiz_collection(
     num_questions — 1-10 questions (default 5)
 
     Use when the user asks to be quizzed, wants trivia, or says 'test me on my collection'.
-    Present ONLY the question and answer options to the user — never reveal the ✓ answer
-    markers. After the user replies, use the ✓ markers to score their answers."""
+    The response embeds a <!--QUIZ:{json}--> block that the frontend renders as an
+    interactive quiz card — do NOT reveal the correct answers in plain text."""
+    import json as _json
     import random
 
     db = (config or {}).get("configurable", {}).get("db")
@@ -361,15 +362,10 @@ def quiz_collection(
         selected = random.sample(pool, num_questions)
 
         TOPICS = ["year", "label", "genre", "artist"]
-        lines = [
-            f"🎵 **Collection Quiz** — {num_questions} question{'s' if num_questions > 1 else ''}"
-            f" | difficulty: {difficulty}\n",
-            "*(Present questions one at a time; hide the ✓ answer markers; score after all answers received.)*\n",
-        ]
+        quiz_questions = []
 
         for i, rec in enumerate(selected, 1):
             if topic == "random":
-                # Rotate through types that have data for this record
                 candidates = [t for t in TOPICS if t != "year" or rec.year]
                 candidates = [t for t in candidates if t != "label" or rec.label]
                 candidates = [t for t in candidates if t != "genre" or rec.get_genres()]
@@ -377,29 +373,36 @@ def quiz_collection(
             else:
                 actual_topic = topic
 
-            q, answer, choices = _build_mc_question(actual_topic, rec, pool, difficulty)
+            q_text, answer, choices = _build_mc_question(actual_topic, rec, pool, difficulty)
 
-            # Fallback to artist if preferred topic had insufficient data
-            if not q:
-                q, answer, choices = _build_mc_question("artist", rec, pool, difficulty)
-            if not q:
+            if not q_text:
+                q_text, answer, choices = _build_mc_question("artist", rec, pool, difficulty)
+            if not q_text or not choices:
                 continue
 
-            if choices:
-                letters = "abcd"
-                correct_letter = letters[choices.index(answer)]
-                opts = "\n".join(
-                    f"   {letters[j]}) {choices[j]}" for j in range(len(choices))
-                )
-                lines.append(f"**Q{i}.** {q}\n{opts}\n   ✓ {correct_letter}) {answer}\n")
-            else:
-                # Open-ended fallback
-                lines.append(f"**Q{i}.** {q}\n   ✓ {answer}\n")
+            letters = list("abcd")
+            correct_letter = letters[choices.index(answer)]
+            choices_dict = {letters[j]: choices[j] for j in range(len(choices))}
 
-        if len(lines) <= 2:
+            quiz_questions.append({
+                "n": i,
+                "q": q_text,
+                "choices": choices_dict,
+                "correct": correct_letter,
+            })
+
+        if not quiz_questions:
             return "Could not generate quiz questions — try a different topic or difficulty."
 
-        return "\n".join(lines)
+        quiz_data = {"total": len(quiz_questions), "questions": quiz_questions}
+        quiz_json = _json.dumps(quiz_data, ensure_ascii=False)
+
+        return (
+            f"<!--QUIZ:{quiz_json}-->\n"
+            f"🎵 **Collection Quiz** — {len(quiz_questions)} question{'s' if len(quiz_questions) > 1 else ''}"
+            f" | topic: {topic} | difficulty: {difficulty}\n\n"
+            "Select your answers using the interactive quiz card below, then click **Check Answers**."
+        )
 
     except Exception as e:
         logger.error(f"quiz_collection tool error: {e}")
@@ -446,7 +449,12 @@ def _record_system_prompt(meta: dict) -> str:
         f"- Estimated Value: {value_str}\n"
         f"- Spotify: {meta.get('spotify_url') or 'Not available'}\n"
         f"- Notes: {meta.get('user_notes') or 'None'}\n\n"
-        "Keep responses concise. Do not repeat the full record details unless asked."
+        "Keep responses concise. Do not repeat the full record details unless asked.\n\n"
+        "Quiz follow-up rules:\n"
+        "- When the user sends quiz results (starts with 'Quiz results:'), acknowledge "
+        "their score, briefly comment on any wrong answers, then ask how they want to "
+        "continue — e.g. another quiz, a different topic or difficulty, or something else.\n"
+        "- Do NOT automatically call quiz_collection again without the user explicitly asking."
     )
 
 
@@ -468,7 +476,12 @@ def _general_system_prompt() -> str:
         "- Sort with sort_by (value/year/artist/title/label/created_at) + sort_order (asc/desc)\n"
         "- Results are capped at 50 — tell the user to narrow the search if truncated\n\n"
         "Use tools proactively when the user asks about prices, record details, "
-        "or their collection. Keep responses concise and conversational."
+        "or their collection. Keep responses concise and conversational.\n\n"
+        "Quiz follow-up rules:\n"
+        "- When the user sends quiz results (starts with 'Quiz results:'), acknowledge "
+        "their score, briefly comment on any wrong answers, then ask how they want to "
+        "continue — e.g. another quiz, a different topic or difficulty, or something else.\n"
+        "- Do NOT automatically call quiz_collection again without the user explicitly asking."
     )
 
 

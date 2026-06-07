@@ -22,6 +22,7 @@
 
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
 import ReactMarkdown from 'react-markdown'
+import { QuizCard, QuizData } from './QuizCard'
 import { fetchWithTimeout, TIMEOUT_PRESETS } from '../api/fetchWithTimeout'
 import styles from './ChatPanel.module.css'
 
@@ -50,6 +51,7 @@ interface ChatMessage {
   images?: File[]
   webEnhanced?: boolean
   collectionQueried?: boolean
+  quizData?: QuizData
   sourcesUsed?: number
   searchResults?: Array<{
     title: string
@@ -81,6 +83,19 @@ interface ChatResponse {
 export interface ChatPanelHandle {
   addMessage: (content: string, role?: 'user' | 'assistant' | 'system') => void
   addAnalysis: (content: string) => void
+}
+
+/** Extract <!--QUIZ:{json}--> from a message string. Returns {quizData, displayText}. */
+function extractQuiz(text: string): { quizData: QuizData | undefined; displayText: string } {
+  const match = text.match(/^<!--QUIZ:(.*?)-->\n?/s)
+  if (!match) return { quizData: undefined, displayText: text }
+  try {
+    const quizData: QuizData = JSON.parse(match[1])
+    const displayText = text.slice(match[0].length)
+    return { quizData, displayText }
+  } catch {
+    return { quizData: undefined, displayText: text }
+  }
 }
 
 /**
@@ -185,7 +200,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
 
   // Cycle loading text while waiting
   useEffect(() => {
-    if (!loading) { setLoadingStep(0); return }
+    if (!loading) { setLoadingStep(0); return undefined }
     const timer = setInterval(() => setLoadingStep(s => (s + 1) % LOADING_STEPS.length), 2000)
     return () => clearInterval(timer)
   }, [loading])
@@ -302,15 +317,19 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
 
   const handleSendMessage = async () => {
     if (!input.trim()) return
-
-    const userMessage: ChatMessage = {
-      role: 'user',
-      content: input,
-      timestamp: new Date().toISOString(),
-    }
-
-    setMessages(prev => enforceMessageLimit([...prev, userMessage], MAX_MESSAGES))
+    await sendMessage(input)
     setInput('')
+  }
+
+  const sendMessage = async (text: string, silent = false) => {
+    if (!silent) {
+      const userMessage: ChatMessage = {
+        role: 'user',
+        content: text,
+        timestamp: new Date().toISOString(),
+      }
+      setMessages(prev => enforceMessageLimit([...prev, userMessage], MAX_MESSAGES))
+    }
     setLoading(true)
 
     try {
@@ -332,7 +351,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            message: userMessage.content,
+            message: text,
             thread_id: record.record_id,
           }),
           timeout: TIMEOUT_PRESETS.NORMAL
@@ -343,7 +362,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            message: userMessage.content,
+            message: text,
             thread_id: getOrCreateSessionId(),
           }),
           timeout: TIMEOUT_PRESETS.NORMAL
@@ -365,12 +384,14 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
         history_context_sent: chatHistoryForContext.length
       })
       
+      const { quizData, displayText } = extractQuiz(data.message)
       const assistantMessage: ChatMessage = {
         role: 'assistant',
-        content: data.message,
+        content: displayText,
         timestamp: new Date().toISOString(),
         webEnhanced: data.web_enhanced,
         collectionQueried: data.collection_queried,
+        quizData,
         sourcesUsed: data.sources_used || 0,
         searchResults: data.search_results || []
       }
@@ -525,6 +546,12 @@ The vinyl card has been updated with all the details. You can edit any informati
                   <div className={styles.markdown}>
                     <ReactMarkdown>{message.content}</ReactMarkdown>
                   </div>
+                  {message.quizData && (
+                    <QuizCard
+                      data={message.quizData}
+                      onSubmitAnswers={(summary) => sendMessage(summary, true)}
+                    />
+                  )}
                   {message.webEnhanced && (
                     <div className={styles.toolBadge}>🔍 Used web search</div>
                   )}

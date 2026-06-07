@@ -71,12 +71,16 @@ Use today's date (`_now_str()` format: `YYYY-MM-DD`). Keep entries factual and c
 
 ### 6. Stage, commit, push
 
-```bash
-git add CHANGELOG.md backend/README.md docs/<changed-files>
-git add <code-files-if-not-already-staged>
-git commit -m "<type>(<scope>): <short summary>
+> ⚠️ **ALWAYS pause here.** Show the user:
+> 1. `git diff --stat` — which files will be committed
+> 2. The proposed commit message
+>
+> **Wait for explicit confirmation before running `git commit` or `git push`.**
 
-<bullet list of what changed>"
+```bash
+# Only after user says "yes" / "go ahead" / "commit":
+git add <files>
+git commit -m "<message>"
 git push
 ```
 

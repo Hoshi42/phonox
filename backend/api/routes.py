@@ -695,18 +695,35 @@ async def chat_with_agent(
         )
 
         # Extract response — last message is the agent's text reply
-        agent_response = result["messages"][-1].content
-
-        # Detect which tools were called
-        from langchain_core.messages import ToolMessage, AIMessage
+        from langchain_core.messages import ToolMessage, AIMessage, HumanMessage as HMsg
         _web_tools = {"web_search", "search_vinyl_prices"}
         _collection_tools = {"query_collection", "quiz_collection"}
+
+        # Only inspect the CURRENT turn (messages after the last HumanMessage)
+        # so we don't pick up quiz_collection calls from earlier turns in the history.
+        all_msgs = result["messages"]
+        last_human_idx = max((i for i, m in enumerate(all_msgs) if isinstance(m, HMsg)), default=-1)
+        current_turn_msgs = all_msgs[last_human_idx + 1:]
+
         _tool_names_used = set()
-        for m in result["messages"]:
+        _quiz_tool_call_id = None
+        for m in current_turn_msgs:
             if isinstance(m, AIMessage) and m.tool_calls:
-                _tool_names_used.update(tc["name"] for tc in m.tool_calls)
+                for tc in m.tool_calls:
+                    _tool_names_used.add(tc["name"])
+                    if tc["name"] == "quiz_collection":
+                        _quiz_tool_call_id = tc["id"]
         tool_calls_made = bool(_tool_names_used & _web_tools)
         collection_queried = bool(_tool_names_used & _collection_tools)
+
+        # For quiz_collection: return the raw tool output to preserve <!--QUIZ:--> marker
+        # (the LLM would otherwise rewrite the questions as plain markdown)
+        agent_response = all_msgs[-1].content
+        if _quiz_tool_call_id:
+            for m in current_turn_msgs:
+                if isinstance(m, ToolMessage) and m.tool_call_id == _quiz_tool_call_id:
+                    agent_response = m.content
+                    break
 
         # Apply explicit metadata corrections if provided in request
         confidence_increment = 0.05
@@ -845,15 +862,31 @@ async def general_chat(
             },
         )
 
-        agent_response = result["messages"][-1].content
-
-        from langchain_core.messages import AIMessage
+        from langchain_core.messages import ToolMessage, AIMessage, HumanMessage as HMsg
         _web_tools = {"web_search", "search_vinyl_prices"}
         _collection_tools = {"query_collection", "quiz_collection"}
+
+        # Only inspect the CURRENT turn (messages after the last HumanMessage)
+        all_msgs = result["messages"]
+        last_human_idx = max((i for i, m in enumerate(all_msgs) if isinstance(m, HMsg)), default=-1)
+        current_turn_msgs = all_msgs[last_human_idx + 1:]
+
         _tool_names_used = set()
-        for m in result["messages"]:
+        _quiz_tool_call_id = None
+        for m in current_turn_msgs:
             if isinstance(m, AIMessage) and m.tool_calls:
-                _tool_names_used.update(tc["name"] for tc in m.tool_calls)
+                for tc in m.tool_calls:
+                    _tool_names_used.add(tc["name"])
+                    if tc["name"] == "quiz_collection":
+                        _quiz_tool_call_id = tc["id"]
+
+        # For quiz_collection: return the raw tool output to preserve <!--QUIZ:--> marker
+        agent_response = all_msgs[-1].content
+        if _quiz_tool_call_id:
+            for m in current_turn_msgs:
+                if isinstance(m, ToolMessage) and m.tool_call_id == _quiz_tool_call_id:
+                    agent_response = m.content
+                    break
 
         return {
             "message": agent_response,

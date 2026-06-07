@@ -1,4 +1,25 @@
 # Changelog
+## [2.2.0] - 2026-06-07 - Interactive quiz cards in chat UI
+
+### Added
+- **`QuizCard` React component** (`frontend/src/components/QuizCard.tsx`, `QuizCard.module.css`) — self-contained interactive quiz UI with:
+  - Dot progress bar (grey → purple when answered → green/red after reveal)
+  - One-question-at-a-time view with Prev / Next navigation
+  - Radio-button-style answer choices with hover highlight
+  - **Check Answers** button (appears once all questions answered) — reveals correct/wrong per choice with green/red colouring
+  - Score badge (`4/5 ★`) in the progress bar after reveal
+  - Auto-submits formatted result summary back into the chat thread so the agent can respond
+- **`<!--QUIZ:{json}-->` protocol** — `quiz_collection` tool now embeds a compact JSON block at the start of its response text. The JSON contains all questions, shuffled choices (keyed `a`–`d`), and correct answer keys. The frontend strips this block before rendering and passes the parsed data to `QuizCard`.
+- **`extractQuiz()` helper** (`frontend/src/components/ChatPanel.tsx`) — parses the marker from assistant messages; stores `quizData` on the `ChatMessage` object.
+- **`sendMessage(text)` helper** (`ChatPanel.tsx`) — extracted from `handleSendMessage` so `QuizCard`'s `onSubmitAnswers` callback can inject answer summaries directly into the chat without user interaction.
+
+### Changed
+- **`quiz_collection` tool** (`backend/agent/chat_agent.py`) — refactored to build structured `QuizData` JSON alongside the human-readable intro text. Answer keys are no longer embedded as visible `✓` markers in plain text; they live only in the hidden JSON block. Tool docstring updated to reflect the new protocol.
+- **`ChatMessage` interface** (`ChatPanel.tsx`) — added optional `quizData?: QuizData` field.
+- **`useEffect` cleanup** (`ChatPanel.tsx`) — fixed pre-existing TypeScript error (not all code paths return a value in loading-step effect).
+
+---
+
 ## [2.1.3] - 2026-06-07 - Fix misleading web-search badge; add collection badge
 
 ### Fixed
