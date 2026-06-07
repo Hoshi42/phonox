@@ -121,21 +121,30 @@ When complete: Display results in VinylCard
 User sends message in ChatPanel
     ↓
 Frontend: POST /api/v1/chat or /api/v1/identify/{record_id}/chat
-    ├ Record context (if record-specific)
-    ├ User message
-    └ Chat history (last 8 messages, user/assistant only)
-        Note: collection analysis is injected as a user→assistant pair
-        via addAnalysis() so it is included in the history slice sent
-        to the model on every follow-up question
+    ├ message
+    ├ thread_id (scopes conversation memory per record or session)
+    └ collection_analysis flag (bypasses agent for large token tasks)
     ↓
-Backend:
-    ├ If message starts with "/web": Force web search
-    ├ Claude analyzes message + context
-    ├ If web search needed:
-    │   ├ Tavily web search query
-    │   ├ Return results + sources
-    │   └ Claude synthesizes answer with citations
-    └ Return response + source metadata
+Backend — LangGraph ReAct agent (chat_agent.py)
+    Architecture: START → agent ──(tool_use)──→ tools → agent (loop, max 3 calls)
+                               └──(text)──────→ END
+
+    Memory: PostgresSaver checkpointer — one thread per record
+            (record_<id>) or general session (general_<session_id>)
+            Thread history capped at 40 messages; token budget enforced
+            via trim_messages before every LLM call
+
+    Agent tools (called autonomously based on intent):
+    ├ web_search            — Tavily/DuckDuckGo web search
+    ├ search_vinyl_prices   — market pricing + valuation data
+    ├ query_collection      — query vinyl_records DB (artist, title,
+    │                         genre, label, barcode, value range, etc.)
+    └ quiz_collection       — generate quiz questions from collection
+
+    Special case — collection_analysis=True:
+    └ Bypasses agent, calls Claude directly with up to 16K output tokens
+    ↓
+Backend returns response + tool usage metadata (web_enhanced, collection_queried)
     ↓
 Frontend: Display message + sources + loading indicators
 ```
