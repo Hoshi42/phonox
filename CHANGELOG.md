@@ -1,4 +1,9 @@
 # Changelog
+## [2.2.3] - 2026-10-29 - Fix rejected chat model parameter
+
+### Fixed
+- **Chat agent** (`backend/agent/chat_agent.py`) — omitted the optional `temperature` parameter rejected by the running provider API; added regression tests for Haiku 4.5 and 5.5 request payloads.
+
 ## [2.2.2] - 2026-10-29 - Fix duplicate responsive font size
 
 ### Fixed

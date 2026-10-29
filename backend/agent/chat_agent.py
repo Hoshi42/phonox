@@ -523,7 +523,7 @@ def _build_agent_node(llm_with_tools):
 # ── Graph compilation ─────────────────────────────────────────────────────
 def _compile_graph(checkpointer: PostgresSaver):
     model_name = os.getenv("ANTHROPIC_CHAT_MODEL", "claude-haiku-4-5-20251001")
-    llm = ChatAnthropic(model=model_name, max_tokens=800, temperature=0.3)
+    llm = ChatAnthropic(model=model_name, max_tokens=800)
     llm_with_tools = llm.bind_tools(_TOOLS)
 
     g = StateGraph(ChatAgentState)
