@@ -103,21 +103,11 @@ function App() {
     const previousRecordId = recordId
     
     try {
-      console.log('App: Starting upload with', files.length, 'files')
-      console.log('App: API Client base URL:', (apiClient as any).baseUrl || 'Unknown')
-      console.log('App: Window location:', window.location.href)
-      console.log('App: User Agent:', navigator.userAgent)
-      console.log('App: Online status:', navigator.onLine)
-      console.log('App: Environment VITE_API_URL:', import.meta.env.VITE_API_URL || 'Not set')
       setLoading(true)
       setError(null)
 
       const response = await apiClient.identify(files)
       const newRecordId = response.record_id as string
-      console.log('App: Upload successful, record ID:', newRecordId)
-      console.log('App: Initial response keys:', Object.keys(response))
-      console.log('App: Initial response status:', response.status)
-      console.log('App: Full initial response:', response)
       setRecordId(newRecordId)
       setUploadedImages(files)
       setRegisteredImageCount(0) // fresh analysis – no images come from the register
@@ -125,9 +115,6 @@ function App() {
 
       // If already analyzed/complete from initial response, use it
       if (response.status === 'analyzed' || response.status === 'complete') {
-        console.log('App: Analysis already complete from initial response, status:', response.status)
-        console.log('App: Response has intermediate_results?', !!response.intermediate_results)
-        console.log('App: Intermediate results data:', response.intermediate_results)
         const newRecord = response as unknown as VinylRecord
         setRecord(newRecord)
         setLoading(false)
@@ -138,36 +125,26 @@ function App() {
         return
       }
 
-      console.log('App: Status is', response.status, '- starting polling...')
       
       // Start polling for results
       let pollCount = 0
       const maxPolls = 600 // 10 minutes with 1-second intervals
       const interval = setInterval(async () => {
         pollCount++
-        console.log(`App: Poll attempt ${pollCount}/${maxPolls}`)
         try {
           const statusResponse = await apiClient.getResult(newRecordId)
-          console.log(`App: Poll ${pollCount} - Status: ${statusResponse.status}`)
-          console.log(`App: Poll ${pollCount} - Full response:`, statusResponse)
           
           // Handle different status values - be more flexible
           const status = statusResponse.status || statusResponse.state || 'processing'
-          console.log(`App: Poll ${pollCount} - Resolved status to: ${status}`)
           
           if (status === 'analyzed' || status === 'complete' || status === 'failed' || status === 'error') {
-            console.log(`App: Poll ${pollCount} - Terminal status detected: ${status}`)
             clearInterval(interval)
             setLoading(false)
             setPollInterval(null)
-            console.log('App: Polling finished with status:', status)
             
             if (status === 'analyzed' || status === 'complete') {
               const newRecord = statusResponse as unknown as VinylRecord
               setRecord(newRecord)
-              console.log('App: Analysis complete, record set:', newRecord)
-              console.log('App: Polling result has intermediate_results?', !!newRecord.intermediate_results)
-              console.log('App: Polling result intermediate_results:', newRecord.intermediate_results)
             } else {
               // Restore previous record if available
               if (previousRecord && previousRecordId) {
@@ -310,7 +287,6 @@ function App() {
   }
 
   const handleImageAdd = (newFiles: FileList) => {
-    console.log('App: handleImageAdd called with files:', newFiles.length)
     
     const filesArray = Array.from(newFiles)
     const totalImages = uploadedImages.length + filesArray.length
@@ -325,7 +301,6 @@ function App() {
     
     if (!record) {
       // If no record yet, start initial analysis
-      console.log('App: No existing record, starting initial analysis with:', filesArray.length, 'files')
       handleUpload(filesArray)
     }
   }
@@ -344,12 +319,6 @@ function App() {
   }
 
   const handleReanalyze = async (images: File[], reanalyzeAll: boolean = false) => {
-    console.log('App: Re-analyzing with', images.length, 'uploaded images')
-    console.log('App: Mode:', reanalyzeAll ? 'COMPLETE RE-ANALYSIS (all images)' : 'ENHANCEMENT (new images only)')
-    console.log('App: Current record ID:', recordId)
-    console.log('App: Is in register:', isRecordInRegister)
-    console.log('App: Current record has database images:', record?.metadata?.image_urls?.length || 0)
-    console.log('App: Browser:', navigator.userAgent)
     
     // Preserve the original record data during re-analysis to prevent context loss
     const originalRecord = record
@@ -358,7 +327,6 @@ function App() {
     
     // If record is NOT in the register (not yet saved to DB), use standard upload flow
     if (!isRecordInRegister || !recordId || !record) {
-      console.log('App: Record not in register yet, using standard upload flow')
       try {
         await handleUpload(images)
       } catch (error) {
@@ -368,7 +336,6 @@ function App() {
       return
     }
     
-    console.log('App: Using re-analysis endpoint for record:', recordId)
     
     try {
       setError(null)
@@ -376,8 +343,6 @@ function App() {
       
       // Call reanalyze endpoint - returns immediate response with analyzed data
       const response = await apiClient.reanalyze(recordId, images, record, reanalyzeAll)
-      console.log('App: Re-analysis response status:', response.status)
-      console.log('App: Re-analysis response:', response)
       
       setLoading(false)
       
@@ -388,8 +353,6 @@ function App() {
         // Mark ALL currently uploaded images as "registered baseline" so the
         // "Analyze N new images" button resets after a successful reanalysis.
         setRegisteredImageCount(originalUploadedImages.length)
-        console.log('App: Re-analysis completed successfully, keeping', originalUploadedImages.length, 'images in memory')
-        console.log('App: Updated record metadata:', updatedRecord.metadata)
         
         // Update localStorage
         localStorage.setItem('phonox_current_record', JSON.stringify(updatedRecord))
@@ -438,9 +401,6 @@ function App() {
   }
 
   const handleRecordSelectFromRegister = async (registerRecord: RegisterRecord) => {
-    console.log('App: Loading record from register:', registerRecord.artist, '-', registerRecord.title)
-    console.log('App: Browser:', navigator.userAgent)
-    console.log('App: Register record has images:', registerRecord.image_urls?.length || 0)
     
     // Convert RegisterRecord to VinylRecord format
     const vinylRecord: VinylRecord = {
@@ -477,12 +437,10 @@ function App() {
     }
 
     // CRITICAL: Set record state first, then load images into memory
-    console.log('App: Setting register record with', vinylRecord.metadata?.image_urls?.length || 0, 'database images')
     setRecord(vinylRecord)
     setRecordId(registerRecord.id)
     
     // Load images from URLs into memory as File objects (memory-first)
-    console.log('App: Loading images from database URLs into memory...')
     setImagesLoading(true)
     try {
       const results = await Promise.allSettled(
@@ -511,7 +469,6 @@ function App() {
           loadedUrls.push(sourceUrls[i])
         }
       })
-      console.log(`App: Loaded ${validFiles.length}/${registerRecord.image_urls?.length || 0} images into memory`)
       setUploadedImages(validFiles)
       // registeredImageCount = how many images came from the register at load time
       // registeredImageUrls = corresponding DB URLs (parallel array) for upload deduplication
@@ -529,7 +486,6 @@ function App() {
     // Close the register view
     setShowRegister(false)
     
-    console.log('App: Register record loaded successfully')
   }
 
   const handleAnalysisReport = (reportContent: string) => {
@@ -574,31 +530,21 @@ function App() {
   }, [isCheckingValue])
 
   const handleUserChange = (username: string) => {
-    console.log('[DEBUG] App: User changed from', currentUser, 'to', username)
-    console.log('[DEBUG] App: Mobile detection:', /Mobi|Android/i.test(navigator.userAgent))
-    console.log('[DEBUG] App: Navigator online:', navigator.onLine)
-    console.log('[DEBUG] App: Window location:', window.location.href)
     
     setCurrentUser(username)
     if (username) {
-      console.log('[DEBUG] App: Loading register for new user:', username)
       // Add mobile-specific debug info
       if (/Mobi|Android/i.test(navigator.userAgent)) {
-        console.log('[DEBUG] Mobile: About to load register for', username)
-        console.log('[DEBUG] Mobile: Current register count before load:', vinylRegister.length)
       }
       loadRegister(username)
     } else {
-      console.log('[DEBUG] App: No user, clearing register')
       setVinylRegister([])
     }
   }
 
   const loadRegister = async (userTag?: string) => {
     const user = userTag || currentUser
-    console.log('[DEBUG] App: Loading register for user:', user, 'currentUser:', currentUser, 'userTag:', userTag)
     if (!user) {
-      console.log('[DEBUG] App: No user specified, skipping register load')
       return
     }
     setRegisterLoading(true)
@@ -607,7 +553,6 @@ function App() {
     const isMobile = /Mobi|Android/i.test(navigator.userAgent)
     
     try {
-      console.log('[DEBUG] App: Making API call to get register for:', user)
       const cacheHeaders = {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
@@ -617,45 +562,25 @@ function App() {
       if (isMobile) {
         // Add mobile-specific cache busting
         cacheHeaders['X-Mobile-Cache-Bust'] = Date.now().toString()
-        console.log('[DEBUG] App: Mobile detected, using enhanced cache control')
-        console.log('[DEBUG] Mobile: API Base URL check...')
       }
       
-      console.log('[DEBUG] App: About to call registerApiClient.getRegister')
       const registerData = await registerApiClient.getRegister(user, { 
         cache: 'no-cache',
         headers: cacheHeaders
       })
       
-      console.log('[DEBUG] App: Register API call completed successfully')
-      console.log('[DEBUG] App: Register loaded, count:', registerData.length)
-      console.log('[DEBUG] App: First record sample:', registerData.length > 0 ? registerData[0] : 'No records')
       
       if (isMobile && registerData.length === 0) {
-        console.log('[DEBUG] Mobile: No records returned - investigating...')
-        console.log('[DEBUG] Mobile: User parameter:', user)
-        console.log('[DEBUG] Mobile: Will attempt direct test call')
       }
       
       setVinylRegister(registerData)
       
       if (isMobile) {
-        console.log('[DEBUG] Mobile: Register state updated, new count should be:', registerData.length)
       }
     } catch (error) {
-      console.error('[DEBUG] Failed to load register:', error)
-      console.error('[DEBUG] Error details:', {
-        name: error instanceof Error ? error.name : 'Unknown',
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : 'No stack'
-      })
-      
-      if (isMobile) {
-        console.error('[DEBUG] Mobile: Register load failed, error was:', error)
-      }
+      console.error('App: Failed to load register:', error)
     } finally {
       setRegisterLoading(false)
-      console.log('[DEBUG] App: Register loading finished, registerLoading set to false')
     }
   }
 
@@ -701,7 +626,6 @@ function App() {
           <button 
             className={styles.registerButton}
             onClick={() => {
-              console.log('Register button clicked - currentUser:', currentUser, 'vinylRegister.length:', vinylRegister.length)
               setShowRegister(true)
             }}
             disabled={!currentUser}

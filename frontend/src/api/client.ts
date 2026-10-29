@@ -44,18 +44,12 @@ export class ApiClient {
       this.baseUrl = baseUrl
     } else if (import.meta.env.VITE_API_URL) {
       this.baseUrl = import.meta.env.VITE_API_URL
-      console.log('[API] Using VITE_API_URL from environment:', this.baseUrl)
     } else if (typeof window !== 'undefined' && window.location.hostname) {
       this.baseUrl = `http://${window.location.hostname}:8000`
-      console.log('[API] Using hostname detection fallback:', this.baseUrl)
     } else {
       this.baseUrl = 'http://localhost:8000'
-      console.log('[API] Using localhost fallback:', this.baseUrl)
     }
     
-    console.log('[API] ApiClient initialized with baseUrl:', this.baseUrl)
-    console.log('[API] window.location.hostname:', typeof window !== 'undefined' ? window.location.hostname : 'N/A')
-    console.log('[API] import.meta.env.VITE_API_URL:', import.meta.env.VITE_API_URL || 'Not set')
   }
 
   async identify(files: File[]): Promise<Record<string, unknown>> {
@@ -66,15 +60,8 @@ export class ApiClient {
     })
 
     const url = `${this.baseUrl}/api/v1/identify`
-    console.log('[API] identify() - Starting upload...')
-    console.log('[API] identify() - Base URL:', this.baseUrl)
-    console.log('[API] identify() - Full URL:', url)
-    console.log('[API] identify() - Files count:', files.length, files.map(f => ({ name: f.name, size: f.size, type: f.type })))
-    console.log('[API] identify() - User Agent:', navigator.userAgent)
-    console.log('[API] identify() - Online:', navigator.onLine)
 
     try {
-      console.log('[API] identify() - Sending fetch request with 120s timeout (includes web scraping for value estimation)...')
       const response = await fetchWithTimeout(url, {
         method: 'POST',
         body: formData,
@@ -82,12 +69,8 @@ export class ApiClient {
         timeout: TIMEOUT_PRESETS.VERY_LONG // 120s for file upload + value estimation via web scraping
       })
 
-      console.log('[API] identify() - Received response')
-      console.log('[API] identify() - Response status:', response.status, response.statusText)
-      console.log('[API] identify() - Response headers:', Object.fromEntries(response.headers.entries()))
 
       if (!response.ok) {
-        console.log('[API] identify() - Response not OK, attempting to parse error...')
         try {
           const error = (await response.json()) as ApiError
           console.error('[API] identify() - Error response:', error)
@@ -101,9 +84,7 @@ export class ApiClient {
         }
       }
 
-      console.log('[API] identify() - Parsing successful response...')
       const result = await response.json()
-      console.log('[API] identify() - Success result:', result)
       // Return the complete response, not just record_id and status
       return result
     } catch (error) {
@@ -119,7 +100,6 @@ export class ApiClient {
 
   async getResult(recordId: string): Promise<Record<string, unknown>> {
     const url = addCacheBustingParam(`${this.baseUrl}/api/v1/identify/${recordId}`)
-    console.log('[API] getResult() - Fetching from:', url)
 
     try {
       const response = await fetchWithTimeout(url, {
@@ -136,7 +116,6 @@ export class ApiClient {
       }
 
       const result = await response.json()
-      console.log('[API] getResult() - Got result:', result)
       return result
     } catch (error) {
       console.error('[API] getResult() - Network error:', error)
@@ -229,10 +208,6 @@ export class ApiClient {
     }
 
     const url = `${this.baseUrl}/api/v1/reanalyze/${recordId}`
-    console.log('[API] reanalyze() - Re-analyzing record:', recordId)
-    console.log('[API] reanalyze() - Mode:', reanalyzeAll ? 'COMPLETE RE-ANALYSIS (all images)' : 'ENHANCEMENT (new images only)')
-    console.log('[API] reanalyze() - Files count:', files.length, files.map(f => ({ name: f.name, size: f.size, type: f.type })))
-    console.log('[API] reanalyze() - Current record data provided:', !!currentRecord)
 
     try {
       const response = await fetchWithTimeout(url, {
@@ -241,7 +216,6 @@ export class ApiClient {
         timeout: TIMEOUT_PRESETS.VERY_LONG // 2m for re-analysis (long operation)
       })
 
-      console.log('[API] reanalyze() - Response status:', response.status, response.statusText)
 
       if (!response.ok) {
         try {
@@ -258,7 +232,6 @@ export class ApiClient {
       }
 
       const result = await response.json()
-      console.log('[API] reanalyze() - Success:', result)
       return result
     } catch (error) {
       console.error('[API] reanalyze() - Failed:', error)

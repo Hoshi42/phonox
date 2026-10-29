@@ -19,23 +19,19 @@ function getCacheHeaders(): HeadersInit {
 const API_BASE = (() => {
   // First try environment variable (highest priority)
   if (import.meta.env.VITE_API_URL) {
-    console.log('[RegisterAPI] Using VITE_API_URL:', import.meta.env.VITE_API_URL)
     return import.meta.env.VITE_API_URL
   }
   
   // Fallback to hostname detection
   if (typeof window !== 'undefined' && window.location.hostname) {
     const fallbackUrl = `http://${window.location.hostname}:8000`
-    console.log('[RegisterAPI] Using hostname fallback:', fallbackUrl)
     return fallbackUrl
   }
   
   // Final fallback
-  console.log('[RegisterAPI] Using localhost fallback')
   return 'http://localhost:8000'
 })()
 
-console.log('[RegisterAPI] Final API_BASE:', API_BASE)
 
 export interface RegisterRecord {
   id: string
@@ -79,21 +75,13 @@ class RegisterApiClient {
 
   constructor() {
     this.baseUrl = `${API_BASE}/api/register`
-    console.log('[RegisterAPI] Initialized with API_BASE:', API_BASE)
-    console.log('[RegisterAPI] Full baseUrl:', this.baseUrl)
-    console.log('[RegisterAPI] VITE_API_URL:', import.meta.env.VITE_API_URL || 'Not set')
-    console.log('[RegisterAPI] window.location.hostname:', typeof window !== 'undefined' ? window.location.hostname : 'N/A')
   }
 
   async getRegister(userTag: string, fetchOptions?: RequestInit): Promise<RegisterRecord[]> {
     const url = `${this.baseUrl}/?user_tag=${encodeURIComponent(userTag)}&_t=${Date.now()}`
     
-    console.log('[RegisterAPI] getRegister() - Starting request...')
-    console.log('[RegisterAPI] getRegister() - URL:', url)
-    console.log('[RegisterAPI] getRegister() - userTag:', userTag)
 
     try {
-      console.log('[RegisterAPI] getRegister() - Sending fetch request...')
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -104,8 +92,6 @@ class RegisterApiClient {
         ...fetchOptions
       })
 
-      console.log('[RegisterAPI] getRegister() - Response received')
-      console.log('[RegisterAPI] getRegister() - Status:', response.status, response.statusText)
 
       if (!response.ok) {
         let errorText = ''
@@ -119,7 +105,6 @@ class RegisterApiClient {
       }
 
       const data = await response.json()
-      console.log('[RegisterAPI] getRegister() - Success:', data.length, 'records received')
       return data
     } catch (error) {
       console.error('[RegisterAPI] getRegister() - Caught error:', error)

@@ -103,23 +103,17 @@ export default function VinylCard({
   // Auto-display intermediate results from image analysis
   useEffect(() => {
     if (!record) {
-      console.log('VinylCard: No record')
       return
     }
     
-    console.log('VinylCard: useEffect triggered - record_id:', record.record_id)
-    console.log('VinylCard: Has intermediate_results?', !!record.intermediate_results)
-    console.log('VinylCard: Last record with results:', lastRecordIdWithResults)
     
     // If this is a new record (different record_id), clear old results
     if (record.record_id !== lastRecordIdWithResults) {
-      console.log('VinylCard: New record detected, clearing old intermediate results')
       setSearchIntermediateResults(null)
     }
     
     // If we have intermediate results and haven't shown them yet for this record
     if (record.intermediate_results && record.record_id !== lastRecordIdWithResults) {
-      console.log('VinylCard: Setting intermediate results from image analysis:', record.intermediate_results)
       setSearchIntermediateResults(record.intermediate_results)
       setLastRecordIdWithResults(record.record_id)
       
@@ -146,9 +140,7 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
         onAddChatMessage(analysisMessage, 'assistant')
       }
     } else if (record.intermediate_results && record.record_id === lastRecordIdWithResults) {
-      console.log('VinylCard: Already showed results for this record')
     } else {
-      console.log('VinylCard: No intermediate_results in record')
     }
   }, [record?.record_id, record?.intermediate_results, lastRecordIdWithResults])
 
@@ -242,7 +234,6 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
         user_notes: editData.notes ?? null,
       }
       onMetadataUpdate(updatedMetadata)
-      console.log('VinylCard: Metadata saved locally (will be persisted when adding/updating in register):', updatedMetadata)
     }
     setIsEditing(false)
     setAppliedWebValue(null)
@@ -256,7 +247,6 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
     setWebValue(null)
     
     try {
-      console.log('VinylCard: Requesting web-based value estimation for', record.artist, '-', record.title)
       
       const response = await fetch(`${API_BASE}/api/v1/estimate-value/${record.record_id}`, {
         method: 'POST',
@@ -270,12 +260,10 @@ ${record.intermediate_results.claude_analysis || 'No analysis available'}`
       }
       
       const data = await response.json()
-      console.log('VinylCard: Value estimation response:', data)
       
       // Store intermediate results for display
       if (data.intermediate_results) {
         setSearchIntermediateResults(data.intermediate_results)
-        console.log('VinylCard: Intermediate results:', data.intermediate_results)
         
         // Send web search results to chat panel
         if (onAddChatMessage) {
@@ -307,7 +295,6 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
         const condition = data.market_condition ? ` [${data.market_condition} market]` : ''
         
         setWebValue(`€${value}${range}${condition}`)
-        console.log('VinylCard: Web value set to:', value)
       } else {
         setWebValue('No price found')
       }
@@ -345,7 +332,6 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
       // Show the applied value in the display immediately
       setAppliedWebValue(newValue)
       
-      console.log('VinylCard: Web value applied and saved to metadata:', newValue)
     } catch (error) {
       console.error('Error applying web value:', error)
     }
@@ -375,11 +361,6 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
       (editData.spotify_url || undefined) : 
       (record.metadata?.spotify_url || undefined)
     
-    console.log('VinylCard: handleRegisterAction started')
-    console.log('VinylCard: isEditing =', isEditing)
-    console.log('VinylCard: Using condition =', condition, 'from', isEditing ? 'editData' : 'record.metadata')
-    console.log('VinylCard: editData.condition =', editData.condition)
-    console.log('VinylCard: record.metadata?.condition =', record.metadata?.condition)
         try {
       if (isInRegister) {
         // Upload only genuinely new images (those without an existing DB URL).
@@ -390,17 +371,13 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
         let newImageUrls: string[] = []
 
         if (newImages.length > 0) {
-          console.log(`VinylCard: Uploading ${newImages.length} new image(s) (${registeredImageUrls.length} already in DB)`)
           const uploadResponse = await registerApiClient.uploadImages(record.record_id, newImages)
           newImageUrls = uploadResponse.uploaded_images.map((img: any) => img.url)
-          console.log('VinylCard: Newly uploaded image URLs:', newImageUrls)
         } else {
-          console.log('VinylCard: No new images to upload – all images already in DB')
         }
 
         // Combine existing DB URLs with any newly uploaded ones.
         const allImageUrls: string[] = [...registeredImageUrls, ...newImageUrls]
-        console.log('VinylCard: Final image_urls for update:', allImageUrls)
         
         const updateRequest = {
           record_id: record.record_id,
@@ -419,8 +396,6 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
           image_urls: allImageUrls  // Use the newly uploaded URLs
         }
         
-        console.log('VinylCard: Sending update request with condition:', updateRequest.condition)
-        console.log('VinylCard: Full update request:', updateRequest)
         
         // Update existing record in register with ALL metadata fields
         await registerApiClient.updateRegisterRecord(updateRequest)
@@ -456,8 +431,6 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
           user_tag: currentUser
         }
         
-        console.log('VinylCard: Sending add request with condition:', addRequest.condition)
-        console.log('VinylCard: Full add request:', addRequest)
         
         await registerApiClient.addToRegister(addRequest)
         onAddToRegister?.(record)
@@ -466,11 +439,6 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
       // Notify parent component of successful register operation
       onRegisterSuccess?.()
       
-      console.log('VinylCard: Record successfully updated in register with values:', {
-        estimated_value_eur: estimatedValue,
-        condition: condition,
-        year: year
-      })
       
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'An unknown error occurred'
@@ -600,7 +568,6 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
               accept="image/*"
               onChange={(e) => {
                 if (e.target.files) {
-                  console.log('VinylCard: Adding images:', e.target.files.length)
                   onImageAdd?.(e.target.files)
                   // Defer the value reset to avoid a Samsung Internet Browser bug:
                   // resetting synchronously inside onChange causes a page reload on Samsung Internet.
@@ -620,7 +587,6 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
             <button 
               onClick={() => {
                 // Complete re-analysis: Re-analyze ALL images (existing + new) from scratch
-                console.log('VinylCard: Triggering COMPLETE re-analysis of all images')
                 onReanalyze(uploadedImages, true)
               }}
               className={styles.reanalyzeAllBtn}
@@ -640,7 +606,6 @@ ${data.intermediate_results.claude_analysis || 'No analysis available'}`
                 onClick={() => {
                   // Analyze only newly uploaded images and intelligently merge metadata
                   const newImages = uploadedImages.slice(originalImageCount)
-                  console.log('VinylCard: Analyzing', newImages.length, 'new images (will intelligently merge with existing metadata)')
                   onReanalyze(newImages)
                 }}
                 className={styles.reanalyzeBtn}

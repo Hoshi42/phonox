@@ -1,4 +1,10 @@
 # Changelog
+## [2.2.1] - 2026-10-29 - Remove frontend debug logging
+
+### Changed
+- **Frontend diagnostics** (`frontend/`) — removed verbose console logging while retaining error and retry messages.
+- **Anthropic model examples** (`.env.example`) — updated recommended model IDs to Claude 5.5.
+
 ## [2.2.0] - 2026-06-07 - Interactive quiz cards in chat UI
 
 ### Added

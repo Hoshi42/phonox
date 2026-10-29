@@ -172,7 +172,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const stored = getStoredChatHistory(record?.record_id)
     if (stored.length > 0) {
-      console.log(`💾 Loaded chat history for record ${record?.record_id}: ${stored.length} messages`)
       return stored
     }
     return [
@@ -215,10 +214,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
     if (record?.record_id) {
       const stored = getStoredChatHistory(record.record_id)
       if (stored.length > 0) {
-        console.log(`💾 Switched to chat history for record ${record.record_id}: ${stored.length} messages`)
         setMessages(stored)
       } else {
-        console.log(`📝 Starting new chat for record ${record.record_id}`)
         setMessages([
           {
             role: 'assistant',
@@ -376,13 +373,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
       const data: ChatResponse = await response.json()
       
       // Debug logging
-      console.log('Chat response data:', {
-        web_enhanced: data.web_enhanced,
-        sources_used: data.sources_used,
-        search_results_count: data.search_results?.length || 0,
-        search_results: data.search_results,
-        history_context_sent: chatHistoryForContext.length
-      })
       
       const { quizData, displayText } = extractQuiz(data.message)
       const assistantMessage: ChatMessage = {
@@ -446,7 +436,6 @@ The vinyl card has been updated with all the details. You can edit any informati
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      console.log('ChatPanel: Handling file selection:', e.target.files.length)
       handleImageUpload(Array.from(e.target.files))
       // Reset the input value to allow selecting the same files again (mobile fix)
       e.target.value = ''

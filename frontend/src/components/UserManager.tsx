@@ -31,18 +31,13 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
 
   useEffect(() => {
     const savedUsername = localStorage.getItem('phonox_username')
-    console.log('UserManager: Initializing, saved username:', savedUsername)
-    console.log('UserManager: Mobile detection - isMobile:', /Mobi|Android/i.test(navigator.userAgent))
-    console.log('UserManager: LocalStorage available:', typeof(Storage) !== "undefined")
     
     // Load existing users from API
     loadExistingUsers()
     if (savedUsername) {
-      console.log('UserManager: Setting username and triggering onUserChange for:', savedUsername)
       setUsername(savedUsername)
       onUserChange(savedUsername)
     } else {
-      console.log('UserManager: No saved username, showing modal')
       setShowModal(true)
     }
   }, [])
@@ -52,9 +47,7 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
       const API_BASE = window.location.hostname === 'localhost' 
         ? 'http://localhost:8000' 
         : `http://${window.location.hostname}:8000`
-      console.log('UserManager: API_BASE:', API_BASE)
       const url = `${API_BASE}/api/register/users?_t=${Date.now()}` // Cache busting
-      console.log('UserManager: Fetching from:', url)
       const response = await fetch(url, { 
         cache: 'no-cache',
         headers: {
@@ -65,7 +58,6 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
       if (response.ok) {
         const users = await response.json()
         setExistingUsers(users)
-        console.log('UserManager: Loaded existing users:', users)
       } else {
         console.error('UserManager: API response not ok:', response.status, response.statusText)
       }
@@ -84,7 +76,6 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
   }
 
   const handleUserSwitch = (selectedUser: string) => {
-    console.log('UserManager: Switching to user:', selectedUser)
     setUsername(selectedUser)
     localStorage.setItem('phonox_username', selectedUser)
     // Force service worker to update cache when switching users
