@@ -33,7 +33,7 @@ Phonox is a full-stack AI-powered vinyl record identification system with these 
 │  ├──────────────────────────────────────────────────────┤   │
 │  │ 1. validate_images      │ Check format, size, count  │   │
 │  │ 2. extract_features     │ Feature pre-processing     │   │
-│  │ 3. vision_extraction    │ Claude Sonnet 4 multimodal │   │
+│  │ 3. vision_extraction    │ Configured vision model   │   │
 │  │ 4. lookup_metadata      │ Discogs + MusicBrainz      │   │
 │  │ 5. websearch_fallback   │ Tavily + DuckDuckGo        │   │
 │  │ 6. metadata_synthesis   │ Merge & verify metadata    │   │
@@ -82,7 +82,7 @@ LangGraph Agent starts 7-node workflow:
     │   └ Pre-process image data for vision pipeline
     │
     ├→ vision_extraction
-    │   ├ Claude Sonnet 4 multimodal analysis
+    │   ├ Configured Claude vision analysis (recommended: Sonnet 5.5)
     │   ├ Extract: artist, title, year, label, genres, barcode, condition
     │   ├ Auto-populate user_notes with vision reasoning
     │   └ Generate confidence scores per field

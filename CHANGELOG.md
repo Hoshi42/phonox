@@ -1,4 +1,10 @@
 # Changelog
+## [2.2.4] - 2026-10-29 - Document Claude 5.5 model recommendations
+
+### Changed
+- **Model documentation** (`README.md`, `backend/README.md`, `docs/`, `.env.example`) — aligned recommendations with Haiku 5.5, Sonnet 5.5 and Opus 5.5; replaced outdated analysis cost claims with current published rates and explicit estimation assumptions.
+- **Configuration guide** — clarified that model variables must reach the backend environment and that the current Compose configuration does not yet forward them.
+
 ## [2.2.3] - 2026-10-29 - Fix rejected chat model parameter
 
 ### Fixed

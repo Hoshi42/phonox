@@ -158,25 +158,56 @@ WEB_SCRAPING_MAX_URLS=5
 
 ## Vision & Chat Models
 
+The recommendations below match `.env.example`. They must be set explicitly in
+the **backend process environment**; they do not change the older code-level
+fallbacks automatically.
+
+!!! warning "Docker Compose model settings"
+    The current Compose file does not forward these four model variables.
+    A project `.env` supplies values for Compose interpolation, but does not
+    automatically export every value into the container. Add these entries
+    under `services.backend.environment` before recreating the backend:
+
+    ```yaml
+    ANTHROPIC_VISION_MODEL: ${ANTHROPIC_VISION_MODEL:-claude-sonnet-5-5}
+    ANTHROPIC_CHAT_MODEL: ${ANTHROPIC_CHAT_MODEL:-claude-haiku-5-5}
+    ANTHROPIC_AGGREGATION_MODEL: ${ANTHROPIC_AGGREGATION_MODEL:-claude-sonnet-5-5}
+    ANTHROPIC_ENHANCEMENT_MODEL: ${ANTHROPIC_ENHANCEMENT_MODEL:-claude-opus-5-5}
+    ```
+
+    Apply with `docker compose up -d --force-recreate backend`; a plain restart
+    does not update the container's environment. This documentation update
+    does not change the Compose file or certify every analysis path with 5.5.
+
 ### Vision Model (Image Analysis)
 
 **`ANTHROPIC_VISION_MODEL`**
-- **Default**: `claude-sonnet-4-5-20250929`
+- **Recommended**: `claude-sonnet-5-5`
 - **Options**:
-  - `claude-sonnet-4-5-20250929` (recommended - best accuracy/speed)
-  - `claude-opus-4-1-20250805` (slower, higher accuracy)
+  - `claude-sonnet-5-5` (balanced vision recommendation)
+  - `claude-haiku-5-5` (lower-cost option; evaluate extraction quality first)
 - **Description**: Model used for vinyl record image analysis
-- **Example**: `ANTHROPIC_VISION_MODEL=claude-opus-4-1-20250805`
+- **Example**: `ANTHROPIC_VISION_MODEL=claude-sonnet-5-5`
 
 ### Chat Model (Conversations)
 
 **`ANTHROPIC_CHAT_MODEL`**
-- **Default**: `claude-haiku-4-5-20251001`
+- **Recommended**: `claude-haiku-5-5`
 - **Options**:
-  - `claude-haiku-4-5-20251001` (fast, cost-effective)
-  - `claude-sonnet-4-5-20250929` (higher quality)
+  - `claude-haiku-5-5` (fast, lower-cost option)
+  - `claude-sonnet-5-5` (alternative for more demanding conversations)
 - **Description**: Model used for chat responses
-- **Example**: `ANTHROPIC_CHAT_MODEL=claude-sonnet-4-5-20250929`
+- **Example**: `ANTHROPIC_CHAT_MODEL=claude-haiku-5-5`
+
+### Aggregation and Enhancement Models
+
+| Variable | Recommended model | Purpose |
+|---|---|---|
+| `ANTHROPIC_AGGREGATION_MODEL` | `claude-sonnet-5-5` | Merge results from multiple images |
+| `ANTHROPIC_ENHANCEMENT_MODEL` | `claude-opus-5-5` | Resolve metadata conflicts during enhancement |
+
+For lower enhancement costs, evaluate `claude-sonnet-5-5` as an alternative to
+Opus. See [model pricing and estimation](../architecture/cost-model.md).
 
 ---
 
@@ -233,7 +264,7 @@ docker-compose exec backend env | grep ANTHROPIC
 ### "Slow identification"
 - Decrease `WEB_SCRAPING_MAX_URLS` to 1-2
 - Decrease `WEB_SCRAPING_TIMEOUT` to 5s
-- Use faster chat model: `claude-haiku`
+- Use the recommended lower-cost chat model: `claude-haiku-5-5`
 
 ---
 
@@ -260,8 +291,10 @@ VITE_POLL_INTERVAL=2000
 VITE_ENV=production
 
 # AI Models
-ANTHROPIC_VISION_MODEL=claude-sonnet-4-5-20250929
-ANTHROPIC_CHAT_MODEL=claude-haiku-4-5-20251001
+ANTHROPIC_VISION_MODEL=claude-sonnet-5-5
+ANTHROPIC_CHAT_MODEL=claude-haiku-5-5
+ANTHROPIC_AGGREGATION_MODEL=claude-sonnet-5-5
+ANTHROPIC_ENHANCEMENT_MODEL=claude-opus-5-5
 
 # Backend
 PYTHONDONTWRITEBYTECODE=1

@@ -63,7 +63,7 @@ Get 1-5 clear photos of your vinyl record. Best results with:
 
 System automatically:
 - Uploads all images
-- Analyzes with AI vision (Claude Sonnet 4)
+- Analyzes with the configured vision model (recommended: Claude Sonnet 5.5)
 - Extracts barcodes if visible
 - Searches Discogs and MusicBrainz
 - Shows results in 5-10 seconds

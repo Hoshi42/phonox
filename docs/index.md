@@ -15,7 +15,7 @@ Phonox is an AI-powered application that helps you:
 
 ### 🤖 AI-Powered Identification
 - Upload photos of your vinyl records (1-10 images)
-- Get instant identification using Claude Sonnet 4 vision analysis
+- Identify records using the configured vision model (recommended: Claude Sonnet 5.5)
 - Automatic barcode detection (UPC/EAN)
 - Automatic metadata enrichment from Discogs, MusicBrainz, and Spotify
 
@@ -131,8 +131,9 @@ chmod +x start-cli.sh
 - **FastAPI** - Modern Python web framework
 - **SQLAlchemy** - ORM for database operations
 - **LangGraph** - Orchestration for AI workflows
-- **Claude Sonnet 4** - Vision analysis
-- **Claude Haiku 4.5** - Chat assistant
+- **Claude Sonnet 5.5** - Recommended for vision analysis and aggregation
+- **Claude Haiku 5.5** - Recommended for chat and market valuation
+- **Claude Opus 5.5** - Recommended for metadata enhancement
 
 ### External Services
 - **Anthropic Claude** - AI vision and chat
@@ -153,7 +154,7 @@ Phonox uses a 6-node LangGraph workflow for record identification:
 ```
 Image Upload
     ↓
-Vision Analysis (Claude Sonnet 4)
+Vision Analysis (recommended: Claude Sonnet 5.5)
     ↓
 Metadata Lookup (Discogs/MusicBrainz)
     ↓
@@ -172,7 +173,7 @@ Get free or affordable API keys from:
 
 | Service | Cost | Purpose |
 |---------|------|---------|
-| [Anthropic](https://console.anthropic.com) | Pay-per-use (~$0.057 / 2-image analysis) | Vision & chat AI |
+| [Anthropic](https://console.anthropic.com) | Pay-per-use; see [current model rates](architecture/cost-model.md) | Vision & chat AI |
 | [Tavily](https://tavily.com) | Free tier (100 calls/month) | Web search |
 | Discogs | Free API | Vinyl metadata |
 | MusicBrainz | Free API | Music metadata |

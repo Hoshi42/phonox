@@ -93,10 +93,10 @@ A curses menu lists all configurable keys with their current values masked:
 ```
   Anthropic API key          ****…TgAA
   Tavily API key             ****…UxT4
-  Vision model               claude-sonnet-4-6
-  Chat model                 claude-haiku-4-5-20251001
-  Aggregation model          claude-sonnet-4-6
-  Enhancement model          claude-opus-4-5
+  Vision model               claude-sonnet-5-5
+  Chat model                 claude-haiku-5-5
+  Aggregation model          claude-sonnet-5-5
+  Enhancement model          claude-opus-5-5
   ──────────────────────────────────────
   Save & apply
   Cancel

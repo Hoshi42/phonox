@@ -13,7 +13,7 @@ validate_images
     ↓
 extract_features
     ↓
-vision_extraction (Claude 3 multimodal)
+vision_extraction (configured Claude vision model)
     ↓
 lookup_metadata (Discogs + MusicBrainz)
     ↓
@@ -31,7 +31,7 @@ backend/
 ├── agent/
 │   ├── graph.py           # LangGraph workflow builder
 │   ├── state.py           # State models (TypedDict)
-│   ├── vision.py          # Claude 3 multimodal analysis
+│   ├── vision.py          # Configured Claude vision analysis
 │   ├── metadata.py        # Discogs/MusicBrainz lookup
 │   ├── websearch.py       # Tavily web search
 │   ├── barcode_utils.py   # Barcode validation/parsing
@@ -50,13 +50,14 @@ backend/
 
 ### 1. Vision Extraction (`agent/vision.py`)
 
-Uses Claude 3 Sonnet multimodal analysis to extract metadata from vinyl record artwork:
+Uses the configured vision model (recommended: Claude Sonnet 5.5) to extract metadata from vinyl record artwork:
 - Artist, title, year
 - Label, catalog number
 - Genres, visual cues
 - Album art characteristics
 
-**Cost**: ~$0.002 per image
+**Cost**: Depends on the effective model, image tokens, prompts and output. See the
+[cost model](../docs/architecture/cost-model.md) for current rates and estimation guidance.
 
 ### 2. Metadata Lookup (`agent/metadata.py`)
 
@@ -194,8 +195,11 @@ A separate **LangGraph ReAct agent** handles the `/api/v1/chat` endpoint. It run
 ```env
 # Anthropic (required for vision analysis)
 ANTHROPIC_API_KEY=sk-...
-ANTHROPIC_VISION_MODEL=claude-sonnet-4-6
-ANTHROPIC_CHAT_MODEL=claude-haiku-4-5-20251001
+# Recommended models (set explicitly in the backend environment)
+ANTHROPIC_VISION_MODEL=claude-sonnet-5-5
+ANTHROPIC_CHAT_MODEL=claude-haiku-5-5
+ANTHROPIC_AGGREGATION_MODEL=claude-sonnet-5-5
+ANTHROPIC_ENHANCEMENT_MODEL=claude-opus-5-5
 
 # Tavily (optional, falls back to DuckDuckGo)
 TAVILY_API_KEY=tvly-...
@@ -209,6 +213,12 @@ UPLOAD_DIR=/app/uploads
 # Server
 SERVER_PORT=8000
 ```
+
+The recommendations above match `.env.example`. The current Compose configuration
+does not forward the model variables to the backend; add them to
+`services.backend.environment` and recreate the backend container to apply them.
+Without explicit settings, older code-level fallback models remain active.
+See the [model configuration guide](../docs/getting-started/configuration.md#vision--chat-models).
 
 ## Image Storage
 

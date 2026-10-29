@@ -14,7 +14,10 @@ The chat panel is on the left side of the main interface and is always visible.
 2. Press Enter or click the Send button
 3. AI responds with information
 
-The chat uses **Claude 3.5 Haiku** for efficient, cost-effective responses.
+The recommended chat model is **Claude Haiku 5.5** (`claude-haiku-5-5`) for
+fast, lower-cost responses. The active model is selected by
+`ANTHROPIC_CHAT_MODEL` in the backend environment; see
+[model configuration](../getting-started/configuration.md#vision--chat-models).
 
 ## Chat Capabilities
 

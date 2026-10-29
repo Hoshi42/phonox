@@ -188,8 +188,8 @@ Full CLI Reference:
 ./phonox-cli configure --anthropic YOUR_KEY --tavily YOUR_KEY
 
 # Configure Anthropic models (for advanced users)
-./phonox-cli configure --vision-model claude-sonnet-4-6
-./phonox-cli configure --chat-model claude-haiku-4-5-20251001
+./phonox-cli configure --vision-model claude-sonnet-5-5
+./phonox-cli configure --chat-model claude-haiku-5-5
 
 # Start services
 ./phonox-cli start
@@ -203,6 +203,21 @@ Full CLI Reference:
 # Restore from backup (use timestamp from backup folder)
 ./phonox-cli restore 20260128_143000
 ```
+
+### Recommended Claude models
+
+| Purpose | Environment variable | Recommended model |
+|---|---|---|
+| Image analysis | `ANTHROPIC_VISION_MODEL` | `claude-sonnet-5-5` |
+| Chat and market valuation | `ANTHROPIC_CHAT_MODEL` | `claude-haiku-5-5` |
+| Multi-image aggregation | `ANTHROPIC_AGGREGATION_MODEL` | `claude-sonnet-5-5` |
+| Metadata enhancement | `ANTHROPIC_ENHANCEMENT_MODEL` | `claude-opus-5-5` |
+
+These are the recommendations in `.env.example`, not a guarantee of the running
+backend's effective configuration. Model variables must reach the backend process;
+the current Compose file does not yet forward them. See the
+[configuration guide](docs/getting-started/configuration.md#vision--chat-models)
+and [current model pricing](docs/architecture/cost-model.md).
 
 ### Interactive Menu
 
@@ -435,4 +450,3 @@ If you find Phonox useful, please consider:
 - **Sharing** it with other vinyl collectors
 
 Every star and piece of feedback is genuinely appreciated and helps drive development forward.
-
