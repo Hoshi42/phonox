@@ -1,4 +1,9 @@
 # Changelog
+## [2.2.2] - 2026-10-29 - Fix duplicate responsive font size
+
+### Fixed
+- **User switch buttons** (`frontend/src/components/UserManager.tsx`) — removed a duplicate `fontSize` style property that blocked TypeScript builds; retained the responsive size.
+
 ## [2.2.1] - 2026-10-29 - Remove frontend debug logging
 
 ### Changed

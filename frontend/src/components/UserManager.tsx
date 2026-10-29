@@ -227,7 +227,6 @@ export default function UserManager({ onUserChange }: UserManagerProps) {
                       fontWeight: 600,
                       boxShadow: '0 4px 15px rgba(16, 185, 129, 0.25)',
                       lineHeight: '1.4',
-                      fontSize: isMobile ? '1.15rem' : '1.1rem',
                       width: '100%',
                       textAlign: 'center',
                       wordBreak: 'break-word'
