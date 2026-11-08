@@ -20,6 +20,7 @@ from backend.db_connection import DatabaseConnectionManager
 from backend.api.models import HealthCheckResponse
 from backend.api.register import router as register_router
 from backend.api.magazine import router as magazine_router
+from backend.api.analysis import router as analysis_router
 from backend.magazine_service import EXECUTOR, maintain_magazines
 
 # Configure logging
@@ -169,6 +170,7 @@ app.dependency_overrides[get_db] = override_get_db
 # Include routers
 app.include_router(register_router)
 app.include_router(magazine_router)
+app.include_router(analysis_router)
 
 # Import routes after app creation to avoid circular imports
 from backend.api import routes  # noqa: E402, F401

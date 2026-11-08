@@ -209,6 +209,18 @@ class CollectionMagazine(Base):  # type: ignore[misc,valid-type]
     published_at: ColumnType = Column(DateTime, nullable=True)
 
 
+class CollectionAnalysis(Base):  # type: ignore[misc,valid-type]
+    """The most recent AI collection analysis of a user, kept so it can always be reopened."""
+    __tablename__ = "collection_analyses"
+
+    id: ColumnType = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_tag: ColumnType = Column(String(50), nullable=False, unique=True, index=True)
+    summary: ColumnType = Column(Text, nullable=False)
+    record_count: ColumnType = Column(Integer, nullable=False, default=0)
+    total_value_eur: ColumnType = Column(Float, nullable=True)
+    created_at: ColumnType = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 def get_db() -> Session:
     """Dependency for getting database session."""
     if SessionLocal is None:
