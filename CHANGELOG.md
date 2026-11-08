@@ -6,10 +6,12 @@
 - **Collection** (`frontend/src/views/CollectionView.tsx`) — replaces the register modal: sticky search, sort/layout sheet, recently-added/artist/genre shelves, grid or list, active-filter chips and skeleton loading. Genres are grouped case-insensitively.
 - **Record details** (`frontend/src/views/RecordSheet.tsx`, `ui/Sheet.tsx`) — `VinylCard` now opens in a bottom sheet (side drawer on desktop) with focus trap, Escape, drag-to-dismiss, a pinned save button, and an in-app confirmation for removal.
 - **Design system** (`frontend/src/styles/tokens.css`, `theme/useTheme.ts`) — design tokens with a light theme, a dark theme following the system setting, and a manual override under Profile. `VinylCard`, chat, quiz, dialogs and magazine styles were rebuilt on the tokens.
-- **Profile** (`frontend/src/views/ProfileView.tsx`) — profile switching (first-run profile picker replaces the old modal), theme, analysis (with in-chat discussion and Markdown report), CSV export and the PDF magazine.
+- **Profile** (`frontend/src/views/ProfileView.tsx`) — shows the Phonox logo; profile switching (first-run profile picker replaces the old modal), theme, analysis (with in-chat discussion and Markdown report), CSV export and the PDF magazine.
 - **Capture** — chat is its own full-height tab; the loaded record stays reachable through a chip.
 
 ### Added
+- **Saved analysis** (`features/analysisApi.ts`) — the latest collection analysis is stored per user via `/api/analysis`; Profile offers **Open last analysis** next to **Run a new analysis**, and reports a failed save without losing the result.
+- **Chat shortcut** (`views/RecordSheet.tsx`) — "Ask the assistant about this record" closes the sheet, opens Capture and focuses the chat input.
 - **Discover tab** — browse by artist, genre or decade; selecting an entry filters the collection.
 - **Branch preview** (`docker-compose.preview.yml`) — runs the frontend of any checkout on port 5174 next to the regular app; `PORT` and `BACKEND_URL` are configurable in `vite.config.ts` and `playwright.config.ts`.
 - **UI tests** (`frontend/e2e/navigation.spec.ts`, `support.ts`) — tabs, search/filter, sheet behaviour, themes, profiles, responsive layout and failure states with mocked data.

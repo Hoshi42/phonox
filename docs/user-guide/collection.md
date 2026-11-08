@@ -54,6 +54,7 @@ Tap a record to:
 - Edit fields, add more images, re-analyze and re-estimate the value
 - Use **Update in Register** (fixed at the bottom of the sheet) to save changes
 - Open Spotify, move the record to another profile or remove it (after confirmation) with the buttons in the sheet header
+- Tap **Ask the assistant about this record** to jump straight into the chat with this record as context
 
 ## Adding Records
 
@@ -111,7 +112,7 @@ To improve identification of a saved record:
 
 ## Collection Reports
 
-**Profile → Collection tools** offers **Analyze collection** (an AI appraisal you can discuss in the chat or download as Markdown) and **Export CSV**.
+**Profile → Collection tools** offers **Analyze collection** (an AI appraisal you can discuss in the chat or download as Markdown) and **Export CSV**. The latest analysis is saved for your profile in the database: afterwards **Open last analysis** shows it again at any time, in any session, without a new AI run; **Run a new analysis** replaces it.
 
 ### PDF Collection Magazine
 
