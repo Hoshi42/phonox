@@ -1,4 +1,14 @@
 # Changelog
+## [2.3.1] - 2026-11-09 - Landscape half-page magazine and stored analysis
+
+### Changed
+- **Magazine PDF layout** (`backend/magazine_pdf.py`) — landscape A4; every album and every artist portrait occupies exactly one half page (two per page); images are resampled to the printed size (about 200 dpi), so the PDF is a fraction of its former size; long texts are shortened to stay within the half page.
+- **Missing information is omitted** — no placeholder portraits or descriptions, no "unknown"/"not recorded" fields, no quality-notes pages; "Unknown Artist" became "Other records". Placeholder texts of earlier editions are dropped when loaded.
+- **Image snapshots** are limited to 2,200 px (JPEG 88) to keep storage small.
+
+### Added
+- **`/api/analysis`** (`backend/api/analysis.py`, table `collection_analyses`) — the latest collection analysis per user is stored and can be reopened.
+
 ## [2.3.0] - 2026-11-08 - Persistent collection magazine PDFs
 
 ### Added

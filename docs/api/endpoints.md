@@ -106,6 +106,36 @@ Cancel returns status and stops at the next safe job boundary, not by killing
 an in-flight provider request. Deletion returns **204**; cancel active work
 first or receive **409**. Collection records are never deleted by these routes.
 
+## Collection Analysis
+
+### GET /api/analysis?user_tag=collector
+
+Returns the user's latest stored analysis:
+
+```json
+{
+  "user_tag": "collector",
+  "summary": "## Collection Composition...",
+  "record_count": 366,
+  "total_value_eur": 11252.11,
+  "created_at": "2026-11-09T00:12:00"
+}
+```
+
+**404** if the user has none yet; **400/422** for a missing or blank `user_tag`.
+
+### PUT /api/analysis?user_tag=collector
+
+```bash
+curl -X PUT 'http://localhost:8000/api/analysis?user_tag=collector' \
+  -H 'Content-Type: application/json' \
+  -d '{"summary": "## Strengths ...", "record_count": 366, "total_value_eur": 11252.11}'
+```
+
+Replaces the previous analysis (only the latest is kept) and returns the stored record.
+Invalid payloads (blank or over-long summary, negative counts or values, unknown fields) return **422**
+and leave the stored analysis untouched.
+
 ## Identification
 
 ### POST /api/v1/identify

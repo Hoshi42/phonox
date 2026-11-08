@@ -20,7 +20,7 @@ Phonox is an intelligent assistant for vinyl record collectors. It helps you:
 - **💰 Get valuations** using multiple data sources (Discogs, MusicBrainz)
 - **🎵 Find Spotify links** for listening to your collection
 - **📝 Organize your collection** with metadata, ratings, and notes
-- **📖 Create a collection magazine** as an illustrated A4 PDF with artist portraits, record articles and EUR estimates; reopen or update it as your collection grows
+- **📖 Create a collection magazine** as an illustrated landscape A4 PDF with one half page per album, artist portraits and EUR estimates; reopen or update it as your collection grows
 - **💬 Chat about records** with an AI agent that remembers your collection
 
 > 🖼️ **See it in action** → [UI Gallery & feature walkthrough](docs/gallery.md)

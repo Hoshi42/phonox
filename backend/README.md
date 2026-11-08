@@ -30,7 +30,7 @@ backend/
 ├── database.py             # SQLAlchemy ORM models
 ├── magazine_models.py      # Validated magazine snapshots and editorial drafts
 ├── magazine_service.py     # Persistent jobs, bounded research and atomic editions
-├── magazine_pdf.py         # Editorial A4 PDF layout and linked contents
+├── magazine_pdf.py         # Landscape A4 layout: one half page per album, linked contents
 ├── agent/
 │   ├── graph.py           # LangGraph workflow builder
 │   ├── state.py           # State models (TypedDict)
@@ -43,6 +43,7 @@ backend/
 │   ├── routes.py          # API endpoints (/identify, /chat)
 │   ├── register.py        # Register endpoints (/register)
 │   ├── magazine.py        # User-scoped magazine lifecycle (/api/magazine)
+│   ├── analysis.py        # Latest collection analysis per user (/api/analysis)
 │   ├── models.py          # Pydantic request/response models
 │   └── __init__.py
 └── tools/
@@ -138,6 +139,18 @@ magazine state, not disposable temporary work.
 
 **Access model:** `user_tag` is the existing collection scope, not authentication.
 The new routes enforce that scope but do not add login/authorization to Phonox.
+
+### Collection Analysis
+
+The most recent AI collection analysis is stored per user (one row in `collection_analyses`)
+so it can always be reopened. `user_tag` is required like for the other collection routes.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/analysis` | The latest analysis (`summary`, `record_count`, `total_value_eur`, `created_at`); 404 if none |
+| PUT | `/api/analysis` | Store/replace it; body `{summary, record_count, total_value_eur?}`, summary up to 100,000 characters |
+
+The table is created automatically on startup (`create_all`).
 
 ### Identification
 

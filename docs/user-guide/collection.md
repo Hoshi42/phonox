@@ -117,13 +117,17 @@ To improve identification of a saved record:
 ### PDF Collection Magazine
 
 Open **My Register**, then expand **PDF Magazine**. Each collection user can
-have one magazine. It is an English, A4 portrait PDF with:
+have one magazine. It is an English, A4 **landscape** PDF with:
 
 - A title page, editable foreword and linked contents/PDF bookmarks.
-- One artist portrait before that artist's records.
-- Large-format chapter photographs where image quality permits, flowing
-  editorial text and galleries containing all available record images.
-- EUR estimates with individual valuation dates, sources and honest data gaps.
+- **One half page per album**, two per page, with the photographs of that copy, the key facts and the estimated value.
+- A half-page artist portrait before an artist's records, where portrait text exists.
+- EUR estimates, dated when the valuation date is known.
+
+Information that is not available is simply left out of the PDF: no portrait page, no empty fields,
+no "unknown" placeholders. Text that is too long for a half page is shortened with an ellipsis
+(the draft warnings tell you which). Images are resampled to the printed size, which keeps even
+large collections to a moderate file size.
 
 Set a title, subtitle, optional display name and optional cover photograph.
 Leave the initial foreword empty for a factual proposal. Private collector notes
@@ -141,9 +145,7 @@ Click **Prepare magazine**, wait for the draft, then review and edit the forewor
 artist portraits, artist chapter assignments and record descriptions.
 **Save editorial changes** refreshes chapter structure. Once reviewed, select
 **Approve & create PDF**. The PDF uses embedded fonts and images and can be read
-offline. Low-resolution or unavailable images are called out in quality notes.
-Decorative full-page crops are accompanied by the complete original images in
-the record articles.
+offline.
 
 **Open magazine** and **Download PDF** reopen the stored edition without
 generation or API costs, including in later sessions. After adding records,
