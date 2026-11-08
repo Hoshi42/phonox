@@ -219,7 +219,6 @@ export default function CollectionView({
                 onChange={() => onQueryChange({ sort: key })}
               />
               <span>{SORT_LABELS[key]}</span>
-              {query.sort === key && <Icon name="check" size={18} />}
             </label>
           ))}
         </fieldset>
