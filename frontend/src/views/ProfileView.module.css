@@ -1,0 +1,274 @@
+.view {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 var(--space-4) var(--space-6);
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.header {
+  padding: var(--space-4) 0 var(--space-3);
+}
+
+.header h1 {
+  font-size: 1.7rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.card {
+  margin-bottom: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.identity h2 {
+  font-size: 1.2rem;
+  overflow-wrap: anywhere;
+}
+
+.identity p {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.initialLarge,
+.initial {
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--on-ink);
+  font-weight: 700;
+}
+
+.initialLarge {
+  width: 56px;
+  height: 56px;
+  font-size: 1.4rem;
+}
+
+.initial {
+  width: 40px;
+  height: 40px;
+}
+
+.secondary,
+.primary,
+.smallAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--touch);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  font-weight: 650;
+}
+
+.secondary {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  background: none;
+}
+
+.primary {
+  border: 0;
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+.primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.smallAction {
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong);
+  background: none;
+  font-size: 0.85rem;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+}
+
+.segmented button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.segmented .segmentActive {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+.tool {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 60px;
+  padding: var(--space-2) 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: none;
+  text-align: left;
+}
+
+.tool:first-of-type {
+  border-top: 0;
+}
+
+.tool:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.tool span {
+  display: flex;
+  flex-direction: column;
+}
+
+.tool small {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.about {
+  text-align: center;
+  font-size: 0.85rem;
+  margin-top: var(--space-5);
+}
+
+.error {
+  color: var(--danger);
+  overflow-wrap: anywhere;
+}
+
+.profiles {
+  list-style: none;
+  margin-bottom: var(--space-4);
+}
+
+.profile {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 60px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  text-align: left;
+}
+
+.profileName {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+.newProfile {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.newProfile input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--touch);
+  padding: 0 var(--space-3);
+  font-size: 1rem;
+}
+
+.gate {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5) var(--space-4);
+  background: var(--bg);
+  overflow-y: auto;
+}
+
+.gateCard {
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+}
+
+.gateCard h1 {
+  font-size: 1.7rem;
+  letter-spacing: -0.02em;
+}
+
+.gateCard p {
+  margin: var(--space-2) 0 var(--space-5);
+  color: var(--text-muted);
+}
+
+.gateCard .profiles,
+.gateCard .newProfile {
+  text-align: left;
+}
+
+.gateLogo {
+  width: 84px;
+  height: 84px;
+  margin: 0 auto var(--space-3);
+  object-fit: contain;
+}
+
+@media (min-width: 900px) {
+  .scroll {
+    padding: 0 var(--space-6) var(--space-6);
+  }
+}

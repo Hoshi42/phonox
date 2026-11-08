@@ -1,108 +1,95 @@
 .card {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 20px;
-  margin-top: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin-top: var(--space-2);
+  color: var(--text);
 }
 
-/* ── Progress dots ─────────────────────────────────── */
 .progress {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 18px;
+  margin-bottom: var(--space-4);
   flex-wrap: wrap;
 }
 
 .dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.15);
-  border: none;
-  cursor: pointer;
+  flex: none;
+  width: 12px;
+  height: 12px;
   padding: 0;
-  transition: all 0.2s;
-  flex-shrink: 0;
-}
-
-.dot:hover {
-  background: rgba(255, 255, 255, 0.3);
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-3);
+  transition: transform 0.2s;
 }
 
 .dotActive {
-  transform: scale(1.5);
-  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.7);
+  transform: scale(1.4);
+  box-shadow: 0 0 0 2px var(--focus);
 }
 
 .dotAnswered {
-  background: rgba(102, 126, 234, 0.65);
+  background: var(--text-muted);
 }
 
 .dotCorrect {
-  background: #4ade80;
+  background: var(--success);
 }
 
 .dotWrong {
-  background: #f87171;
+  background: var(--danger);
 }
 
 .scoreBadge {
   margin-left: auto;
   font-size: 0.85rem;
   font-weight: 700;
-  color: #4ade80;
-  letter-spacing: 0.03em;
+  color: var(--success);
 }
 
-/* ── Question ──────────────────────────────────────── */
 .question {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .qNum {
   font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-subtle);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
 .qText {
   margin: 6px 0 0;
-  font-size: 0.97rem;
-  color: rgba(255, 255, 255, 0.9);
+  font-size: 1rem;
   line-height: 1.55;
 }
 
-/* ── Choices ───────────────────────────────────────── */
 .choices {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 18px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
 }
 
 .choice {
   display: flex;
   align-items: center;
-  gap: 10px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 10px 14px;
-  cursor: pointer;
-  text-align: left;
-  color: rgba(255, 255, 255, 0.75);
-  font-size: 0.88rem;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  gap: var(--space-3);
   width: 100%;
+  min-height: var(--touch);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: none;
+  text-align: left;
+  font-size: 0.92rem;
 }
 
 .choice:hover:not(:disabled) {
-  background: rgba(102, 126, 234, 0.12);
-  border-color: rgba(102, 126, 234, 0.45);
-  color: rgba(255, 255, 255, 0.95);
+  background: var(--surface-2);
 }
 
 .choice:disabled {
@@ -110,85 +97,69 @@
 }
 
 .choiceSelected {
-  background: rgba(102, 126, 234, 0.2);
-  border-color: rgba(102, 126, 234, 0.75);
-  color: white;
+  border-color: var(--focus);
+  background: var(--surface-2);
 }
 
 .choiceCorrect {
-  background: rgba(74, 222, 128, 0.12);
-  border-color: #4ade80;
-  color: #4ade80;
+  border-color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  color: var(--success);
 }
 
 .choiceWrong {
-  background: rgba(248, 113, 113, 0.12);
-  border-color: #f87171;
-  color: #f87171;
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
 }
 
 .choiceLetter {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--surface-3);
   font-size: 0.72rem;
   font-weight: 700;
-  flex-shrink: 0;
   text-transform: uppercase;
 }
 
-/* ── Navigation ────────────────────────────────────── */
 .nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .navBtn {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.65);
-  padding: 6px 14px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.83rem;
-  transition: background 0.15s, color 0.15s;
+  min-height: 38px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: none;
+  font-size: 0.85rem;
   white-space: nowrap;
 }
 
-.navBtn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.9);
-}
-
 .navBtn:disabled {
-  opacity: 0.25;
+  opacity: 0.3;
   cursor: not-allowed;
 }
 
 .submitBtn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
-  color: white;
-  padding: 8px 22px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.88rem;
-  font-weight: 600;
-  transition: opacity 0.2s, transform 0.1s;
-}
-
-.submitBtn:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
+  min-height: 40px;
+  padding: 0 var(--space-5);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: var(--on-ink);
+  font-size: 0.9rem;
+  font-weight: 650;
 }
 
 .hint {
   font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--text-subtle);
 }

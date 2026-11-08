@@ -12,13 +12,19 @@
  * @returns {JSX.Element} The main application interface
  */
 
-import { useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import styles from './App.module.css'
 import VinylSpinner from './components/VinylSpinner'
 import ChatPanel, { ChatPanelHandle } from './components/ChatPanel'
 import VinylCard from './components/VinylCard'
-import VinylRegister from './components/VinylRegister'
-import UserManager from './components/UserManager'
+import AppShell, { Tab } from './shell/AppShell'
+import CollectionView from './views/CollectionView'
+import DiscoverView from './views/DiscoverView'
+import CaptureView from './views/CaptureView'
+import ProfileView, { ProfileGate } from './views/ProfileView'
+import RecordSheet from './views/RecordSheet'
+import { useTheme } from './theme/useTheme'
+import { CollectionQuery, EMPTY_QUERY, GroupBy } from './features/collection'
 import { apiClient } from './api/client'
 import { registerApiClient, RegisterRecord } from './services/registerApi'
 
@@ -89,12 +95,13 @@ function App() {
   // True while images are being fetched from the backend after selecting a register record.
   const [imagesLoading, setImagesLoading] = useState(false)
   const [vinylRegister, setVinylRegister] = useState<RegisterRecord[]>([])
-  const [showRegister, setShowRegister] = useState(false)
   const [registerLoading, setRegisterLoading] = useState(false)
-  const [currentUser, setCurrentUser] = useState('')
+  const [currentUser, setCurrentUser] = useState(() => localStorage.getItem('phonox_username') || '')
   const [isCheckingValue, setIsCheckingValue] = useState(false)
-  const [chatExpanded, setChatExpanded] = useState(false) // Mobile panel expand/collapse
-  const [cardExpanded, setCardExpanded] = useState(false) // Mobile panel expand/collapse
+  const [tab, setTab] = useState<Tab>('collection')
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [query, setQuery] = useState<CollectionQuery>(EMPTY_QUERY)
+  const { preference: theme, setPreference: setTheme } = useTheme()
   const metadataUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const chatInputRef = useRef<HTMLTextAreaElement | null>(null)
 
@@ -393,10 +400,12 @@ function App() {
   const handleDeleteFromRegister = async (recordId: string) => {
     try {
       await registerApiClient.removeFromRegister(recordId, currentUser)
+      if (record?.record_id === recordId) clearRecord()
       await loadRegister(currentUser)
     } catch (error) {
       console.error('Failed to remove from register:', error)
       alert('Failed to remove record from register. Please try again.')
+      throw error
     }
   }
 
@@ -483,9 +492,7 @@ function App() {
       setImagesLoading(false)
     }
     
-    // Close the register view
-    setShowRegister(false)
-    
+    setSheetOpen(true)
   }
 
   const handleAnalysisReport = (reportContent: string) => {
@@ -494,10 +501,22 @@ function App() {
     if (chatPanelRef.current) {
       chatPanelRef.current.addAnalysis(reportContent)
     }
-    
-    // Close the register modal
-    setShowRegister(false)
+    setTab('capture')
   }
+
+  const clearRecord = () => {
+    setRecord(null)
+    setRecordId(null)
+    setUploadedImages([])
+    setRegisteredImageCount(0)
+    setRegisteredImageUrls([])
+    setSheetOpen(false)
+  }
+
+  // A freshly analysed or selected record opens in the detail sheet.
+  useEffect(() => {
+    if (record) setSheetOpen(true)
+  }, [record?.record_id])
 
   const isRecordInRegister = record ? 
     vinylRegister.some(r => r.id === record.record_id) : false
@@ -530,16 +549,28 @@ function App() {
   }, [isCheckingValue])
 
   const handleUserChange = (username: string) => {
-    
+    if (username === currentUser) return
+    localStorage.setItem('phonox_username', username)
     setCurrentUser(username)
-    if (username) {
-      // Add mobile-specific debug info
-      if (/Mobi|Android/i.test(navigator.userAgent)) {
-      }
-      loadRegister(username)
-    } else {
-      setVinylRegister([])
-    }
+    setQuery(EMPTY_QUERY)
+    clearRecord()
+    setVinylRegister([])
+    setTab('collection')
+  }
+
+  const updateQuery = useCallback((patch: Partial<CollectionQuery>) => {
+    setQuery(previous => ({ ...previous, ...patch }))
+  }, [])
+
+  const pickFromDiscover = (by: GroupBy, key: string) => {
+    setQuery(previous => ({
+      ...previous,
+      search: '',
+      artist: by === 'artist' ? key : null,
+      genre: by === 'genre' ? key : null,
+      decade: by === 'decade' ? Number(key) : null,
+    }))
+    setTab('collection')
   }
 
   const loadRegister = async (userTag?: string) => {
@@ -599,122 +630,100 @@ function App() {
     )
   }
 
+  if (!currentUser) {
+    return <ProfileGate onSelect={handleUserChange} />
+  }
+
+  const recordTitle = record?.metadata?.title || record?.title
+  const spotifyUrl = record?.metadata?.spotify_url
+
   return (
-    <div className={styles.container}>
-      <header className={styles.header}>
-        {/* Left: Logo */}
-        <div className={styles.headerLeft}>
-          <img src="/phonox.png" alt="Phonox" className={styles.logo} />
-          <div>
-            <h1 className={styles.title} style={{ lineHeight: 1 }}>Phonox</h1>
-            <a
-              href="https://phonox-blog.web.app"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ display: 'block', marginTop: '1px', fontSize: '0.65rem', opacity: 0.6, color: 'inherit', textDecoration: 'none', letterSpacing: '0.03em' }}
-              onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-              onMouseLeave={e => (e.currentTarget.style.opacity = '0.6')}
-            >
-              phonox-blog.web.app
-            </a>
-          </div>
-        </div>
-        
-        {/* Right: Register & User */}
-        <div className={styles.headerRight}>
-          <UserManager onUserChange={handleUserChange} />
-          <button 
-            className={styles.registerButton}
-            onClick={() => {
-              setShowRegister(true)
-            }}
-            disabled={!currentUser}
-            title={!currentUser ? 'Please select a user first' : `${currentUser}'s register with ${vinylRegister.length} records`}
-          >
-            📚 My Register ({vinylRegister.length})
-          </button>
-        </div>
-      </header>
+    <>
+      <AppShell
+        active={tab}
+        onChange={setTab}
+        views={{
+          collection: (
+            <CollectionView
+              user={currentUser}
+              records={vinylRegister}
+              loading={registerLoading}
+              query={query}
+              onQueryChange={updateQuery}
+              onOpenRecord={handleRecordSelectFromRegister}
+              onOpenDiscover={() => setTab('discover')}
+              onOpenProfile={() => setTab('profile')}
+              onCapture={() => setTab('capture')}
+            />
+          ),
+          discover: <DiscoverView records={vinylRegister} onPick={pickFromDiscover} />,
+          capture: (
+            <CaptureView recordTitle={recordTitle} onOpenRecord={() => setSheetOpen(true)}>
+              <ChatPanel
+                ref={chatPanelRef}
+                record={record}
+                onImageUpload={handleUpload}
+                onAnalysisComplete={() => {}}
+                onMetadataUpdate={handleMetadataUpdate}
+                chatInputRef={chatInputRef}
+              />
+            </CaptureView>
+          ),
+          profile: (
+            <ProfileView
+              user={currentUser}
+              records={vinylRegister}
+              theme={theme}
+              onThemeChange={setTheme}
+              onSwitchUser={handleUserChange}
+              onDiscussInChat={handleAnalysisReport}
+            />
+          ),
+        }}
+      />
 
-      <main className={styles.main}>
-        <div className={`${styles.chatContainer} ${chatExpanded ? styles.mobileExpanded : ''} ${cardExpanded ? styles.panelHidden : ''}`}>
-          <div className={styles.containerHeader}>
-            <button 
-              onClick={() => {
-                setChatExpanded(!chatExpanded)
-                setCardExpanded(false)
-              }}
-              className={styles.expandBtn}
-              title={chatExpanded ? "Collapse chat" : "Expand chat full width"}
-            >
-              {chatExpanded ? '✕' : '⇧'}
-            </button>
-          </div>
-          <ChatPanel
-            ref={chatPanelRef}
-            record={record}
-            onImageUpload={handleUpload}
-            onAnalysisComplete={() => {}}
-            onMetadataUpdate={handleMetadataUpdate}
-            chatInputRef={chatInputRef}
-          />
-        </div>
-        
-        <div className={`${styles.cardContainer} ${cardExpanded ? styles.mobileExpanded : ''} ${chatExpanded ? styles.panelHidden : ''}`}>
-          <div className={styles.containerHeader}>
-            <button 
-              onClick={() => {
-                setCardExpanded(!cardExpanded)
-                setChatExpanded(false)
-              }}
-              className={styles.expandBtn}
-              title={cardExpanded ? "Collapse vinyl card" : "Expand vinyl card full width"}
-            >
-              {cardExpanded ? '✕' : '⇧'}
-            </button>
-          </div>
-          <VinylCard
-            key={record?.record_id || 'empty'}
-            record={record}
-            uploadedImages={uploadedImages}
-            registeredImageCount={registeredImageCount}
-            registeredImageUrls={registeredImageUrls}
-            imagesLoading={imagesLoading}
-            onMetadataUpdate={handleMetadataUpdate}
-            onImageAdd={handleImageAdd}
-            onImageRemove={handleImageRemove}
-            onAddToRegister={handleAddToRegister}
-            onUpdateRegister={handleUpdateRegister}
-            onRegisterSuccess={() => loadRegister(currentUser)}
-            onReanalyze={handleReanalyze}
-            onAddChatMessage={(content, role) => chatPanelRef.current?.addMessage(content, role)}
-            isInRegister={isRecordInRegister}
-            currentUser={currentUser}
-            isCheckingValue={isCheckingValue}
-            onSetIsCheckingValue={setIsCheckingValue}
-          />
-          {isCheckingValue && (
-            <div className={styles.cardLoadingOverlay}>
-              <div className={styles.loadingContent}>
-                <VinylSpinner 
-                  message="Estimating Market Value..."
-                  subtext="Searching web for current prices"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      </main>
-
-      {showRegister && (
-        <VinylRegister
-          user={currentUser}
-          records={vinylRegister}
-          onClose={() => setShowRegister(false)}
-          onDeleteRecord={handleDeleteFromRegister}
-          onRecordSelect={handleRecordSelectFromRegister}
-          onAnalysisReport={handleAnalysisReport}
+      <RecordSheet
+        open={sheetOpen && !!record}
+        title={recordTitle || 'Record'}
+        user={currentUser}
+        recordId={record?.record_id || null}
+        inRegister={isRecordInRegister}
+        spotifyUrl={spotifyUrl}
+        onClose={() => setSheetOpen(false)}
+        onRemove={handleDeleteFromRegister}
+        onMoved={() => { clearRecord(); loadRegister(currentUser) }}
+      >
+        <VinylCard
+          key={record?.record_id || 'empty'}
+          record={record}
+          uploadedImages={uploadedImages}
+          registeredImageCount={registeredImageCount}
+          registeredImageUrls={registeredImageUrls}
+          imagesLoading={imagesLoading}
+          onMetadataUpdate={handleMetadataUpdate}
+          onImageAdd={handleImageAdd}
+          onImageRemove={handleImageRemove}
+          onAddToRegister={handleAddToRegister}
+          onUpdateRegister={handleUpdateRegister}
+          onRegisterSuccess={() => loadRegister(currentUser)}
+          onReanalyze={handleReanalyze}
+          onAddChatMessage={(content, role) => chatPanelRef.current?.addMessage(content, role)}
+          isInRegister={isRecordInRegister}
+          currentUser={currentUser}
+          isCheckingValue={isCheckingValue}
+          onSetIsCheckingValue={setIsCheckingValue}
         />
+      </RecordSheet>
+
+      {isCheckingValue && (
+        <div className={styles.loadingOverlay}>
+          <div className={styles.loadingContent}>
+            <VinylSpinner
+              message="Estimating Market Value..."
+              subtext="Searching web for current prices"
+            />
+          </div>
+        </div>
       )}
 
       {loading && (
@@ -740,7 +749,7 @@ function App() {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
 

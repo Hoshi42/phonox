@@ -593,8 +593,8 @@ The vinyl card has been updated with all the details. You can edit any informati
             onKeyPress={handleKeyPress}
             placeholder={
               record 
-                ? "Ask about this record — value, history, pressings, condition…"
-                : "Ask about vinyl records, prices, artists, collecting tips…"
+                ? "Ask about this record…"
+                : "Ask about records, prices, artists…"
             }
             className={styles.input}
             rows={1}
