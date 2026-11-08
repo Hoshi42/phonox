@@ -504,6 +504,13 @@ function App() {
     setTab('capture')
   }
 
+  // Hands the loaded record over to the chat, which already uses it as context.
+  const askAboutRecord = () => {
+    setSheetOpen(false)
+    setTab('capture')
+    window.setTimeout(() => chatInputRef.current?.focus(), 80)
+  }
+
   const clearRecord = () => {
     setRecord(null)
     setRecordId(null)
@@ -692,6 +699,7 @@ function App() {
         onClose={() => setSheetOpen(false)}
         onRemove={handleDeleteFromRegister}
         onMoved={() => { clearRecord(); loadRegister(currentUser) }}
+        onAskChat={askAboutRecord}
       >
         <VinylCard
           key={record?.record_id || 'empty'}

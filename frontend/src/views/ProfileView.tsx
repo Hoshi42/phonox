@@ -8,6 +8,8 @@ import AnalysisContent from '../ui/AnalysisContent'
 import VinylSpinner from '../components/VinylSpinner'
 import CollectionMagazine from '../components/CollectionMagazine'
 import { downloadAnalysisReport, exportCsv, requestCollectionAnalysis } from '../features/collectionTools'
+import { recordValue } from '../features/collection'
+import { fetchStoredAnalysis, parseStoredDate, saveAnalysis, StoredAnalysis } from '../features/analysisApi'
 import styles from './ProfileView.module.css'
 
 const MAX_NAME = 50
@@ -110,33 +112,67 @@ export default function ProfileView({
   user, records, theme, onThemeChange, onSwitchUser, onDiscussInChat,
 }: ProfileViewProps) {
   const [switching, setSwitching] = useState(false)
-  const [analysis, setAnalysis] = useState<{ open: boolean; loading: boolean; summary: string; error: string }>({
-    open: false, loading: false, summary: '', error: '',
-  })
+  const [stored, setStored] = useState<StoredAnalysis | null>(null)
+  const [storedError, setStoredError] = useState(false)
+  const [analysis, setAnalysis] = useState({ open: false, loading: false, error: '', saveWarning: '' })
+
+  // The latest analysis lives in the database, so it can be reopened in any session.
+  useEffect(() => {
+    const controller = new AbortController()
+    setStored(null)
+    setStoredError(false)
+    fetchStoredAnalysis(user, controller.signal).then(
+      result => setStored(result),
+      error => {
+        if (controller.signal.aborted) return
+        console.error('[Profile] Could not load the saved analysis:', error)
+        setStoredError(true)
+      },
+    )
+    return () => controller.abort()
+  }, [user])
 
   const analyze = async () => {
-    setAnalysis({ open: true, loading: true, summary: '', error: '' })
+    setAnalysis({ open: true, loading: true, error: '', saveWarning: '' })
     try {
       const summary = await requestCollectionAnalysis(records)
-      setAnalysis({ open: true, loading: false, summary, error: '' })
+      const totalValue = records.reduce((sum, record) => sum + recordValue(record), 0)
+      try {
+        setStored(await saveAnalysis(user, summary, records.length, totalValue))
+        setAnalysis({ open: true, loading: false, error: '', saveWarning: '' })
+      } catch (error) {
+        console.error('[Profile] Could not save the analysis:', error)
+        setStored({ summary, record_count: records.length, total_value_eur: totalValue, created_at: new Date().toISOString() })
+        setAnalysis({
+          open: true, loading: false, error: '',
+          saveWarning: 'This analysis could not be saved and will not be available later. Download it to keep it.',
+        })
+      }
     } catch (error) {
       console.error('[Profile] Collection analysis failed:', error)
       setAnalysis({
-        open: true, loading: false, summary: '',
+        open: true, loading: false, saveWarning: '',
         error: error instanceof Error ? error.message : 'Failed to analyze collection',
       })
     }
   }
 
   const closeAnalysis = () => {
-    if (!analysis.loading) setAnalysis(previous => ({ ...previous, open: false }))
+    if (!analysis.loading) setAnalysis(previous => ({ ...previous, open: false, saveWarning: '' }))
   }
+
+  const shown = analysis.loading || analysis.error ? null : stored
+  const when = stored ? parseStoredDate(stored.created_at) : null
 
   return (
     <div className={styles.view}>
       <div className={styles.scroll}>
-        <header className={styles.header}>
-          <h1>Profile</h1>
+        <header className={styles.brand}>
+          <img src="/phonox.png" alt="Phonox" className={styles.logo} />
+          <div>
+            <span className={styles.wordmark}>PHONOX</span>
+            <h1>Profile</h1>
+          </div>
         </header>
 
         <section className={styles.card} aria-labelledby="profile-user">
@@ -172,9 +208,23 @@ export default function ProfileView({
 
         <section className={styles.card} aria-labelledby="profile-tools">
           <h2 id="profile-tools" className={styles.sectionTitle}>Collection tools</h2>
+          {stored && when && (
+            <button type="button" className={styles.tool} onClick={() => setAnalysis({ open: true, loading: false, error: '', saveWarning: '' })}>
+              <Icon name="chart" />
+              <span>
+                <strong>Open last analysis</strong>
+                <small>{when.toLocaleDateString()} · {stored.record_count} records</small>
+              </span>
+            </button>
+          )}
           <button type="button" className={styles.tool} onClick={analyze} disabled={!records.length}>
-            <Icon name="chart" /> <span><strong>Analyze collection</strong><small>Professional appraisal and growth tips</small></span>
+            <Icon name="chart" />
+            <span>
+              <strong>{stored ? 'Run a new analysis' : 'Analyze collection'}</strong>
+              <small>Professional appraisal and growth tips</small>
+            </span>
           </button>
+          {storedError && <p role="alert" className={styles.error}>The saved analysis could not be loaded.</p>}
           <button type="button" className={styles.tool} onClick={() => exportCsv(records)} disabled={!records.length}>
             <Icon name="download" /> <span><strong>Export CSV</strong><small>All records as a spreadsheet</small></span>
           </button>
@@ -204,12 +254,18 @@ export default function ProfileView({
         title="Collection analysis"
         size="large"
         onClose={closeAnalysis}
-        actions={analysis.summary ? (
+        actions={shown && when ? (
           <>
-            <button type="button" className={styles.smallAction} onClick={() => { onDiscussInChat(analysis.summary); closeAnalysis() }}>
+            <button type="button" className={styles.smallAction} onClick={() => { onDiscussInChat(shown.summary); closeAnalysis() }}>
               <Icon name="chat" size={16} /> Chat
             </button>
-            <button type="button" className={styles.smallAction} onClick={() => downloadAnalysisReport(analysis.summary, records)}>
+            <button
+              type="button"
+              className={styles.smallAction}
+              onClick={() => downloadAnalysisReport(shown.summary, {
+                recordCount: shown.record_count, totalValue: shown.total_value_eur, generatedAt: when,
+              })}
+            >
               <Icon name="download" size={16} /> Report
             </button>
           </>
@@ -219,9 +275,16 @@ export default function ProfileView({
           <VinylSpinner message="Analyzing your collection..." subtext="Professional valuation in progress" />
         ) : analysis.error ? (
           <p role="alert" className={styles.error}>{analysis.error}</p>
-        ) : (
-          <AnalysisContent text={analysis.summary} />
-        )}
+        ) : shown && when ? (
+          <>
+            <p className={styles.analysisMeta}>
+              Created {when.toLocaleString()} · {shown.record_count} records
+              {shown.total_value_eur !== null && ` · €${Math.round(shown.total_value_eur).toLocaleString('en-US')}`}
+            </p>
+            {analysis.saveWarning && <p role="alert" className={styles.error}>{analysis.saveWarning}</p>}
+            <AnalysisContent text={shown.summary} />
+          </>
+        ) : null}
       </Sheet>
     </div>
   )

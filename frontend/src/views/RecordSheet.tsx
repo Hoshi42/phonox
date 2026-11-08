@@ -15,6 +15,7 @@ interface RecordSheetProps {
   onClose: () => void
   onRemove: (recordId: string) => Promise<void> | void
   onMoved: () => void
+  onAskChat: () => void
   children: ReactNode
 }
 
@@ -89,7 +90,7 @@ function MoveDialog({
 }
 
 export default function RecordSheet({
-  open, title, user, recordId, inRegister, spotifyUrl, onClose, onRemove, onMoved, children,
+  open, title, user, recordId, inRegister, spotifyUrl, onClose, onRemove, onMoved, onAskChat, children,
 }: RecordSheetProps) {
   const [moving, setMoving] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -137,6 +138,9 @@ export default function RecordSheet({
   return (
     <>
       <Sheet open={open} title={title} size="large" onClose={onClose} actions={actions}>
+        <button type="button" className={styles.chatButton} onClick={onAskChat}>
+          <Icon name="chat" size={18} /> Ask the assistant about this record
+        </button>
         {children}
       </Sheet>
       {recordId && (

@@ -142,6 +142,85 @@ test.describe('profile and appearance', () => {
   })
 })
 
+test.describe('analysis, chat shortcut and logo', () => {
+  const stored = {
+    summary: '## Collection Composition\nA **jazz-heavy** collection.',
+    record_count: 18, total_value_eur: 333, created_at: '2026-11-08T09:30:00',
+  }
+
+  test('the stored analysis can be reopened without running a new one', async ({ page }) => {
+    let chatCalls = 0
+    await page.route('**/api/v1/chat', route => { chatCalls++; return route.fulfill({ json: { message: 'x' } }) })
+    await seedApp(page, { analysis: stored })
+    await page.goto('/')
+    await tab(page, 'Profile').click()
+    await page.getByRole('button', { name: /Open last analysis/ }).click()
+    const dialog = page.getByRole('dialog', { name: 'Collection analysis' })
+    await expect(dialog.getByRole('heading', { name: 'Collection Composition' })).toBeVisible()
+    await expect(dialog.getByText('jazz-heavy')).toBeVisible()
+    await expect(dialog.getByText(/18 records · €333/)).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Report' })).toBeVisible()
+    expect(chatCalls).toBe(0)
+  })
+
+  test('without a stored analysis only a new one is offered', async ({ page }) => {
+    await seedApp(page)
+    await page.goto('/')
+    await tab(page, 'Profile').click()
+    await expect(page.getByRole('button', { name: /Open last analysis/ })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /Analyze collection/ })).toBeVisible()
+  })
+
+  test('a new analysis is saved for the user and can be opened afterwards', async ({ page }) => {
+    const { analysisSaves } = await seedApp(page)
+    await page.route('**/api/v1/chat', route => route.fulfill({ json: { message: '## Fresh result\nNew text.' } }))
+    await page.goto('/')
+    await tab(page, 'Profile').click()
+    await page.getByRole('button', { name: /Analyze collection/ }).click()
+    await expect(page.getByRole('heading', { name: 'Fresh result' })).toBeVisible()
+    await expect.poll(() => analysisSaves.length).toBe(1)
+    expect(analysisSaves[0]).toMatchObject({ summary: '## Fresh result\nNew text.', record_count: 18 })
+    await page.keyboard.press('Escape')
+    await page.reload()
+    await tab(page, 'Profile').click()
+    await page.getByRole('button', { name: /Open last analysis/ }).click()
+    await expect(page.getByRole('heading', { name: 'Fresh result' })).toBeVisible()
+  })
+
+  test('a failing save is reported but the result stays readable', async ({ page }) => {
+    await seedApp(page)
+    await page.route('**/api/analysis**', route =>
+      route.request().method() === 'PUT' ? route.fulfill({ status: 500, json: {} }) : route.fulfill({ status: 404, json: {} }))
+    await page.route('**/api/v1/chat', route => route.fulfill({ json: { message: 'Readable text' } }))
+    await page.goto('/')
+    await tab(page, 'Profile').click()
+    await page.getByRole('button', { name: /Analyze collection/ }).click()
+    await expect(page.getByRole('alert')).toContainText('could not be saved')
+    await expect(page.getByText('Readable text')).toBeVisible()
+  })
+
+  test('the record sheet jumps straight into the chat', async ({ page }) => {
+    await seedApp(page)
+    await page.goto('/')
+    await page.getByRole('button', { name: /Miles Davis Album 1 by/ }).first().click()
+    await page.getByRole('button', { name: 'Ask the assistant about this record' }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(tab(page, 'Capture')).toHaveAttribute('aria-current', 'page')
+    await expect(page.getByPlaceholder('Ask about this record…')).toBeFocused()
+  })
+
+  test('the Phonox logo is shown on the profile page', async ({ page }) => {
+    await seedApp(page)
+    await page.goto('/')
+    await tab(page, 'Profile').click()
+    const logo = page.getByRole('img', { name: 'Phonox' }).and(page.locator('img[src="/phonox.png"]')).last()
+    await expect(logo).toBeVisible()
+    const box = await logo.boundingBox()
+    expect(box!.width).toBeGreaterThanOrEqual(48)
+    await expect(page.getByText('PHONOX', { exact: true })).toBeVisible()
+  })
+})
+
 test.describe('responsive layout', () => {
   test('phone: no horizontal overflow and the tab bar leaves most of the screen to content', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 })

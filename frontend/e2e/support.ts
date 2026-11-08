@@ -48,19 +48,35 @@ interface SeedOptions {
   records?: SampleRecord[]
   /** Records per user when `records` is not given. */
   count?: number
+  /** Analysis returned by GET /api/analysis; null (default) means none stored. */
+  analysis?: { summary: string; record_count: number; total_value_eur: number | null; created_at: string } | null
 }
 
 /**
- * Selects a profile and mocks the register endpoints so tests never depend on real data.
- * Must be called before page.goto().
+ * Selects a profile and mocks the register and analysis endpoints so tests never depend on real data.
+ * Must be called before page.goto(). Returns the analyses the app tried to save.
  */
-export async function seedApp(page: Page, options: SeedOptions = {}): Promise<void> {
+export async function seedApp(page: Page, options: SeedOptions = {}): Promise<{ analysisSaves: unknown[] }> {
   const user = options.user ?? 'alice'
   const users = options.users ?? [user, 'bob']
+  const analysisSaves: unknown[] = []
+  let analysis = options.analysis ?? null
   await page.addInitScript(
     (name: string) => { if (name) localStorage.setItem('phonox_username', name) },
     user,
   )
+  await page.route('**/api/analysis**', async route => {
+    if (route.request().method() === 'PUT') {
+      const saved = route.request().postDataJSON()
+      analysisSaves.push(saved)
+      analysis = { ...saved, created_at: '2026-11-09T10:00:00' }
+      await route.fulfill({ json: { user_tag: user, ...analysis } })
+    } else if (analysis) {
+      await route.fulfill({ json: { user_tag: user, ...analysis } })
+    } else {
+      await route.fulfill({ status: 404, json: { detail: 'No analysis has been saved for this user.' } })
+    }
+  })
   await page.route('**/api/register/**', async route => {
     const url = new URL(route.request().url())
     if (route.request().method() !== 'GET') {
@@ -74,6 +90,7 @@ export async function seedApp(page: Page, options: SeedOptions = {}): Promise<vo
       await route.fulfill({ json: options.records ?? sampleRecords(owner, options.count) })
     }
   })
+  return { analysisSaves }
 }
 
 export const MAGAZINE_DEFAULTS = {

@@ -128,14 +128,19 @@ IMPORTANT: Do NOT recommend switching to other services or platforms like Discog
   return data.message || ''
 }
 
-export function downloadAnalysisReport(summary: string, records: RegisterRecord[]): void {
-  const totalValue = records.reduce((sum, record) => sum + recordValue(record), 0)
+export interface ReportMeta {
+  recordCount: number
+  totalValue: number | null
+  generatedAt: Date
+}
+
+export function downloadAnalysisReport(summary: string, meta: ReportMeta): void {
+  const value = meta.totalValue === null ? '' : `**Estimated Total Value:** €${meta.totalValue.toFixed(2)}  \n`
   const report = `# Vinyl Collection Analysis Report
 
-**Generated:** ${new Date().toLocaleString('de-DE')}  
-**Total Records:** ${records.length}  
-**Estimated Total Value:** €${totalValue.toFixed(2)}  
-
+**Generated:** ${meta.generatedAt.toLocaleString('de-DE')}  
+**Total Records:** ${meta.recordCount}  
+${value}
 ---
 
 ## Professional Analysis
@@ -149,6 +154,6 @@ ${summary}
   downloadBlob(
     report,
     'text/markdown;charset=utf-8',
-    `phonox-collection-analysis-${new Date().toISOString().slice(0, 10)}.md`,
+    `phonox-collection-analysis-${meta.generatedAt.toISOString().slice(0, 10)}.md`,
   )
 }
