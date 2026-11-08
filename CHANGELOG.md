@@ -1,4 +1,13 @@
 # Changelog
+## [2.3.0] - 2026-11-08 - Persistent collection magazine PDFs
+
+### Added
+- **Collection magazine** — one persistent magazine per collection user, with editable English foreword, artist portraits, record articles, all available images, EUR valuation notes and linked contents.
+- **Editorial PDF layout** — A4 pages, embedded fonts, large-format chapter photographs, two-column portraits, original-image galleries and transparent image-quality warnings.
+- **Magazine lifecycle API and collection controls** — prepare, review, publish, reopen, download, update, cancel and delete; database-enforced user uniqueness, immutable image snapshots and atomic replacement of the current edition.
+- **Bounded research** — Discogs, MusicBrainz and existing web search providers, explicit cost/data-transfer consent, 20-step jobs and 1,200-token AI output limits; no invented fallback prices.
+- **Acceptance coverage** — isolated lifecycle, budget, snapshot, PDF navigation, layout and cleanup tests, including 100 records with five images each; desktop/mobile UI workflow tests.
+
 ## [2.2.4] - 2026-10-29 - Document Claude 5.5 model recommendations
 
 ### Changed

@@ -24,7 +24,7 @@ from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
-from backend.database import get_db, VinylRecord, VinylImage
+from backend.database import get_db, VinylRecord, VinylImage, CollectionMagazine
 
 router = APIRouter(prefix="/api/register", tags=["register"])
 
@@ -163,11 +163,11 @@ async def get_register(user_tag: str, db: Session = Depends(get_db)):
 
 @router.get("/users", response_model=List[str])
 async def get_users(db: Session = Depends(get_db)):
-    """Get all distinct users who have records."""
+    """Keep collectors with a saved magazine selectable even without records."""
     result = db.query(VinylRecord.user_tag).filter(
         VinylRecord.user_tag.isnot(None),
         VinylRecord.user_tag != ""
-    ).distinct().all()
+    ).union(db.query(CollectionMagazine.user_tag)).all()
     
     return [row[0] for row in result if row[0]]
 

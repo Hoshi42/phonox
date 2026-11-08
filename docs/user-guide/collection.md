@@ -114,6 +114,60 @@ To improve identification of a saved record:
 
 ## Collection Reports
 
+### PDF Collection Magazine
+
+Open **My Register**, then expand **PDF Magazine**. Each collection user can
+have one magazine. It is an English, A4 portrait PDF with:
+
+- A title page, editable foreword and linked contents/PDF bookmarks.
+- One artist portrait before that artist's records.
+- Large-format chapter photographs where image quality permits, flowing
+  editorial text and galleries containing all available record images.
+- EUR estimates with individual valuation dates, sources and honest data gaps.
+
+Set a title, subtitle, optional display name and optional cover photograph.
+Leave the initial foreword empty for a factual proposal. Private collector notes
+are excluded unless explicitly enabled.
+
+**Research and cost consent:** available Discogs, MusicBrainz and web search
+sources are used after you approve the external data transfer and cost allowance.
+Only necessary artist/album/release details leave Phonox, not your name, private
+notes or photographs. Each job has 20 research/AI steps and at most 1,200 output
+tokens per AI call. The displayed EUR allowance is approximate, not a provider
+quote. You can disable research to create a magazine from stored information.
+Missing API keys or failed sources are shown as warnings.
+
+Click **Prepare magazine**, wait for the draft, then review and edit the foreword,
+artist portraits, artist chapter assignments and record descriptions.
+**Save editorial changes** refreshes chapter structure. Once reviewed, select
+**Approve & create PDF**. The PDF uses embedded fonts and images and can be read
+offline. Low-resolution or unavailable images are called out in quality notes.
+Decorative full-page crops are accompanied by the complete original images in
+the record articles.
+
+**Open magazine** and **Download PDF** reopen the stored edition without
+generation or API costs, including in later sessions. After adding records,
+the panel displays new/changed/removed counts. **Update magazine / prepare draft**
+creates a new snapshot, inserts records into the appropriate artist chapters
+and rebuilds contents, page numbers and summaries. It also handles changed or
+removed records. Previously edited text/settings are retained; an automatic
+foreword updates its counts. Unfinished research can continue within a new,
+explicitly approved job budget.
+
+Enable **Research current EUR estimates** when you want new valuations.
+Reused prices retain their real dates; an edition's creation date is not a
+valuation date. Missing values do not count as zero, and estimates are not
+binding sale prices or insurance appraisals.
+
+The previous PDF remains available during an update and after cancellation or
+failure. It is replaced only after successful creation. Following a server
+restart, explicitly retry interrupted work; already incurred costs remain.
+The current PDF is kept until replacement or **Delete magazine**, which does
+not delete your records. Only the latest successful edition is offered, not a
+full version archive.
+Users with a saved magazine remain in the user selector even if their collection
+becomes empty.
+
 ### Generate Analysis Report
 
 Click **"Generate Report"** in the register to:

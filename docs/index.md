@@ -93,6 +93,7 @@ docker compose up -d --build
 - **[API Reference](api/introduction.md)** - Complete API documentation
 - **[Database & Retry Configuration](database-retry.md)** - Connection troubleshooting
 - **[Contributing](contributing.md)** - How to contribute
+- **[Collection Magazine](user-guide/collection.md#pdf-collection-magazine)** - Create, reopen and update an illustrated PDF
 
 ## 💻 CLI Tools
 

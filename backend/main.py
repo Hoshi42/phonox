@@ -2,6 +2,8 @@
 
 import logging
 import os
+import asyncio
+from contextlib import suppress
 from datetime import datetime
 from contextlib import asynccontextmanager
 from typing import Dict, Any
@@ -17,6 +19,8 @@ from backend.database import Base, VinylRecord, get_db
 from backend.db_connection import DatabaseConnectionManager
 from backend.api.models import HealthCheckResponse
 from backend.api.register import router as register_router
+from backend.api.magazine import router as magazine_router
+from backend.magazine_service import EXECUTOR, maintain_magazines
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -52,6 +56,21 @@ def override_get_db():
         db.close()
 
 
+def magazine_maintenance(recover: bool = False):
+    if SessionLocal is None:
+        raise RuntimeError("Database connection not available")
+    with SessionLocal() as db:
+        maintain_magazines(db, recover=recover)
+
+
+async def magazine_cleanup_loop():
+    while True:
+        await asyncio.sleep(3600)
+        try:
+            await asyncio.to_thread(magazine_maintenance)
+        except Exception:
+            logger.exception("Scheduled magazine cleanup failed")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -74,6 +93,7 @@ async def lifespan(app: FastAPI):
         # Create tables
         Base.metadata.create_all(bind=engine)
         logger.info("✅ Database tables created/verified")
+        magazine_maintenance(recover=True)
 
         # Initialize LangGraph chat agent (creates checkpoint tables, compiles graph)
         from backend.agent.chat_agent import init_chat_agent
@@ -84,7 +104,14 @@ async def lifespan(app: FastAPI):
         logger.critical("Application startup failed. Database connection is required.")
         raise
 
-    yield
+    cleanup_task = asyncio.create_task(magazine_cleanup_loop())
+    try:
+        yield
+    finally:
+        cleanup_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await cleanup_task
+        await asyncio.to_thread(EXECUTOR.shutdown, wait=True, cancel_futures=True)
 
     # Shutdown
     logger.info("Shutting down Phonox API server")
@@ -141,6 +168,7 @@ app.dependency_overrides[get_db] = override_get_db
 
 # Include routers
 app.include_router(register_router)
+app.include_router(magazine_router)
 
 # Import routes after app creation to avoid circular imports
 from backend.api import routes  # noqa: E402, F401

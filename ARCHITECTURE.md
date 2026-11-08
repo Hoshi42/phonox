@@ -10,6 +10,7 @@ Phonox is a full-stack AI-powered vinyl record identification system with these 
 2. **Multi-source Metadata Enrichment**: Discogs + MusicBrainz + Web search
 3. **AI Chat Assistant**: Context-aware queries with web search integration
 4. **Personal Collection Management**: Register, organize, valuate records
+5. **Collection Magazine**: One persistent, illustrated PDF magazine per collection user, with reviewed drafts and updateable editions
 
 ## Architecture Diagram
 
@@ -57,10 +58,19 @@ Phonox is a full-stack AI-powered vinyl record identification system with these 
 │  VinylRecord (main records)                                 │
 │  VinylImage (uploaded images)                               │
 │  User collections (register)                                │
+│  CollectionMagazine (PDF drafts + current edition)           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ## Data Flow
+
+Magazine exports use a separate single background worker, not the identification
+LangGraph. User-scoped snapshots and editorial drafts are stored in
+`collection_magazines`; image snapshots and PDFs live in the persistent uploads
+volume. Bounded Discogs/MusicBrainz/web research requires consent before editorial
+review and PDF rendering. A new edition replaces the current one atomically only
+after successful rendering, while interrupted work becomes explicitly retryable.
+See [magazine API and deployment](backend/README.md#collection-magazine).
 
 ### 1. Record Identification Flow
 
