@@ -63,7 +63,7 @@ class MagazineRecord(BaseModel):
 
 class MagazineArtist(BaseModel):
     name: str
-    portrait: str
+    portrait: str = ""
     manual: bool = False
     researched: bool = False
     sources: list[MagazineSource] = Field(default_factory=list)

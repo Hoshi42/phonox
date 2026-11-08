@@ -14,7 +14,7 @@ from backend.magazine_models import (
     MagazineApproval, MagazineArtist, MagazineDraftEdit, MagazineSettings, MagazineStatus,
 )
 from backend.magazine_service import (
-    BUSY, EXECUTOR, asset_path, collection_records, delete_magazine_files, fallback_portrait,
+    BUSY, EXECUTOR, asset_path, collection_records, delete_magazine_files,
     get_status, load_payload, magazine_directory, record_order, run_preparation, run_render,
 )
 
@@ -119,7 +119,7 @@ def edit_draft(edits: MagazineDraftEdit, user_tag: str = Depends(user_scope), db
             artist = old_artists[renamed_from].model_copy(deep=True, update={"name": name})
             draft.warnings.append(f"Review retained artist portrait after chapter rename: {name}.")
         else:
-            artist = old_artists.get(name, MagazineArtist(name=name, portrait=fallback_portrait(name)))
+            artist = old_artists.get(name, MagazineArtist(name=name))
         portrait_edit = artist_edits.get(name)
         if portrait_edit is None and name not in old_artists and renamed_from:
             portrait_edit = artist_edits.get(renamed_from)

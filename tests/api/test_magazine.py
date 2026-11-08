@@ -3,6 +3,7 @@
 import json
 import os
 import time
+from collections import Counter
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -11,7 +12,6 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from PIL import Image, ImageDraw
 from pypdf import PdfReader
-from pypdf.generic import ContentStream
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -70,7 +70,8 @@ def add_record(env, artist="Artist One", title="First Album", user="alice", valu
         record_id = record.id
         for index in range(images):
             source = env.root / f"{record_id}-{index}.png"
-            photo = Image.new("RGB", (1800, 2400), "#315966" if index % 2 else "#b0643d")
+            tint = record_id.replace("-", "")[index * 6:index * 6 + 6].ljust(6, "7")
+            photo = Image.new("RGB", (1800, 2400), f"#{tint}")
             draw = ImageDraw.Draw(photo)
             draw.ellipse((180, 520, 1620, 1960), fill="#152125")
             draw.ellipse((700, 1040, 1100, 1440), fill="#eee3c4")
@@ -157,7 +158,11 @@ def test_one_magazine_per_user_and_duplicate_start(environment):
     assert env.client.get("/api/magazine/pdf?user_tag=bob").status_code == 404
 
 
-def test_pdf_magazine_structure_images_fonts_links_and_large_format(environment):
+def page_text(document, index):
+    return document.pages[index].extract_text()
+
+
+def test_landscape_half_page_magazine_structure_images_fonts_links(environment):
     env = environment
     for artist in ("Artist One", "Artist Two", "Artist Three"):
         for index in range(2):
@@ -167,11 +172,14 @@ def test_pdf_magazine_structure_images_fonts_links_and_large_format(environment)
     document = reader(env)
     assert result["record_count"] == 6
     assert result["page_count"] == len(document.pages)
+    assert all(float(page.mediabox.width) > float(page.mediabox.height) for page in document.pages)
+    assert abs(float(document.pages[0].mediabox.width) - 841.89) < 0.5
     text = "\n".join(page.extract_text() for page in document.pages)
-    for heading in ("Foreword", "Contents", "The collection at a glance", "Sources & edition notes"):
+    for heading in ("Foreword", "Contents", "The collection at a glance", "Sources"):
         assert heading in text
     assert "PRIVATE COLLECTOR NOTE" not in text
-    assert "Stored estimate" in text and "Valuation date: unknown" in text
+    for absent in ("unknown", "not available", "not recorded", "Value unavailable", "No researched"):
+        assert absent.lower() not in text.lower()
     entries = list(outline_entries(document.outline))
     for entry in entries:
         destination = document.get_destination_page_number(entry)
@@ -179,31 +187,16 @@ def test_pdf_magazine_structure_images_fonts_links_and_large_format(environment)
         assert entry.title in document.pages[destination].extract_text()
     album_entries = [entry for entry in entries if " Album " in entry.title]
     assert len(album_entries) == 6
-    assert sum(len(page.images) for page in document.pages) >= 15  # 12 original views plus three chapter photos
+    # Every album owns one half page, so a page never carries more than two albums.
+    per_page = Counter(document.get_destination_page_number(entry) for entry in album_entries)
+    assert max(per_page.values()) == 2 and len(per_page) == 3
+    assert sum(len(page.images) for page in document.pages) >= 12  # both views of all six albums
     for page in document.pages:
-        fonts = page["/Resources"].get("/Font", {})
-        for font in fonts.values():
+        for font in page["/Resources"].get("/Font", {}).values():
             descriptor = font.get_object().get("/FontDescriptor")
             if descriptor:
                 assert "/FontFile2" in descriptor.get_object()
-    full_bleed_pages = 0
-    for page in document.pages:
-        operations = ContentStream(page.get_contents(), document).operations
-        image_drawn = False
-        overlay_area = 0.0
-        full_image = False
-        for operands, operator in operations:
-            if operator == b"cm" and len(operands) == 6:
-                full_image = full_image or (abs(float(operands[0]) - 595.2756) < 1
-                                            and abs(float(operands[3]) - 841.8898) < 1)
-            if operator == b"Do" and full_image:
-                image_drawn = True
-            if operator == b"re" and image_drawn:
-                overlay_area += float(operands[2]) * float(operands[3])
-        if image_drawn:
-            assert overlay_area / (595.2756 * 841.8898) < 0.2
-            full_bleed_pages += 1
-    assert full_bleed_pages >= 3
+    assert len(env.client.get("/api/magazine/pdf?user_tag=alice").content) < 1_500_000
     response = env.client.get("/api/magazine/pdf?user_tag=alice")
     assert response.content.startswith(b"%PDF-")
     assert response.headers["content-disposition"].startswith("inline")
@@ -304,9 +297,10 @@ def test_unknown_values_duplicates_compilations_and_artist_normalization(environ
     assert len(prepared["draft"]["artists"]) == 3
     publish(env)
     text = "\n".join(page.extract_text() for page in reader(env).pages)
-    assert "Value unavailable" in text and "EUR 0.00" in text
+    assert "EUR 0" in text and "across 1 of 4 records" in text
+    assert "Unavailable" not in text and "unknown" not in text.lower()
     assert "Copy 1" in text and "Copy 2" in text
-    assert "1 of 4 copies" in text
+    assert "Other records" in text and "Unknown Artist" not in text
 
 
 def test_failed_update_and_cancellation_keep_previous_pdf(environment, monkeypatch):
@@ -462,7 +456,9 @@ def test_long_titles_and_hundred_record_collection(environment):
     prepare(env, title="A long magazine title " * 8)
     result = publish(env)
     assert result["record_count"] == 100
-    assert sum(len(page.images) for page in reader(env).pages) >= 503
+    # Identical test images are stored once per page, so count unique images per half-page pair.
+    assert sum(len(page.images) for page in reader(env).pages) >= 250
+    assert result["page_count"] < 80  # two albums per landscape page
     assert len([entry for entry in outline_entries(reader(env).outline) if "Édition vinyl" in entry.title]) == 100
 
 
@@ -470,7 +466,7 @@ def test_automatic_foreword_is_updated_but_user_text_is_preserved(environment):
     env = environment
     add_record(env)
     first = prepare(env, title="My custom magazine")
-    assert "1 record across 1 artist chapter." in first["draft"]["settings"]["preface"]
+    assert "1 record by 1 artist or group." in first["draft"]["settings"]["preface"]
     publish(env)
     add_record(env, title="Second Album")
     updated = prepare(env)
@@ -603,7 +599,7 @@ def test_user_with_empty_collection_and_saved_magazine_remains_selectable(enviro
     assert env.client.get("/api/magazine/pdf?user_tag=alice").status_code == 200
 
 
-def test_two_column_portrait_and_300_dpi_photo_output(environment):
+def test_portrait_half_page_and_downscaled_images(environment):
     env = environment
     record_id = add_record(env, images=1)
     with env.db() as db:
@@ -611,24 +607,58 @@ def test_two_column_portrait_and_300_dpi_photo_output(environment):
         Image.new("RGB", (3840, 5400), "#315966").save(image.file_path)
     prepared = prepare(env)
     draft = prepared["draft"]
+    portrait = "This sample portrait describes only the fictional test collection and its records. " * 15
     response = env.client.put("/api/magazine/draft?user_tag=alice", json={
         "version": prepared["draft_version"], "preface": draft["settings"]["preface"],
         "records": [{"id": record_id, "group": "Artist One",
                      "description": draft["records"][0]["description"]}],
-        "artists": [{"name": "Artist One", "portrait":
-                     "This sample portrait describes only the fictional test collection and its records. " * 15}],
+        "artists": [{"name": "Artist One", "portrait": portrait}],
     })
     assert response.status_code == 200, response.text
     publish(env)
     document = reader(env)
-    assert any(image.image.width >= 2480 and image.image.height >= 3507
-               and image.image.width < 3840
-               for page in document.pages for image in page.images)
-    assert any(
-        operator == b"cm" and len(operands) == 6 and abs(float(operands[4]) - 257.9528) < 1
-        for page in document.pages
-        for operands, operator in ContentStream(page.get_contents(), document).operations
-    )
+    texts = [page.extract_text() for page in document.pages]
+    cell_page = next(text for text in texts if "ARTIST ONE" in text)
+    assert "This sample portrait" in cell_page and "First Album" in cell_page  # portrait and album share the page
+    # The 3840x5400 source is resampled to what a half-page cell needs, far below the original size.
+    widths = [image.image.width for page in document.pages for image in page.images]
+    assert widths and max(widths) <= 1800 and min(widths) < 700
+    assert len(env.client.get("/api/magazine/pdf?user_tag=alice").content) < 600_000
+
+
+def test_old_placeholder_texts_never_reach_the_pdf(environment):
+    env = environment
+    add_record(env, images=1)
+    prepare(env)
+    with env.db() as db:
+        magazine = db.query(CollectionMagazine).one()
+        payload = MagazineDraft.model_validate_json(magazine.draft_payload)
+        payload.records[0].description = "x. A researched musical description is not available yet. y."
+        payload.artists[0].portrait = "A researched artist portrait is not available yet."
+        magazine.draft_payload = payload.model_dump_json()
+        db.commit()
+    publish(env)
+    text = "\n".join(page.extract_text() for page in reader(env).pages)
+    assert "not available yet" not in text and "ARTIST\n" not in text
+
+
+def test_overlong_text_is_shortened_to_stay_on_its_half_page(environment):
+    env = environment
+    record_id = add_record(env, images=1)
+    prepared = prepare(env)
+    draft = prepared["draft"]
+    long_text = "A very long editorial sentence about this particular record. " * 120
+    env.client.put("/api/magazine/draft?user_tag=alice", json={
+        "version": prepared["draft_version"], "preface": draft["settings"]["preface"],
+        "records": [{"id": record_id, "group": "Artist One", "description": long_text}],
+        "artists": [{"name": "Artist One", "portrait": ""}],
+    })
+    result = publish(env)
+    document = reader(env)
+    assert result["page_count"] == len(document.pages)
+    assert any("Text shortened to fit one half page" in note for note in status(env)["warnings"])
+    cell_pages = [page for page in document.pages if "First Album" in page.extract_text() and "…" in page.extract_text()]
+    assert len(cell_pages) == 1
 
 
 def test_lost_commit_acknowledgement_does_not_delete_the_published_pdf(environment, monkeypatch):

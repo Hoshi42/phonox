@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 STEP_LIMIT = 20
 OUTPUT_TOKEN_LIMIT = 1200
 INPUT_BYTE_LIMIT = 8000
+MAX_ASSET_PIXELS = 2200
 TEMP_MAX_AGE_SECONDS = 23 * 3600  # Hourly cleanup keeps unreferenced work below 24 hours.
 BUSY = ("preparing", "researching", "rendering")
 EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="magazine")
@@ -53,12 +54,24 @@ def asset_path(magazine_id: str, asset: str) -> Path:
     return magazine_directory(magazine_id) / "assets" / asset
 
 
+OTHER_RECORDS = "Other records"
+COMPILATIONS = "Various Artists / Compilations"
+NO_PORTRAIT = {OTHER_RECORDS, COMPILATIONS}
+# Texts earlier editions generated when nothing was known. They are dropped so readers never see them.
+PLACEHOLDER_MARKERS = (
+    "A researched artist portrait is not available yet",
+    "A researched musical description is not available yet",
+    "No artist biography can be verified yet",
+    "This chapter brings together multi-artist compilations",
+)
+
+
 def artist_name(value: str | None) -> str:
     name = " ".join(unicodedata.normalize("NFC", value or "").split())
     if not name:
-        return "Unknown Artist"
+        return OTHER_RECORDS
     if name.casefold() in {"various", "various artists", "sampler", "v.a.", "va"}:
-        return "Various Artists / Compilations"
+        return COMPILATIONS
     return name
 
 
@@ -67,30 +80,8 @@ def record_order(record: MagazineRecord) -> tuple:
             (record.title or "").casefold(), record.id)
 
 
-def fallback_portrait(name: str) -> str:
-    if name == "Various Artists / Compilations":
-        return ("This chapter brings together multi-artist compilations from the collection. "
-                "Each release is presented as its own listening journey, rather than attributed "
-                "to a single performer. The articles document the available release information "
-                "and the collector's own images.")
-    if name == "Unknown Artist":
-        return "These records have no identified artist. No artist biography can be verified yet."
-    return (f"This chapter collects the records credited to {name} in this collection. "
-            "A researched artist portrait is not available yet. The following pages preserve "
-            "the known release details and photographs without inventing biographical facts.")
-
-
-def fallback_description(record: MagazineRecord) -> str:
-    title = record.title or "Untitled record"
-    year = f" The stored release year is {record.year}." if record.year else " The release year is not recorded."
-    label = f" The listed label is {record.label}." if record.label else ""
-    genres = f" Its recorded genres are {', '.join(record.genres)}." if record.genres else ""
-    return (f"{title} is catalogued under {record.artist or 'an unidentified artist'}."
-            f"{year}{label}{genres} This article documents the individual copy held in the "
-            "collection. The accompanying photographs show the available views of that copy; "
-            "catalogue and condition details are reproduced only where recorded. A researched "
-            "musical description is not available yet. No claim about an original pressing, "
-            "rarity or release history is inferred from the album title alone.")
+def is_placeholder(text: str) -> bool:
+    return any(marker in text for marker in PLACEHOLDER_MARKERS)
 
 
 def collection_records(db: Session, user_tag: str) -> list[VinylRecord]:
@@ -117,9 +108,10 @@ def image_snapshot(image: VinylImage, magazine_id: str, copy: bool, warnings: li
                 with Image.open(BytesIO(content)) as original:
                     original.seek(0)
                     photo = ImageOps.exif_transpose(original).convert("RGB")
+                    photo.thumbnail((MAX_ASSET_PIXELS, MAX_ASSET_PIXELS))
                     result.width, result.height = photo.size
                     destination.parent.mkdir(parents=True, exist_ok=True)
-                    photo.save(destination, "JPEG", quality=95)
+                    photo.save(destination, "JPEG", quality=88, optimize=True)
         return result
     except (OSError, ValueError, UnidentifiedImageError, Image.DecompressionBombError) as exc:
         logger.warning("Magazine image %s unavailable: %s", image.id, exc)
@@ -155,7 +147,6 @@ def snapshot_records(db: Session, magazine: CollectionMagazine, settings: Magazi
         fingerprint = hashlib.sha256(json.dumps(fingerprint_data, sort_keys=True).encode()).hexdigest()
         record = MagazineRecord(**data, images=images, fingerprint=fingerprint,
                                 value_eur=value, value_kind="stored" if value is not None else "unavailable")
-        record.description = fallback_description(record)
         if value is not None:
             record.valuation_note = "Stored estimate; valuation date unknown."
         result.append(record)
@@ -170,7 +161,21 @@ def compare_records(current: list[MagazineRecord], latest: list[MagazineRecord])
 
 
 def load_payload(value: str | None) -> MagazineDraft | None:
-    return MagazineDraft.model_validate_json(value) if value else None
+    if not value:
+        return None
+    payload = MagazineDraft.model_validate_json(value)
+    # Editions created before the half-page layout stored placeholder texts and a different label.
+    for record in payload.records:
+        if is_placeholder(record.description):
+            record.description = ""
+        if record.group == "Unknown Artist":
+            record.group = OTHER_RECORDS
+    for artist in payload.artists:
+        if is_placeholder(artist.portrait):
+            artist.portrait = ""
+        if artist.name == "Unknown Artist":
+            artist.name = OTHER_RECORDS
+    return payload
 
 
 def cost_estimate(records: int, artists: int) -> float:
@@ -353,13 +358,13 @@ def prepare_draft(db: Session, magazine: CollectionMagazine, settings: MagazineS
             if old.fingerprint != record.fingerprint and old.description_manual:
                 warnings.append(f"Review edited description after collection changes: {record.title or record.id}.")
     old_artists = {artist.name: artist for artist in previous.artists} if previous else {}
-    artists = [old_artists.get(name, MagazineArtist(name=name, portrait=fallback_portrait(name)))
+    artists = [old_artists.get(name, MagazineArtist(name=name))
                for name in sorted({record.group for record in records}, key=str.casefold)]
     if previous:
         for artist in artists:
             old_ids = {record.id for record in previous.records if record.group == artist.name}
             new_ids = {record.id for record in records if record.group == artist.name}
-            if artist.name in old_artists and old_ids != new_ids:
+            if artist.name in old_artists and artist.portrait and old_ids != new_ids:
                 warnings.append(f"Review retained artist portrait after release changes: {artist.name}.")
     preface_manual = bool(settings.preface)
     if previous and settings.preface == previous.settings.preface:
@@ -367,18 +372,12 @@ def prepare_draft(db: Session, magazine: CollectionMagazine, settings: MagazineS
     if not preface_manual:
         settings.preface = (
             f"This edition brings together {len(records)} {'record' if len(records) == 1 else 'records'} "
-            f"across {len(artists)} artist {'chapter' if len(artists) == 1 else 'chapters'}. "
-            "It is a portrait of a collection through its music, recorded details and original photographs. "
-            "Each chapter starts with the artist before moving to the individual records, so releases "
-            "can be read together rather than as isolated catalogue entries.\n\n"
-            "The images belong to the documented copies and offer different views of covers, labels "
-            "and other details wherever these are available. Release information reflects the collection "
-            "snapshot used for this edition. Gaps are acknowledged rather than filled with assumptions.\n\n"
-            "Value boxes provide estimates in EUR, not guaranteed sale prices. Their individual dates "
-            "and research notes matter: creating a new edition does not itself make an older estimate "
-            "current. The source notes at the end distinguish researched context from stored information. "
-            "This magazine is both a reading companion and a record of the collection at a particular "
-            "moment, ready to grow as new records find their place on the shelves."
+            f"by {len(artists)} {'artist or group' if len(artists) == 1 else 'artists and groups'}. "
+            "It is a portrait of a collection through its music, its covers and the copies that "
+            "actually sit on the shelf.\n\n"
+            "Every record has a half page of its own, with the photographs taken of that very copy. "
+            "Prices are estimates in EUR, not guaranteed sale prices. The collection is documented "
+            "as it stands at the time of this edition and will grow as new records arrive."
         )
     return MagazineDraft(settings=settings, snapshot_at=utc_now(), records=sorted(records, key=record_order),
                          artists=artists, warnings=warnings,
@@ -400,7 +399,7 @@ def enrich_draft(draft: MagazineDraft, check: Callable[[], None]) -> None:
     failures = (APIError, ValueError, ValidationError, MetadataError)
     for artist in draft.artists:
         check()
-        if artist.manual or artist.researched or artist.name in {"Unknown Artist", "Various Artists / Compilations"}:
+        if artist.manual or artist.researched or artist.name in NO_PORTRAIT:
             continue
         if draft.steps_used + 2 > STEP_LIMIT:
             break
@@ -472,7 +471,7 @@ def enrich_draft(draft: MagazineDraft, check: Callable[[], None]) -> None:
     if draft.steps_used >= STEP_LIMIT - 3:
         draft.warnings.append("Research budget reached: some texts or values may remain unresearched. Update again to continue.")
     for artist in draft.artists:
-        if not artist.manual and not artist.researched and artist.name not in {"Unknown Artist", "Various Artists / Compilations"}:
+        if not artist.manual and not artist.researched and artist.name not in NO_PORTRAIT:
             draft.warnings.append(f"No researched portrait available for {artist.name}.")
 
 
