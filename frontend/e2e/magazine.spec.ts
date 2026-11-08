@@ -18,7 +18,7 @@ function magazine(user: string, overrides: Partial<MagazineStatus> = {}): Magazi
 
 async function openCollection(page: Page) {
   await page.goto('/')
-  await page.getByRole('button', { name: /My Register/ }).click()
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Profile' }).click()
   await page.getByRole('button', { name: /PDF Magazine/ }).click()
 }
 
@@ -53,7 +53,9 @@ test('existing magazine opens without generation and user switch resets its cont
   await expect(page.getByRole('link', { name: 'Open magazine' })).toHaveAttribute('href', /user_tag=alice/)
   await expect(page.getByRole('link', { name: 'Download PDF' })).toHaveAttribute('href', /download=true/)
   expect(starts).toBe(0)
-  await page.locator('header select').selectOption('bob')
+  await page.getByRole('button', { name: 'Switch or add profile' }).click()
+  await page.getByRole('button', { name: 'bob' }).click()
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Profile' }).click()
   await page.getByRole('button', { name: /PDF Magazine/ }).click()
   await expect(page.getByLabel('Magazine title')).toHaveValue("bob's magazine")
   await expect(page.getByRole('link', { name: 'Open magazine' })).toHaveCount(0)
