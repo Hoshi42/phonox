@@ -110,7 +110,7 @@ For all configuration options, see [`.env.example`](./.env.example)
 
 ### Identify a Vinyl Record
 
-1. Click **"Upload Image"** on the home page
+1. Open the **Capture** tab and tap **"+ Add Record"**
 2. Take a photo or upload an image of:
    - The album cover (front or back)
    - The barcode (if visible)
@@ -119,22 +119,22 @@ For all configuration options, see [`.env.example`](./.env.example)
    - Scan for the barcode
    - Search Discogs and MusicBrainz
    - Extract album metadata automatically
-4. Review the results and save to your collection
+4. Review the results in the record sheet and save to your collection
 
 ### Manage Your Collection
 
-1. Visit **"Register"** to see all your vinyl records
-2. **Edit** any record to:
+1. Open the **Collection** tab to search, sort and browse your vinyl records (or use **Discover** for artists, genres and decades)
+2. Tap any record and **Edit** it to:
    - Add notes or condition notes
    - Add Spotify link
    - Update valuation
    - Rate the record
-3. **Delete** records from your collection
-4. **Export** your collection as an illustrated [PDF magazine](docs/user-guide/collection.md#pdf-collection-magazine)
+3. **Delete** or move records from the record sheet
+4. **Export** your collection as CSV or an illustrated [PDF magazine](docs/user-guide/collection.md#pdf-collection-magazine) from the **Profile** tab; the Profile tab also switches between light, dark and system theme
 
 ### Chat with the Agent
 
-1. Open the **Chat** panel on the right
+1. Open the **Capture** tab
 2. Ask questions about your collection:
    - "What's my rarest record?"
    - "Show me all records from the 80s"

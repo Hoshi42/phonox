@@ -1,80 +1,74 @@
 # Managing Your Collection
-> **Update (v2.0.5):** The user switcher in the header is now a compact dropdown in all views. The My Register button height is aligned with the other header controls on mobile.
 
-> **Update (v1.9.6):** The VinylRegister modal now uses a taller layout and vertical scrolling, ensuring all records and action buttons (like 'Add to Register' and 'Update') are always visible, even with large collections.
+> **Update (v2.4.0):** Phonox has a new mobile-first interface. The header is gone: navigate with the tab bar (bottom on phones, left rail on larger screens). Record details open in a sheet, and there is a light and a dark theme. See [Navigation](#navigation).
 
 Learn how to manage, organize, and maintain your vinyl collection in Phonox.
 
+## Navigation
+
+| Tab | What it is for |
+|---|---|
+| **Collection** | Search, sort and browse your records: recently added, artists, genres and all records |
+| **Capture** | Chat with the assistant and add records by photographing them (**+ Add Record**) |
+| **Discover** | Browse by artist, genre or decade; tapping an entry filters the collection |
+| **Profile** | Switch or add profiles, choose light/dark/system theme, collection tools and the [PDF magazine](#pdf-collection-magazine) |
+
+Tapping a record opens its details in a sheet (a side panel on wide screens). Swipe the handle down, press **Esc** or use **✕** to close it. A record that is currently loaded stays reachable from the **Capture** tab through the chip next to its title.
+
 ## Collection Overview
 
-The **My Collection** feature stores all your saved vinyl records in a PostgreSQL database. You can:
-- View all records with thumbnails
-- Filter by user/collector
-- Load records back into VinylCard for viewing/editing
-- Delete records from your collection
-- Generate analysis reports
+The **Collection** tab shows all records saved for the selected profile. You can:
+- Search by artist, title, label, catalogue number or barcode
+- Sort by artist, title, year, value or date added, and switch between grid and list
+- Filter by artist, genre or decade (from the shelves or the **Discover** tab)
+- Open a record to view or edit it, move it to another profile or remove it
+- Generate analysis reports and export a CSV from the **Profile** tab
 
 ## Opening Your Collection
 
-Click the **"My Collection"** button (top right) to open the VinylRegister modal.
+The **Collection** tab is the start screen. The header shows the number of records and their total estimated value; the avatar opens your profile.
 
-The register displays:
-- **User selector** - Filter by username/collector
-- **Record list** - All saved records with thumbnails
-- **Record count** - Total records for selected user
-- **Action buttons** - View, Delete, Report
+When filters or a search are active, the shelves are replaced by a result list with its own total value. Active filters appear as removable chips above the results.
 
 ## Viewing Records
 
 ### Browse Collection
 
-The register shows each record with:
-- Album artwork thumbnail (if available)
-- Artist name
-- Album title
-- Release year
-- User/collector name
-- Date added to collection
+Each record card shows:
+- Album artwork (a placeholder if no image exists)
+- Title and artist
+- Release year and estimated value
 
-### Filter by User
+### Switch Profiles
 
-Use the user dropdown menu to:
-- View only your records
-- Switch between different collectors
-- See records from specific users
+Open **Profile → Switch or add profile** to change between collectors or create a new one. The first time you open Phonox you are asked to choose a profile.
 
 ### Search Within Collection
 
-While viewing the register:
-- Scroll through the list of records
-- Records are sorted by creation date (newest first)
-- Each record shows key identifying information
+Type in the search field at the top of the Collection tab. The search bar stays visible while you scroll. Use the sort button next to it for sorting and layout.
 
 ### Load Record Details
 
-Click the **"View"** button on any record to:
-- Close the register modal
-- Load the complete record into VinylCard
-- Display full metadata and all images
-- Enable editing and value estimation
-- Add more images to the record
+Tap a record to:
+- Open the record sheet with full metadata and all images
+- Edit fields, add more images, re-analyze and re-estimate the value
+- Use **Update in Register** (fixed at the bottom of the sheet) to save changes
+- Open Spotify, move the record to another profile or remove it (after confirmation) with the buttons in the sheet header
 
 ## Adding Records
 
 ### From Identification Results
 
-After identifying a vinyl record:
-1. Review the metadata in VinylCard
-2. Select your username from the dropdown (or type a new username)
-3. Click **"Add to Register"** button
-4. Record is saved with current date/time
-5. Confirmation message appears
+After identifying a vinyl record in the **Capture** tab, the result opens in the record sheet:
+1. Review the metadata
+2. Click **"Add to Register"** at the bottom of the sheet (it saves to the active profile)
+3. The record appears in the **Collection** tab
 
 ### Adding Images to Existing Records
 
 Once a record is in your collection:
-1. Load the record from the register (click "View")
-2. In VinylCard, click **"Add Image"** button
+1. Open the record from the **Collection** tab
+2. In the sheet, click **"Add More Images"**
 3. Select up to 5 images total
 4. Images are uploaded to the record
 5. Maximum 10MB per image (PNG, JPG, GIF, WebP)
@@ -84,8 +78,8 @@ Once a record is in your collection:
 ### Edit Record Metadata
 
 To update a record:
-1. Load the record from register (click "View")
-2. In VinylCard, click on any field to edit:
+1. Open the record from the **Collection** tab
+2. Click **Edit** and change any field:
    - Artist, Title, Year, Label
    - Catalog Number, Barcode
    - Genres, Condition
@@ -96,27 +90,32 @@ To update a record:
 ### Delete from Collection
 
 To remove a record:
-1. In the register, find the record
-2. Click **"Delete"** button next to the record
-3. Confirm deletion in the prompt
+1. Open the record from the **Collection** tab
+2. Click the trash button in the sheet header
+3. Confirm in the dialog
 4. Record is permanently removed from database
 
 **Note:** Deletion cannot be undone. The record data is permanently removed.
 
+### Move to Another Profile
+
+Use the move button in the sheet header to choose an existing profile or create a new one.
+
 ### Re-analyze a Record
 
 To improve identification of a saved record:
-1. Load the record from register
-2. Click **"Re-analyze"** button
-3. Upload new/additional images
-4. System re-processes with updated images
-5. Metadata is refreshed
+1. Open the record from the **Collection** tab
+2. Click **"Reanalyze All"** (or analyze only new images)
+3. System re-processes with updated images
+4. Metadata is refreshed
 
 ## Collection Reports
 
+**Profile → Collection tools** offers **Analyze collection** (an AI appraisal you can discuss in the chat or download as Markdown) and **Export CSV**.
+
 ### PDF Collection Magazine
 
-Open **My Register**, then expand **PDF Magazine**. Each collection user can
+Open the **Profile** tab and expand **PDF Magazine** (section *Collection magazine*). Each collection user can
 have one magazine. It is an English, A4 **landscape** PDF with:
 
 - A title page, editable foreword and linked contents/PDF bookmarks.
@@ -172,17 +171,9 @@ becomes empty.
 
 ### Generate Analysis Report
 
-Click **"Generate Report"** in the register to:
-- Create a comprehensive collection analysis
-- Export record list with metadata
-- View statistics and insights
-- Get valuation summaries
+Open **Profile → Collection tools → Analyze collection** to get an AI appraisal of the whole collection. From the result you can continue the conversation in **Capture** (**Chat**) or download it as Markdown (**Report**).
 
-Report includes:
-- Total record count
-- Records by user
-- Date ranges
-- Metadata completeness
+**Export CSV** in the same section downloads every record with its metadata.
 
 ## User Management
 
@@ -191,22 +182,22 @@ Report includes:
 Phonox supports multiple users/collectors:
 - Each user has their own collection view
 - Records are tagged with username
-- Filter collection by user
+- Switch between collections from the **Profile** tab
 - Useful for households or shared collections
 
 ### Creating Users
 
 Users are created automatically when:
 - Adding a record with a new username
-- Typing a new name in the user selector
+- Typing a new name in **Profile → Switch or add profile**
 - No explicit user registration required
 
 ### Switching Users
 
 To view another user's collection:
-1. Open register
-2. Select user from dropdown
-3. Register updates to show that user's records
+1. Open the **Profile** tab
+2. Choose **Switch or add profile**
+3. Select the profile; the Collection tab shows that user's records
 
 ## Database & Backups
 

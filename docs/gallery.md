@@ -125,15 +125,15 @@ The right-hand Vinyl Card updates in real time with complete metadata, a Spotify
 | Feature | Where to find it |
 |---|---|
 | Profile selection | App startup modal |
-| AI vinyl chat | Left chat panel |
-| Upload images for analysis | Upload button in chat header or "📷 Upload Images" quick button |
-| View identified record | Right panel — Vinyl Card |
-| Edit metadata | ✏️ Edit button on Vinyl Card |
-| Save to collection | "Add to Register" / "Update in Register" button |
-| Browse collection | 📚 My Register button (top right) |
-| Search collection | Search bar inside My Register |
-| Market value lookup | "💰 Check Value" → Web Search button on Vinyl Card |
-| Re-analyze with AI | 🔄 Reanalyze All button on Vinyl Card |
-| AI collection report | Analyze Collection button inside My Register |
-| Export collection | CSV button inside My Register |
-| Mobile full-screen panels | ⇧ expand button on each panel header |
+| AI vinyl chat | Capture tab |
+| Upload images for analysis | "+ Add Record" button in the Capture tab |
+| View identified record | Record sheet (opens automatically after analysis) |
+| Edit metadata | ✏️ Edit button in the record sheet |
+| Save to collection | "Add to Register" / "Update in Register" button (bottom of the record sheet) |
+| Browse collection | Collection tab |
+| Search collection | Search bar at the top of the Collection tab |
+| Market value lookup | "💰 Check Value" → Web Search button in the record sheet |
+| Re-analyze with AI | 🔄 Reanalyze All button in the record sheet |
+| AI collection report | Profile tab → Analyze collection |
+| Export collection | Profile tab → Export CSV |
+| Switch profile / theme | Profile tab |
