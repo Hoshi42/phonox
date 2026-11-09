@@ -89,9 +89,8 @@ The `start-cli.sh` script automatically:
 ### Step 5: Verify Installation
 
 Open **http://localhost:5173** - you should see the Phonox interface with:
-- Upload area with drag-and-drop in the center
-- Chat panel on the right
-- "My Collection" button (top right)
+- A tab bar: Collection, Capture, Discover and Profile
+- On first start, a screen to choose or create a collection profile
 
 ---
 

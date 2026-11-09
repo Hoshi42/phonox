@@ -1,19 +1,23 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+// The dev port can be overridden (e.g. PORT=5174) to run a branch preview next to the main app.
+const port = Number(process.env.PORT) || 5173
+
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5173,
+    port,
     host: '0.0.0.0',
     hmr: {
-      port: 5173,
-      clientPort: 5173,
+      port,
+      clientPort: port,
       overlay: false,
     },
     proxy: {
       '/api': {
-        target: 'http://backend:8000',
+        // BACKEND_URL lets the branch preview reach the backend from outside the compose network.
+        target: process.env.BACKEND_URL || 'http://backend:8000',
         changeOrigin: true,
       },
     },

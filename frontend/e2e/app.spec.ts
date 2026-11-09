@@ -1,9 +1,11 @@
 import { test, expect } from '@playwright/test'
+import { seedApp } from './support'
 
 test.describe('Phonox Application', () => {
   test.beforeEach(async ({ page }) => {
+    await seedApp(page)
     await page.goto('/')
-    await expect(page.locator('h1')).toContainText('Phonox')
+    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible()
   })
 
   test('should have proper title and meta tags', async ({ page }) => {
@@ -25,8 +27,8 @@ test.describe('Phonox Application', () => {
 
   test('should be responsive on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 })
-    await expect(page.locator('h1')).toBeVisible()
-    await expect(page.locator('text=Click to upload')).toBeVisible()
+    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Collection', level: 1 })).toBeVisible()
   })
 })
 
@@ -46,9 +48,14 @@ test.describe('Health & API Endpoints', () => {
 })
 
 test.describe('Image Upload', () => {
+  test.beforeEach(async ({ page }) => {
+    await seedApp(page)
+    await page.goto('/')
+    await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Capture' }).click()
+  })
+
   test('should display upload interface', async ({ page }) => {
-    await expect(page.locator('text=Click to upload or drag and drop')).toBeVisible()
-    await expect(page.locator('text=PNG, JPG, GIF')).toBeVisible()
+    await expect(page.getByRole('button', { name: '+ Add Record' })).toBeVisible()
   })
 
   test('should validate file input attributes', async ({ page }) => {
@@ -79,7 +86,7 @@ test.describe('Image Upload', () => {
       })
     })
 
-    await expect(page.locator('h1')).toContainText('Phonox')
+    await expect(page.getByRole('button', { name: '+ Add Record' })).toBeVisible()
   })
 })
 

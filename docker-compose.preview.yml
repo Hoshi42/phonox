@@ -1,0 +1,28 @@
+# Isolated preview of the frontend from this checkout, next to the regular app.
+#
+#   docker compose -f docker-compose.preview.yml up
+#
+# Opens on http://localhost:5174 and talks to the backend that is already running
+# on port 8000 (the browser reaches it via the page's hostname, so phones on the
+# same network work too). It does not touch the regular frontend on port 5173.
+name: phonox-preview
+
+services:
+  frontend-preview:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm ci --no-audit --no-fund && npm run dev -- --host 0.0.0.0"
+    environment:
+      PORT: "5174"
+      VITE_API_URL: ""
+      BACKEND_URL: "http://host.docker.internal:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "0.0.0.0:5174:5174"
+    volumes:
+      - ./frontend:/app
+      - preview_node_modules:/app/node_modules
+
+volumes:
+  preview_node_modules:

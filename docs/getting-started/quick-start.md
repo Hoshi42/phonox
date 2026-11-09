@@ -101,19 +101,19 @@ Genres: Rock, Pop
 
 ### Step 5: Save to Collection
 
-1. Select your username from dropdown (or type new name)
-2. Click **"Add to Register"** button
+1. Review the result in the record sheet
+2. Click **"Add to Register"** (it saves to your active profile)
 3. Record saved to PostgreSQL database
-4. View anytime in "My Collection"
+4. View anytime in the **Collection** tab
 
 ## Managing Your Collection
 
-Click **"My Collection"** button (top right):
+Open the **Collection** tab:
 - View all saved records with thumbnails
-- Filter by user/collector
-- Click "View" to load record details
-- Click "Delete" to remove records
-- Generate analysis reports
+- Search, sort, and filter by artist, genre or decade
+- Tap a record to see its details
+- Remove or move records from the detail sheet
+- Generate analysis reports from the **Profile** tab
 
 ## Tips for Best Results
 

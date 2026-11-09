@@ -13,11 +13,11 @@ Learn how to upload and identify vinyl records in Phonox.
 ### Step 1: Navigate to Upload
 
 1. Open Phonox in your browser at http://localhost:5173
-2. You'll see the main interface with:
-   - Chat panel (left side)
-   - Upload area with drag-and-drop zone (center)
-   - Record display area (right side)
-   - "My Collection" button (top right)
+2. You'll see the main interface with a tab bar (bottom on phones, left on larger screens):
+   - **Collection** — your saved records
+   - **Capture** — chat panel with the **+ Add Record** button for uploading photos
+   - **Discover** — browse by artist, genre or decade
+   - **Profile** — profiles, theme, collection tools
 
 ### Step 2: Upload Images
 
@@ -147,12 +147,12 @@ Manage images in your record:
 
 ### View Your Collection
 
-Click **"My Collection"** button to:
+Open the **Collection** tab to:
 - View all saved records
-- Search and filter
-- Load records back into VinylCard
+- Search, sort and filter
+- Open records in the detail sheet
 - Delete records
-- Generate reports
+- Generate reports from the **Profile** tab
 
 ## Re-analyzing Records
 
