@@ -1,4 +1,32 @@
 # Changelog
+## [2.3.2] - 2026-11-09 - Visible progress for magazine jobs
+
+### Added
+- **Job progress** (`backend/magazine_service.py`, `GET /api/magazine` → `progress`) — label, items done/total, percentage and elapsed time for freezing the collection, research steps and typesetting.
+- **Progress bar** (`frontend/src/components/CollectionMagazine.tsx`) — percentage, counts and elapsed time while a magazine job runs; also shown when the panel is collapsed; indeterminate (no fake percentage) until measurable.
+
+### Changed
+- Status polling no longer re-reads every image file while a job runs.
+
+## [2.3.1] - 2026-11-09 - Landscape half-page magazine and stored analysis
+
+### Changed
+- **Magazine PDF layout** (`backend/magazine_pdf.py`) — landscape A4; every album and every artist portrait occupies exactly one half page (two per page); images are resampled to the printed size (about 200 dpi), so the PDF is a fraction of its former size; long texts are shortened to stay within the half page.
+- **Missing information is omitted** — no placeholder portraits or descriptions, no "unknown"/"not recorded" fields, no quality-notes pages; "Unknown Artist" became "Other records". Placeholder texts of earlier editions are dropped when loaded.
+- **Image snapshots** are limited to 2,200 px (JPEG 88) to keep storage small.
+
+### Added
+- **`/api/analysis`** (`backend/api/analysis.py`, table `collection_analyses`) — the latest collection analysis per user is stored and can be reopened.
+
+## [2.3.0] - 2026-11-08 - Persistent collection magazine PDFs
+
+### Added
+- **Collection magazine** — one persistent magazine per collection user, with editable English foreword, artist portraits, record articles, all available images, EUR valuation notes and linked contents.
+- **Editorial PDF layout** — A4 pages, embedded fonts, large-format chapter photographs, two-column portraits, original-image galleries and transparent image-quality warnings.
+- **Magazine lifecycle API and collection controls** — prepare, review, publish, reopen, download, update, cancel and delete; database-enforced user uniqueness, immutable image snapshots and atomic replacement of the current edition.
+- **Bounded research** — Discogs, MusicBrainz and existing web search providers, explicit cost/data-transfer consent, 20-step jobs and 1,200-token AI output limits; no invented fallback prices.
+- **Acceptance coverage** — isolated lifecycle, budget, snapshot, PDF navigation, layout and cleanup tests, including 100 records with five images each; desktop/mobile UI workflow tests.
+
 ## [2.2.4] - 2026-10-29 - Document Claude 5.5 model recommendations
 
 ### Changed

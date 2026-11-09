@@ -28,6 +28,9 @@ confidence_gate → auto_commit or requires_review
 backend/
 ├── main.py                 # FastAPI app entry point
 ├── database.py             # SQLAlchemy ORM models
+├── magazine_models.py      # Validated magazine snapshots and editorial drafts
+├── magazine_service.py     # Persistent jobs, bounded research and atomic editions
+├── magazine_pdf.py         # Landscape A4 layout: one half page per album, linked contents
 ├── agent/
 │   ├── graph.py           # LangGraph workflow builder
 │   ├── state.py           # State models (TypedDict)
@@ -39,6 +42,8 @@ backend/
 ├── api/
 │   ├── routes.py          # API endpoints (/identify, /chat)
 │   ├── register.py        # Register endpoints (/register)
+│   ├── magazine.py        # User-scoped magazine lifecycle (/api/magazine)
+│   ├── analysis.py        # Latest collection analysis per user (/api/analysis)
 │   ├── models.py          # Pydantic request/response models
 │   └── __init__.py
 └── tools/
@@ -86,6 +91,66 @@ Decision logic:
 - Low confidence (<0.65) → Require manual input
 
 ## API Endpoints
+
+### Collection Magazine
+
+Every `/api/magazine` request requires `?user_tag=<collection-user>`.
+There is at most one magazine per user, enforced by a database unique constraint.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/magazine` | Status, current edition, collection changes and optional draft (`include_draft=false` for lightweight responses) |
+| POST | `/api/magazine/prepare` | Prepare an English editorial draft; returns 202 |
+| PUT | `/api/magazine/draft` | Save foreword, artist portraits and record group/description edits using `version` |
+| POST | `/api/magazine/publish` | Approve the draft version and render the PDF; returns 202 |
+| POST | `/api/magazine/cancel` | Stop at the next safe job boundary; keep the current PDF |
+| GET | `/api/magazine/pdf` | Open current PDF; `download=true` sends an attachment |
+| GET | `/api/magazine/images/{image_id}` | Read an image from this user's persistent draft/current snapshot |
+| DELETE | `/api/magazine` | Delete the magazine and its files, never collection records; returns 204 |
+
+Preparation uses `MagazineSettings`: title, subtitle, display name, foreword,
+cover image, private-note opt-in, research, valuation refresh and explicit consent.
+Research requires `consent=true`. Each database lookup, web search invocation or
+AI call consumes one of **20 steps per job**; AI output is limited to **1,200
+tokens**, input evidence is bounded, and automatic AI retries are disabled.
+The existing web search helper can make two Tavily attempts plus DuckDuckGo
+fallback within a search step. The UI's EUR allowance is an estimate, not a
+provider price guarantee. Missing keys/sources and budget exhaustion produce
+visible draft warnings, not fabricated portraits or prices.
+
+The existing `ANTHROPIC_CHAT_MODEL`, `ANTHROPIC_API_KEY`, `DISCOGS_TOKEN` and
+`TAVILY_API_KEY` configuration is reused; no new secrets are required.
+See [API request examples](../docs/api/endpoints.md#collection-magazine).
+
+**Deployment:** rebuild the backend (`docker compose up -d --build backend`) to
+install ReportLab, pypdf and DejaVu fonts. `Base.metadata.create_all` adds the new
+`collection_magazines` table without changing existing record tables.
+Files live under `UPLOAD_DIR/magazines` (default `/app/uploads/magazines` in the
+Compose backend), covered by the existing persistent uploads volume.
+Back up that directory together with the database.
+
+Run one backend API process for this store, as in the existing Compose setup.
+Jobs use a single background worker and persist status/drafts in PostgreSQL.
+On restart, interrupted jobs become explicitly retryable failures; paid calls
+are never automatically replayed. The current PDF stays available.
+Obsolete PDFs/assets are removed after successful replacement; hourly maintenance
+removes unreferenced work within 24 hours. Saved editorial drafts are persistent
+magazine state, not disposable temporary work.
+
+**Access model:** `user_tag` is the existing collection scope, not authentication.
+The new routes enforce that scope but do not add login/authorization to Phonox.
+
+### Collection Analysis
+
+The most recent AI collection analysis is stored per user (one row in `collection_analyses`)
+so it can always be reopened. `user_tag` is required like for the other collection routes.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/analysis` | The latest analysis (`summary`, `record_count`, `total_value_eur`, `created_at`); 404 if none |
+| PUT | `/api/analysis` | Store/replace it; body `{summary, record_count, total_value_eur?}`, summary up to 100,000 characters |
+
+The table is created automatically on startup (`create_all`).
 
 ### Identification
 

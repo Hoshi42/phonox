@@ -13,6 +13,8 @@ python-multipart>=0.0.6
 psycopg2-binary>=2.9.9
 psycopg[binary]>=3.1.1
 Pillow>=10.1.0
+reportlab>=4.2.0
+pypdf>=5.0.0
 
 # LLM & AI APIs
 anthropic>=0.7.0

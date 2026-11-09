@@ -189,6 +189,38 @@ class VinylImage(Base):  # type: ignore[misc,valid-type]
             "is_primary": self.is_primary,
         }
 
+class CollectionMagazine(Base):  # type: ignore[misc,valid-type]
+    """One persistent magazine per collection user, with an isolated working draft."""
+    __tablename__ = "collection_magazines"
+
+    id: ColumnType = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_tag: ColumnType = Column(String(50), nullable=False, unique=True, index=True)
+    status: ColumnType = Column(String(30), nullable=False, default="draft")
+    phase: ColumnType = Column(String(255), nullable=False, default="")
+    error: ColumnType = Column(Text, nullable=True)
+    job_token: ColumnType = Column(String(36), nullable=True)
+    draft_version: ColumnType = Column(Integer, nullable=False, default=0)
+    draft_payload: ColumnType = Column(Text, nullable=True)
+    current_payload: ColumnType = Column(Text, nullable=True)
+    current_pdf: ColumnType = Column(String(100), nullable=True)
+    edition: ColumnType = Column(Integer, nullable=False, default=0)
+    page_count: ColumnType = Column(Integer, nullable=False, default=0)
+    updated_at: ColumnType = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    published_at: ColumnType = Column(DateTime, nullable=True)
+
+
+class CollectionAnalysis(Base):  # type: ignore[misc,valid-type]
+    """The most recent AI collection analysis of a user, kept so it can always be reopened."""
+    __tablename__ = "collection_analyses"
+
+    id: ColumnType = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_tag: ColumnType = Column(String(50), nullable=False, unique=True, index=True)
+    summary: ColumnType = Column(Text, nullable=False)
+    record_count: ColumnType = Column(Integer, nullable=False, default=0)
+    total_value_eur: ColumnType = Column(Float, nullable=True)
+    created_at: ColumnType = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 def get_db() -> Session:
     """Dependency for getting database session."""
     if SessionLocal is None:

@@ -24,6 +24,7 @@ import { useState } from 'react'
 import { RegisterRecord, registerApiClient } from '../services/registerApi'
 import VinylSpinner from './VinylSpinner'
 import styles from './VinylRegister.module.css'
+import CollectionMagazine from './CollectionMagazine'
 
 const API_BASE = import.meta.env.VITE_API_URL
   || (typeof window !== 'undefined' && window.location.hostname
@@ -31,6 +32,7 @@ const API_BASE = import.meta.env.VITE_API_URL
     : 'http://localhost:8000')
 
 interface VinylRegisterProps {
+  user: string
   records: RegisterRecord[]
   onClose: () => void
   onDeleteRecord: (recordId: string) => void
@@ -45,6 +47,7 @@ interface CollectionAnalysis {
 }
 
 export default function VinylRegister({
+  user,
   records,
   onClose,
   onDeleteRecord,
@@ -677,6 +680,9 @@ ${analysis.summary}
             </select>
           </div>
         </div>
+
+        <CollectionMagazine key={user} user={user}
+          records={records.filter(record => record.user_tag === user && !movedRecordIds.has(record.id))} />
 
         {/* Records */}
         <div className={styles.recordsContainer}>

@@ -708,6 +708,7 @@ function App() {
 
       {showRegister && (
         <VinylRegister
+          user={currentUser}
           records={vinylRegister}
           onClose={() => setShowRegister(false)}
           onDeleteRecord={handleDeleteFromRegister}
