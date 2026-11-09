@@ -208,6 +208,11 @@ async def identify_vinyl(
             config = {"configurable": {"thread_id": record_id}}
             result_state = graph.invoke(initial_state, config=config)
 
+            # The graph aborts when the images could not be analyzed: record the failure,
+            # don't store placeholder metadata or run a valuation for it
+            if result_state.get("error"):
+                raise RuntimeError(result_state["error"])
+
             # Update record with results
             # Keep status as "analyzed" (not yet in register)
             vinyl_record.status = "analyzed"

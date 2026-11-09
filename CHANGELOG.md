@@ -1,4 +1,10 @@
 # Changelog
+## [2.5.1] - 2026-11-09 - Failed analysis aborts
+
+### Fixed
+- **Failed analysis aborts** (`backend/agent/graph.py`, `backend/api/routes.py`) — when the images cannot be analyzed (vision error, invalid image, no images), the workflow now ends right after the vision step with an error. Before, it carried on with "ERROR – ERROR": Discogs, web search and a valuation looked for a record named ERROR, and the record was stored as "analyzed" with artist ERROR. Now the record is marked `failed` with the reason and no metadata, and no lookups or Claude valuation run.
+- **Integration tests** (`tests/integration/test_end_to_end.py`) — the workflow tests now mock the vision step instead of relying on the failed-vision path.
+
 ## [2.5.0] - 2026-11-09 - Exact pressings, Discogs prices, faster analysis
 
 ### Added

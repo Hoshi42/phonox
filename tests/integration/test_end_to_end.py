@@ -35,13 +35,33 @@ def sample_vinyl_images():
             "format": "jpeg",
             "size_bytes": 500000,
             "path": "/tmp/abbey_road_1.jpg",
+            "content": "aGVsbG8=",
         },
         {
             "format": "png",
             "size_bytes": 400000,
             "path": "/tmp/abbey_road_2.png",
+            "content": "aGVsbG8=",
         },
     ]
+
+
+@pytest.fixture(autouse=True)
+def mock_vision():
+    """Vision analysis succeeds; a failed analysis aborts the workflow (see test_graph.py)."""
+    result = {
+        "artist": "The Beatles",
+        "title": "Abbey Road",
+        "year": 1969,
+        "label": "Apple Records",
+        "catalog_number": "PCS 7088",
+        "genres": ["Rock"],
+        "confidence": 0.85,
+    }
+    with patch("backend.agent.graph.extract_vinyl_metadata_with_retry", side_effect=lambda **kw: dict(result)), \
+         patch("backend.agent.graph.aggregate_with_llm", side_effect=lambda results: dict(results[0])), \
+         patch("backend.agent.graph.search_spotify_album", return_value=None):
+        yield
 
 
 @pytest.fixture

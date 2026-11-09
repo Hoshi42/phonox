@@ -327,6 +327,13 @@ def extract_features_node(state: VinylState) -> VinylState:
     return state
 
 
+def vision_failed(vision_data: Optional[Dict[str, Any]]) -> bool:
+    """True when the vision step reported an error or returned the ERROR placeholder."""
+    if not vision_data:
+        return False
+    return bool(vision_data.get("error")) or "ERROR" in (vision_data.get("artist"), vision_data.get("title"))
+
+
 def vision_extraction_node(state: VinylState) -> VinylState:
     """
     Use Claude 3 Sonnet to analyze album artwork and extract metadata.
@@ -352,12 +359,14 @@ def vision_extraction_node(state: VinylState) -> VinylState:
     """
     if not state.get("validation_passed"):
         logger.warning("vision_extraction: Images not validated")
+        state["error"] = "Image validation failed: " + "; ".join(state.get("validation_errors") or ["unknown reason"])
         return state
 
     images = state.get("images", [])
 
     if not images:
         logger.warning("vision_extraction: No images provided")
+        state["error"] = "No images provided"
         return state
 
     # Process ALL images (in parallel - they are independent) and aggregate results for better accuracy
@@ -480,6 +489,7 @@ def vision_extraction_node(state: VinylState) -> VinylState:
     except Exception as e:
         logger.error(f"vision_extraction: Failed to extract metadata: {e}")
         vision_results = {
+            "error": f"Image analysis failed: {e}",
             "artist": "Unknown",
             "title": "Unknown",
             "year": None,
@@ -491,6 +501,11 @@ def vision_extraction_node(state: VinylState) -> VinylState:
         }
 
     state["vision_extraction"] = vision_results
+
+    # A failed analysis aborts the workflow: nothing sensible can be looked up for it
+    if vision_failed(vision_results):
+        state["error"] = vision_results.get("error") or "Image analysis failed"
+        logger.error(f"vision_extraction: Analysis failed, aborting workflow: {state['error']}")
 
     # Add vision results to evidence chain for confidence calculation
     evidence_chain = state.get("evidence_chain", [])
@@ -559,7 +574,7 @@ def lookup_metadata_node(state: VinylState) -> VinylState:
 
     # A catalog number or barcode identifies the pressing even when the title is unreadable
     has_identifier = bool(vision_data.get("catalog_number") or vision_data.get("barcode"))
-    if not artist or (not title and not has_identifier):
+    if vision_failed(vision_data) or not artist or (not title and not has_identifier):
         logger.warning("lookup_metadata: Insufficient data for metadata lookup")
         return state
 
@@ -927,7 +942,9 @@ def build_agent_graph():
           ↓
     vision_extraction  (Claude Sonnet – per image + multi-image aggregation)
           ↓
-    lookup_metadata    (Discogs + MusicBrainz + Spotify)
+    [if the analysis failed → END with state["error"]]
+          ↓
+    lookup_metadata    (Discogs + Spotify; MusicBrainz if enabled)
           ↓
     [if confidence < 0.75]
     websearch_fallback (Tavily / DuckDuckGo)
@@ -959,7 +976,15 @@ def build_agent_graph():
     graph.add_edge(START, "validate_images")
     graph.add_edge("validate_images", "extract_features")
     graph.add_edge("extract_features", "vision_extraction")
-    graph.add_edge("vision_extraction", "lookup_metadata")
+
+    def route_from_vision(state: VinylState) -> Literal["lookup_metadata", "__end__"]:
+        """Abort when the images could not be analyzed instead of searching for an ERROR record."""
+        if state.get("error") or vision_failed(state.get("vision_extraction")):
+            logger.error(f"route_from_vision: Aborting workflow ({state.get('error') or 'vision extraction failed'})")
+            return END
+        return "lookup_metadata"
+
+    graph.add_conditional_edges("vision_extraction", route_from_vision)
 
     # Conditional edge: lookup_metadata → metadata_synthesis or websearch_fallback
     def route_from_lookup(state: VinylState) -> Literal["metadata_synthesis", "websearch_fallback"]:
