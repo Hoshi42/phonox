@@ -99,6 +99,43 @@ test.describe('Image Upload', () => {
     await expect(page.getByText('Artist and title are clearly printed on the label.')).toBeVisible()
   })
 
+  test('stops the chat spinner when the upload fails', async ({ page }) => {
+    await page.route('**/api/v1/identify', route => route.fulfill({
+      status: 500,
+      json: { detail: 'Server error' },
+    }))
+
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'cover.jpg',
+      mimeType: 'image/jpeg',
+      buffer: Buffer.from('mock image'),
+    })
+
+    await expect(page.getByText('The analysis did not finish')).toBeVisible()
+    await expect(page.getByText('Crafting response…')).toHaveCount(0)
+    await expect(page.getByPlaceholder('Ask about records, prices, artists…')).toBeEnabled()
+  })
+
+  test('stops the chat spinner when the analysis fails', async ({ page }) => {
+    await page.route('**/api/v1/identify', route => route.fulfill({
+      status: 202,
+      json: { record_id: 'failed-1' },
+    }))
+    await page.route('**/api/v1/identify/failed-1', route => route.fulfill({
+      status: 200,
+      json: { record_id: 'failed-1', status: 'failed', error: 'vision unavailable' },
+    }))
+
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'cover.jpg',
+      mimeType: 'image/jpeg',
+      buffer: Buffer.from('mock image'),
+    })
+
+    await expect(page.getByText('The analysis did not finish')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByPlaceholder('Ask about records, prices, artists…')).toBeEnabled()
+  })
+
   test('should show vinyl spinner during upload', async ({ page }) => {
     // Mock slow identify endpoint
     await page.route('**/api/v1/identify', async (route) => {

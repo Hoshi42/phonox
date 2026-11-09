@@ -673,6 +673,8 @@ function App() {
                 onAnalysisComplete={() => {}}
                 onMetadataUpdate={handleMetadataUpdate}
                 chatInputRef={chatInputRef}
+                analyzing={loading}
+                analysisError={error}
               />
             </CaptureView>
           ),

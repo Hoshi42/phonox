@@ -1,4 +1,10 @@
 # Changelog
+## [2.4.3] - 2026-11-09 - Chat no longer hangs after a failed scan
+
+### Fixed
+- **Chat spinner after failed analysis** (`frontend/src/components/ChatPanel.tsx`, `App.tsx`) — the chat set its "Thinking… / Researching… / Crafting response…" indicator when a photo was uploaded but only cleared it after a successful result. After a failed upload or analysis it spun forever and blocked the input. `App` now passes its analysis state and error to the chat, which stops the spinner and replaces the "Analyzing…" notice with the failure reason.
+- **E2E coverage** (`frontend/e2e/app.spec.ts`) — added tests for a failed upload and a failed analysis.
+
 ## [2.4.2] - 2026-11-09 - Stable Capture on phones
 
 ### Fixed

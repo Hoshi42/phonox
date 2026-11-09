@@ -66,6 +66,10 @@ interface ChatPanelProps {
   onAnalysisComplete?: (result: any) => void
   onMetadataUpdate?: (metadata: any) => void
   chatInputRef?: React.MutableRefObject<HTMLTextAreaElement | null>
+  /** True while the parent is uploading/analyzing images. */
+  analyzing?: boolean
+  /** Latest analysis error reported by the parent. */
+  analysisError?: string | null
 }
 
 interface ChatResponse {
@@ -163,6 +167,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
   onAnalysisComplete,
   onMetadataUpdate,
   chatInputRef,
+  analyzing,
+  analysisError,
 }: ChatPanelProps, ref) => {
   const initialGreeting = record 
     ? '👋 Hi! Ask me anything about this record - its value, history, pressing details, or collecting tips!'
@@ -433,6 +439,32 @@ The vinyl card has been updated with all the details. You can edit any informati
       }
     }
   }, [record?.status, record?.record_id])
+
+  // The upload spinner is set locally but cleared only by a successful result. When the parent
+  // finishes without one (upload/analysis failed), stop it and replace the "Analyzing" notice.
+  const wasAnalyzing = useRef(false)
+  useEffect(() => {
+    if (analyzing) {
+      wasAnalyzing.current = true
+      return
+    }
+    if (!wasAnalyzing.current) return
+    wasAnalyzing.current = false
+    setLoading(false)
+    setMessages(prev => {
+      const last = prev[prev.length - 1]
+      if (!last || last.role !== 'system' || !last.content.includes('Analyzing')) return prev
+      const reason = analysisError ? ` (${analysisError})` : ''
+      return enforceMessageLimit([
+        ...prev.slice(0, -1),
+        {
+          role: 'system',
+          content: `⚠️ The analysis did not finish${reason}. Please try again.`,
+          timestamp: new Date().toISOString(),
+        },
+      ], MAX_MESSAGES)
+    })
+  }, [analyzing])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
