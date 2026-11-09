@@ -1,4 +1,12 @@
 # Changelog
+## [2.4.1] - 2026-11-09 - Restore notes in analyzed record details
+
+### Fixed
+- **Analysis notes** (`backend/agent/vision.py`, `backend/api/routes.py`) — request a concise evidence summary from vision analysis and expose it as Notes without overwriting user-provided notes.
+- **Analysis graph** (`backend/agent/graph.py`) — copy single-image results before attaching per-image details, preventing circular references during metadata synthesis.
+- **Claude requests** (`backend/agent/vision.py`, `backend/agent/graph.py`) — omit the unsupported `temperature` parameter from direct Messages API calls.
+- **Frontend healthcheck** (`Dockerfile.frontend`) — probe IPv4 loopback so Vite is reported healthy in the container.
+
 ## [2.4.0] - 2026-11-08 - Mobile-first frontend modernization
 
 ### Changed

@@ -119,6 +119,7 @@ def test_extract_metadata_success(mock_anthropic, mock_image_base64):
                 "label": "Apple Records",
                 "catalog_number": "PCS 7088",
                 "genres": ["Rock", "Pop"],
+                "reasoning": "Artist and title are clearly printed on the label.",
                 "confidence": 0.95,
             })
         )
@@ -136,7 +137,11 @@ def test_extract_metadata_success(mock_anthropic, mock_image_base64):
     assert result["label"] == "Apple Records"
     assert result["catalog_number"] == "PCS 7088"
     assert result["genres"] == ["Rock", "Pop"]
+    assert result["reasoning"] == "Artist and title are clearly printed on the label."
     assert result["confidence"] == 0.95
+    request = mock_client.messages.create.call_args.kwargs
+    assert "temperature" not in request
+    assert '"reasoning"' in request["messages"][0]["content"][1]["text"]
 
 
 @patch("backend.agent.vision.Anthropic")

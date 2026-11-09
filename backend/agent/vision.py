@@ -429,6 +429,7 @@ STEP 8: RETURN STRUCTURED JSON
     "all_visible_text": "complete list of all text found in step 2",
     "condition": "Mint (M)" through "Poor (P)" based on visible damage,
     "condition_notes": "brief description of wear/damage observed",
+    "reasoning": "brief user-facing summary of visible evidence and any uncertainty, without step-by-step internal analysis",
     "confidence": 0.75
 }}
 
@@ -456,7 +457,6 @@ CRITICAL:
         message = client.messages.create(
             model=vision_model,
             max_tokens=1500,  # Increased for detailed chain-of-thought analysis
-            temperature=0.3,  # Deterministic output for consistent metadata extraction
             system=system_prompt,  # Expert context for better analysis
             timeout=CLAUDE_API_TIMEOUT,  # Configurable timeout from environment
             messages=cast(

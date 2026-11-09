@@ -57,7 +57,7 @@ def aggregate_with_llm(all_results: List[Dict[str, Any]]) -> Dict[str, Any]:
     
     if len(all_results) == 1:
         # Only one image, no aggregation needed
-        return all_results[0]
+        return all_results[0].copy()
     
     logger.info(f"Using Claude to aggregate {len(all_results)} image results...")
     
@@ -104,7 +104,6 @@ Return ONLY valid JSON:
         response = anthropic_client.messages.create(
             model=aggregation_model,
             max_tokens=1500,
-            temperature=0.3,  # Deterministic for consistent merging
             messages=[{"role": "user", "content": aggregation_prompt}]
         )
         

@@ -12,11 +12,13 @@ Tests for:
 """
 
 import pytest
+import json
 from datetime import datetime
 from typing import List
 from unittest.mock import patch, MagicMock
 
 from backend.agent.graph import (
+    aggregate_with_llm,
     build_agent_graph,
     validate_images_node,
     extract_features_node,
@@ -73,6 +75,26 @@ def valid_images_state() -> VinylState:
 # ============================================================================
 # VALIDATE_IMAGES_NODE TESTS
 # ============================================================================
+
+
+@patch("backend.agent.graph.anthropic_client")
+def test_aggregate_with_llm_uses_supported_messages_parameters(mock_client):
+    mock_client.messages.create.return_value = MagicMock(
+        content=[MagicMock(text=json.dumps({"artist": "Artist", "title": "Album"}))]
+    )
+
+    aggregate_with_llm([{"artist": "Artist"}, {"title": "Album"}])
+
+    assert "temperature" not in mock_client.messages.create.call_args.kwargs
+
+
+def test_aggregate_with_llm_single_result_can_be_serialized():
+    image_result = {"artist": "Artist", "title": "Album"}
+
+    aggregated = aggregate_with_llm([image_result])
+    aggregated["image_results"] = [image_result]
+
+    assert json.loads(json.dumps(aggregated))["image_results"] == [image_result]
 
 
 def test_validate_images_no_images(empty_state):

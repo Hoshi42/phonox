@@ -64,6 +64,41 @@ test.describe('Image Upload', () => {
     await expect(uploadInput).toHaveAttribute('multiple', '')
   })
 
+  test('shows analyzed details and notes in the record sheet', async ({ page }) => {
+    await page.route('**/api/v1/identify', route => route.fulfill({
+      status: 202,
+      json: {
+        record_id: 'analysis-with-notes',
+        status: 'analyzed',
+        metadata: {
+          artist: 'The Beatles',
+          title: 'Abbey Road',
+          year: 1969,
+          label: 'Apple Records',
+          catalog_number: 'PCS 7088',
+          genres: ['Rock', 'Pop'],
+        },
+        confidence: 0.95,
+        auto_commit: true,
+        needs_review: false,
+        evidence_chain: [],
+        user_notes: 'Artist and title are clearly printed on the label.',
+      },
+    }))
+
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'cover.jpg',
+      mimeType: 'image/jpeg',
+      buffer: Buffer.from('mock image'),
+    })
+
+    const recordDetails = page.getByRole('dialog')
+    await expect(recordDetails.getByText('The Beatles', { exact: true })).toBeVisible()
+    await expect(recordDetails.getByText('Apple Records', { exact: true })).toBeVisible()
+    await page.getByText('Notes', { exact: true }).click()
+    await expect(page.getByText('Artist and title are clearly printed on the label.')).toBeVisible()
+  })
+
   test('should show vinyl spinner during upload', async ({ page }) => {
     // Mock slow identify endpoint
     await page.route('**/api/v1/identify', async (route) => {

@@ -65,7 +65,8 @@ After upload, Phonox automatically:
 3. **Barcode Detection** - Extracts UPC/EAN barcodes if visible
 4. **Web Search** - Searches Discogs, MusicBrainz, and other sources
 5. **Metadata Extraction** - Retrieves artist, title, year, label, catalog number
-6. **Results Display** - Shows identified record in VinylCard
+6. **Notes** - Adds a short summary of visible evidence and any identification uncertainty
+7. **Results Display** - Shows identified record in VinylCard
 
 Results display in the VinylCard:
 ```
@@ -76,6 +77,7 @@ Label: Apple Records
 Catalog: PCS 7088
 Barcode: 5099969945724
 Genres: Rock, Pop
+Notes: Artist and album title are clearly visible on the cover.
 ```
 
 ### Step 5: Review Results

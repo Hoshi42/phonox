@@ -397,7 +397,7 @@ EXPLANATION: [brief explanation]"""
                 vinyl_record.condition = vision_data.get("condition")
 
             # Auto-populate notes with the analysis reasoning from the vision agent
-            if vision_data and vision_data.get("reasoning"):
+            if vision_data and vision_data.get("reasoning") and not vinyl_record.user_notes:
                 vinyl_record.user_notes = vision_data["reasoning"]
 
             # Handle errors
