@@ -41,7 +41,7 @@ from backend.api.models import (
 from backend.agent.graph import build_agent_graph
 from backend.agent.state import VinylState
 from backend.agent.metadata import estimate_vinyl_value, format_discogs_market_context
-from backend.agent.llm_utils import response_text as response_text_of
+from backend.agent.llm_utils import response_text as response_text_of, content_text
 from backend.agent.valuation import format_market_notes
 from backend.agent.metadata_enhancer import MetadataEnhancer
 from backend.agent.chat_agent import get_chat_graph
@@ -756,11 +756,11 @@ async def chat_with_agent(
 
         # For quiz_collection: return the raw tool output to preserve <!--QUIZ:--> marker
         # (the LLM would otherwise rewrite the questions as plain markdown)
-        agent_response = all_msgs[-1].content
+        agent_response = content_text(all_msgs[-1].content)
         if _quiz_tool_call_id:
             for m in current_turn_msgs:
                 if isinstance(m, ToolMessage) and m.tool_call_id == _quiz_tool_call_id:
-                    agent_response = m.content
+                    agent_response = content_text(m.content)
                     break
 
         # Apply explicit metadata corrections if provided in request
@@ -919,11 +919,11 @@ async def general_chat(
                         _quiz_tool_call_id = tc["id"]
 
         # For quiz_collection: return the raw tool output to preserve <!--QUIZ:--> marker
-        agent_response = all_msgs[-1].content
+        agent_response = content_text(all_msgs[-1].content)
         if _quiz_tool_call_id:
             for m in current_turn_msgs:
                 if isinstance(m, ToolMessage) and m.tool_call_id == _quiz_tool_call_id:
-                    agent_response = m.content
+                    agent_response = content_text(m.content)
                     break
 
         return {

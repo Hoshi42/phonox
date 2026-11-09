@@ -3,7 +3,7 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from backend.agent.llm_utils import response_text
+from backend.agent.llm_utils import content_text, response_text
 
 
 def _message(*blocks, stop_reason="end_turn"):
@@ -30,6 +30,22 @@ def test_truncated_response_is_logged(caplog):
     with caplog.at_level("WARNING"):
         response_text(_message(SimpleNamespace(type="text", text="{"), stop_reason="max_tokens"))
     assert "max_tokens" in caplog.text
+
+
+def test_content_text_drops_thinking_blocks_of_chat_messages():
+    blocks = [
+        {"type": "thinking", "thinking": "", "signature": "abc"},
+        {"type": "text", "text": "Hello "},
+        {"type": "text", "text": "world"},
+    ]
+    assert content_text(blocks) == "Hello world"
+
+
+def test_content_text_passes_strings_and_handles_odd_values():
+    assert content_text("plain") == "plain"
+    assert content_text(["a", {"type": "text", "text": "b"}]) == "ab"
+    assert content_text(None) == ""
+    assert content_text([{"type": "thinking", "thinking": "x"}]) == ""
 
 
 def test_vision_extraction_reads_json_behind_a_thinking_block():

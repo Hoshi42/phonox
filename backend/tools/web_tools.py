@@ -315,6 +315,9 @@ class WebScrapingTool:
         """Scrape multiple URLs and return results."""
         results = []
         for url in urls[:WEB_SCRAPING_MAX_URLS]:  # Limit to configured max URLs
+            # Discogs pages block scraping (HTTP 403); its API provides that data instead
+            if "discogs.com" in url:
+                continue
             result = self.scrape_url(url, max_chars)
             results.append(result)
         return results
@@ -340,11 +343,7 @@ class EnhancedChatTools:
         
         if scrape_results and search_results:
             # Scrape top results based on configuration
-            # Discogs pages block scraping (HTTP 403); its API provides that data instead
-            urls_to_scrape = [
-                r["url"] for r in search_results[:WEB_SCRAPING_MAX_URLS]
-                if r.get("url") and r["url"] != "#" and "discogs.com" not in r["url"]
-            ]
+            urls_to_scrape = [r["url"] for r in search_results[:WEB_SCRAPING_MAX_URLS] if r.get("url") and r["url"] != "#"]
             if urls_to_scrape:
                 scraped = self.scraping_tool.scrape_multiple_urls(urls_to_scrape)
                 response["scraped_content"] = scraped

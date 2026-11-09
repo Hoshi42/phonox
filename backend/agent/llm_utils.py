@@ -20,3 +20,22 @@ def response_text(message: Any) -> str:
     return "".join(
         block.text for block in blocks if isinstance(getattr(block, "text", None), str)
     )
+
+
+def content_text(content: Any) -> str:
+    """
+    Plain text of a chat message's content.
+
+    LangChain messages carry either a string or a list of content blocks; models that
+    think first add a ``thinking`` block, which must not reach the user.
+    """
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(
+            block if isinstance(block, str)
+            else str(block.get("text") or "") if isinstance(block, dict) and block.get("type") == "text"
+            else ""
+            for block in content
+        )
+    return "" if content is None else str(content)

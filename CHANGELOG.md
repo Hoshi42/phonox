@@ -1,4 +1,10 @@
 # Changelog
+## [2.5.2] - 2026-11-09 - Chat answers with web search
+
+### Fixed
+- **Chat showed an error after web searches** (`backend/api/routes.py`, `backend/agent/llm_utils.py`) — the chat model (Haiku 5.5) can think before answering, so the agent's last message holds a list of content blocks (`thinking` + `text`) instead of a string. The chat routes returned that list as `message`, the frontend could not read it and showed "Sorry, I encountered an error". The routes now return only the text (`content_text`), for the record chat and the general chat.
+- **Discogs pages are never scraped** (`backend/tools/web_tools.py`) — the filter moved into `scrape_multiple_urls`, so the chat tools no longer log 403 errors for Discogs pages either.
+
 ## [2.5.1] - 2026-11-09 - Failed analysis aborts
 
 ### Fixed
