@@ -1,0 +1,51 @@
+.content {
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+
+.content h3 {
+  margin: var(--space-5) 0 var(--space-2);
+  font-size: 1.1rem;
+}
+
+.content h4 {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: 1rem;
+}
+
+.content p,
+.content ul,
+.content ol {
+  margin-bottom: var(--space-3);
+}
+
+.content ul,
+.content ol {
+  padding-left: var(--space-5);
+}
+
+.content li {
+  margin-bottom: 4px;
+}
+
+.table {
+  overflow-x: auto;
+  margin-bottom: var(--space-4);
+}
+
+.table table {
+  border-collapse: collapse;
+  min-width: 100%;
+  font-size: 0.85rem;
+}
+
+.table th,
+.table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.table th {
+  background: var(--surface-2);
+}

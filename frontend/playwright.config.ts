@@ -1,5 +1,9 @@
 import { defineConfig, devices } from '@playwright/test'
 
+// Set PORT (and optionally PLAYWRIGHT_BASE_URL) to test a branch preview next to the regular app.
+const port = Number(process.env.PORT) || 5173
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || `http://localhost:${port}`
+
 /**
  * E2E test configuration for Phonox frontend
  */
@@ -11,7 +15,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -37,7 +41,8 @@ export default defineConfig({
 
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:5173',
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
+    env: { PORT: String(port) },
   },
 })

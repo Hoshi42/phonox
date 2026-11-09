@@ -190,30 +190,32 @@ User can later:
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                      App.tsx                             │
-│  - Global state: record, register, user                  │
+│  - Global state: record, register, user, collection query│
 │  - API calls orchestration                               │
 │  - Polling logic for long-running jobs                   │
 └──────────────────────────────────────────────────────────┘
-         ↙         ↓              ↘
-    ┌─────────┐  ┌──────────┐  ┌──────────────┐
-    │ImageUp- │  │VinylCard │  │VinylRegister │
-    │load.tsx │  │.tsx      │  │.tsx          │
-    └─────────┘  └──────────┘  └──────────────┘
-                       ↓              ↓
-                  ┌────────────────────────┐
-                  │   ChatPanel.tsx        │
-                  │ - AI chat interface    │
-                  │ - Web search results   │
-                  │ - Context awareness    │
-                  └────────────────────────┘
-                  
-                  │
-                  ↓
-    ┌──────────────────────────────┐
-    │   UserManager.tsx            │
-    │ - Auth/user switching        │
-    │ - localStorage persistence   │
-    └──────────────────────────────┘
+        ↓ renders
+┌──────────────────────────────────────────────────────────┐
+│  shell/AppShell — bottom tab bar / side rail             │
+│  (all views stay mounted; chat & scroll state survive)   │
+└──────────────────────────────────────────────────────────┘
+    ↓            ↓            ↓            ↓
+┌──────────┐ ┌────────────┐ ┌──────────┐ ┌─────────────────┐
+│Collection│ │CaptureView │ │Discover  │ │ProfileView      │
+│View      │ │└ ChatPanel │ │View      │ │ profiles, theme,│
+│ search,  │ │  (+ upload)│ │ artists, │ │ analysis, CSV,  │
+│ shelves, │ └────────────┘ │ genres,  │ │ CollectionMaga- │
+│ grid     │                │ decades  │ │ zine            │
+└──────────┘                └──────────┘ └─────────────────┘
+    ↓ tap a record / analysis finished
+┌──────────────────────────────────────────────────────────┐
+│  views/RecordSheet (ui/Sheet: bottom sheet / side drawer)│
+│   └ VinylCard — metadata, images, value, register action │
+│   └ move / remove dialogs                                │
+└──────────────────────────────────────────────────────────┘
+
+Shared: styles/tokens.css (light/dark design tokens), theme/useTheme,
+        features/collection (filter, sort, grouping), features/collectionTools (CSV, analysis)
 ```
 
 ## Database Schema

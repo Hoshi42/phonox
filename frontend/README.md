@@ -4,11 +4,12 @@ React + TypeScript + Vite PWA for Phonox vinyl record identification.
 
 ## Features
 
-- **Image Upload**: Drag-and-drop interface for 1-5 images
-- **Real-time Analysis**: Polls backend for AI identification results
-- **Manual Review**: Correction form for low-confidence results
+- **Mobile-first navigation**: bottom tab bar on phones, side rail on wide screens (Collection, Capture, Discover, Profile)
+- **Collection browsing**: search, sort, grid/list, shelves for recent records, artists and genres
+- **Record sheet**: bottom sheet on phones, side drawer on desktop, with focus trapping, Escape and drag-to-dismiss
+- **Light and dark theme**: follows the system by default, switchable under Profile
+- **Image upload and analysis**: photograph a cover in the Capture tab; results are polled from the backend
 - **Progressive Web App**: Installable on mobile and desktop
-- **Offline Support**: Service worker caches results
 - **Responsive Design**: Works on desktop, tablet, and mobile
 
 ## Quick Start
@@ -34,6 +35,26 @@ npm run dev
 # Opens at http://localhost:5173
 ```
 
+The dev server port and proxy target can be overridden, which is how a branch is previewed next to the regular app:
+
+```bash
+PORT=5174 BACKEND_URL=http://localhost:8000 npm run dev
+```
+
+### Previewing a branch in isolation
+
+From a git worktree of the branch (so your regular checkout and its running containers are untouched):
+
+```bash
+git worktree add ../phonox-preview <branch>
+cd ../phonox-preview
+docker compose -f docker-compose.preview.yml up -d   # http://localhost:5174
+docker compose -f docker-compose.preview.yml down     # when finished
+git worktree remove ../phonox-preview
+```
+
+The preview reuses the backend and database on port 8000 and installs its own `node_modules` in a Docker volume.
+
 ### Build
 
 ```bash
@@ -54,35 +75,47 @@ npm run test:e2e
 npm run test:e2e:ui
 
 # Run specific test file
-npm run test:e2e -- e2e/app.spec.ts
+npm run test:e2e -- e2e/navigation.spec.ts
+
+# Test a preview running on another port
+PORT=5174 npm run test:e2e -- e2e/navigation.spec.ts
 ```
+
+The tests mock the register endpoints (`e2e/support.ts`), so they do not depend on real data.
 
 ## Project Structure
 
 ```
 frontend/
 ├── src/
-│   ├── main.tsx              # Entry point
-│   ├── App.tsx               # Main app component
-│   ├── App.css               # Global styles
-│   ├── api/
-│   │   └── client.ts         # API client (fetch-based)
-│   └── components/
-│       ├── ImageUpload.tsx   # Image upload component
-│       ├── LoadingSpinner.tsx # Loading indicator
-│       ├── ResultsView.tsx    # Results display
-│       ├── ReviewForm.tsx     # Manual correction form
-│       └── *.module.css       # Component styles
+│   ├── main.tsx              # Entry point (applies the stored theme before render)
+│   ├── App.tsx               # State, API orchestration and tab wiring
+│   ├── config.ts             # API base URL
+│   ├── styles/               # tokens.css (light/dark design tokens), base.css
+│   ├── theme/useTheme.ts     # system | light | dark preference
+│   ├── shell/AppShell.tsx    # Tab bar / side rail
+│   ├── ui/                   # Sheet, Icon, RecordCard, AnalysisContent
+│   ├── views/                # CollectionView, DiscoverView, CaptureView, ProfileView, RecordSheet
+│   ├── features/             # collection.ts (filter/sort/group), collectionTools.ts (CSV, analysis)
+│   ├── api/ services/        # Backend clients
+│   └── components/           # VinylCard, ChatPanel, QuizCard, CollectionMagazine, ErrorModal, VinylSpinner
 ├── public/
 │   ├── manifest.json         # PWA manifest
 │   └── sw.js                 # Service worker
 ├── e2e/
-│   └── app.spec.ts          # End-to-end tests
+│   ├── navigation.spec.ts    # Tabs, collection, sheet, profile, responsive layout
+│   ├── magazine.spec.ts      # PDF magazine panel
+│   ├── app.spec.ts           # Smoke tests
+│   └── support.ts            # Shared mocks and sample data
 ├── index.html               # HTML entry point
-├── vite.config.ts           # Vite configuration
+├── vite.config.ts           # Vite configuration (PORT, BACKEND_URL)
 ├── tsconfig.json            # TypeScript configuration
 └── playwright.config.ts     # Playwright configuration
 ```
+
+## Theming
+
+All colours come from CSS custom properties in `src/styles/tokens.css`. Use `var(--surface)`, `var(--text)`, `var(--accent)` and the translucent `rgb(var(--ink-rgb) / 0.1)` instead of literal colours so both themes work.
 
 ## API Integration
 

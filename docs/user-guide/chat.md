@@ -217,7 +217,7 @@ What's your collecting budget and focus?"
 ❌ Access other users' collections
 ❌ Perform transactions
 
-Use the UI buttons in VinylCard and VinylRegister for those actions.
+Use the record sheet and the Profile tab for those actions.
 
 ## Privacy & Data
 
