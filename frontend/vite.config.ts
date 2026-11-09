@@ -9,6 +9,10 @@ export default defineConfig({
   server: {
     port,
     host: '0.0.0.0',
+    // Test reports must not trigger full page reloads on connected devices.
+    watch: {
+      ignored: ['**/playwright-report/**', '**/test-results/**'],
+    },
     hmr: {
       port,
       clientPort: port,

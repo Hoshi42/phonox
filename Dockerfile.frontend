@@ -28,9 +28,11 @@ COPY frontend/ .
 # Expose port
 EXPOSE 5173
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+# Health check (the production build runs before the server starts)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
     CMD wget -q -O- http://127.0.0.1:5173 || exit 1
 
-# Run Vite dev server with host binding
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# Serve the production build. The Vite dev server's HMR WebSocket drops whenever a phone
+# browser is backgrounded (camera/photo picker) and the client then reloads the page, which
+# aborts Capture. For hot reload use docker-compose.preview.yml.
+CMD ["sh", "-c", "npx vite build && exec npx vite preview --host 0.0.0.0 --port 5173 --strictPort"]

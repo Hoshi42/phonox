@@ -270,7 +270,7 @@ docker compose exec backend mypy backend/ --ignore-missing-imports
 ```bash
 cd frontend
 npm install
-npm run dev  # Check HMR works
+npm run dev  # Check HMR works (the Docker frontend serves a production build; use docker-compose.preview.yml for hot reload)
 npm run lint
 npm run test  # if tests exist
 ```

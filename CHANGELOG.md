@@ -1,4 +1,11 @@
 # Changelog
+## [2.4.2] - 2026-11-09 - Stable Capture on phones
+
+### Fixed
+- **Capture on mobile** (`Dockerfile.frontend`) — the frontend container now serves the production build with `vite preview` instead of the dev server. The dev server's HMR WebSocket drops when a phone browser goes to the background (camera/photo picker) and the Vite client then reloaded the page, aborting Capture and returning to the start screen. For hot reload use `docker-compose.preview.yml`.
+- **Dev server reloads** (`frontend/vite.config.ts`) — ignore `playwright-report/` and `test-results/` so test runs no longer reload every connected device.
+- **Discogs token** (`docker-compose.yml`) — pass `DISCOGS_TOKEN` to the backend; it was set in `.env` but never reached the container, so Discogs requests stayed unauthenticated.
+
 ## [2.4.1] - 2026-11-09 - Restore notes in analyzed record details
 
 ### Fixed
