@@ -12,6 +12,47 @@ interface Props {
 
 const busyStatuses = new Set(['preparing', 'researching', 'rendering'])
 
+function formatElapsed(seconds: number): string {
+  const minutes = Math.floor(seconds / 60)
+  return `${minutes}:${String(seconds % 60).padStart(2, '0')}`
+}
+
+/** Progress bar for the running job; indeterminate until the backend can measure it. */
+function JobProgress({ status, compact = false }: { status: MagazineStatus; compact?: boolean }) {
+  const progress = status.progress
+  const percent = progress?.percent ?? null
+  const label = progress?.label || status.phase || 'Working on your magazine…'
+  const detail = progress && progress.total
+    ? `${progress.done} of ${progress.total}`
+    : ''
+  return (
+    <div className={compact ? styles.progressCompact : styles.progressBlock}>
+      <div
+        className={styles.track}
+        role="progressbar"
+        aria-label={label}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent ?? undefined}
+        aria-valuetext={percent === null ? `${label}, in progress` : `${label}, ${Math.round(percent)} percent`}
+      >
+        <div
+          className={`${styles.bar} ${percent === null ? styles.indeterminate : ''}`}
+          style={percent === null ? undefined : { width: `${percent}%` }}
+        />
+      </div>
+      <p className={styles.progressText}>
+        <span>{label}</span>
+        <span>
+          {percent !== null && `${Math.round(percent)}%`}
+          {detail && ` · ${detail}`}
+          {progress && ` · ${formatElapsed(progress.elapsed_seconds)}`}
+        </span>
+      </p>
+    </div>
+  )
+}
+
 export default function CollectionMagazine({ user, records }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [status, setStatus] = useState<MagazineStatus | null>(null)
@@ -120,13 +161,14 @@ export default function CollectionMagazine({ user, records }: Props) {
         <button onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>
           PDF Magazine {expanded ? '−' : '+'}
         </button>
-        <span>One magazine for {user} · A4 · English · EUR</span>
+        <span>One magazine for {user} · A4 landscape · English · EUR</span>
         {status?.has_pdf && (
           <>
             <a href={magazineApi.pdfUrl(user)} target="_blank" rel="noopener noreferrer">Open magazine</a>
             <a href={magazineApi.pdfUrl(user, true)}>Download PDF</a>
           </>
         )}
+        {busy && !expanded && status && <JobProgress status={status} compact />}
       </div>
       {expanded && (
         <div className={styles.content}>
@@ -144,9 +186,15 @@ export default function CollectionMagazine({ user, records }: Props) {
               {' '}{changes?.removed} removed records. Update to include these changes.
             </p>
           )}
-          {busy && (
-            <div role="status" aria-live="polite" className={styles.notice}>
-              <p>{status?.phase || 'Working on your magazine…'} The existing edition remains available.</p>
+          {busy && status && (
+            <div role="status" className={styles.notice}>
+              <JobProgress status={status} />
+              <p>
+                {status.status === 'rendering'
+                  ? 'Typesetting the PDF. Large collections take a few minutes.'
+                  : 'Preparing the draft. Large collections take a few minutes; you can leave this page open or come back later.'}
+                {' '}The existing edition remains available.
+              </p>
               <button disabled={pending} onClick={() => execute(async () => {
                 const result = await magazineApi.cancel(user)
                 setStatus(result)

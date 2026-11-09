@@ -7,9 +7,11 @@ import math
 import os
 import re
 import shutil
+import time
 import unicodedata
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
@@ -25,7 +27,7 @@ import backend.database as database
 from backend.database import CollectionMagazine, VinylImage, VinylRecord
 from backend.magazine_models import (
     MagazineArtist, MagazineChanges, MagazineDraft, MagazineImage,
-    MagazineRecord, MagazineSettings, MagazineSource, MagazineStatus,
+    MagazineRecord, MagazineSettings, MagazineSource, MagazineStatus, MagazineProgress,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,6 +40,43 @@ BUSY = ("preparing", "researching", "rendering")
 EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="magazine")
 UPLOAD_ROOT = Path(os.getenv("UPLOAD_DIR", str(Path(__file__).resolve().parent.parent / "uploads")))
 MAGAZINE_ROOT = UPLOAD_ROOT / "magazines"
+
+
+@dataclass
+class JobProgress:
+    """In-memory progress of a running job. Jobs run in this process only and never survive a restart."""
+    label: str
+    done: int = 0
+    total: int = 0
+    base: float = 0.0   # percent already covered by earlier stages
+    span: float = 100.0  # percent this stage covers
+    started: float = field(default_factory=time.monotonic)
+
+    def percent(self) -> float | None:
+        if not self.total:
+            return None
+        return round(min(99.0, self.base + self.span * min(1.0, self.done / self.total)), 1)
+
+
+PROGRESS: dict[str, JobProgress] = {}
+
+
+def set_progress(magazine_id: str, label: str, done: int = 0, total: int = 0,
+                 base: float = 0.0, span: float = 100.0) -> None:
+    started = PROGRESS[magazine_id].started if magazine_id in PROGRESS else time.monotonic()
+    PROGRESS[magazine_id] = JobProgress(label, done, total, base, span, started)
+
+
+def clear_progress(magazine_id: str) -> None:
+    PROGRESS.pop(magazine_id, None)
+
+
+def progress_of(magazine_id: str) -> MagazineProgress | None:
+    job = PROGRESS.get(magazine_id)
+    if job is None:
+        return None
+    return MagazineProgress(label=job.label, done=job.done, total=job.total, percent=job.percent(),
+                            elapsed_seconds=int(time.monotonic() - job.started))
 
 
 def utc_now() -> str:
@@ -123,11 +162,14 @@ def image_snapshot(image: VinylImage, magazine_id: str, copy: bool, warnings: li
 
 
 def snapshot_records(db: Session, magazine: CollectionMagazine, settings: MagazineSettings,
-                     copy: bool) -> tuple[list[MagazineRecord], list[str]]:
+                     copy: bool, tick: Callable[[int, int], None] | None = None) -> tuple[list[MagazineRecord], list[str]]:
     result: list[MagazineRecord] = []
     warnings: list[str] = []
     names: dict[str, str] = {}
-    for row in collection_records(db, magazine.user_tag):
+    rows = collection_records(db, magazine.user_tag)
+    for position, row in enumerate(rows, start=1):
+        if tick:
+            tick(position - 1, len(rows))
         name = artist_name(row.artist)
         group = names.setdefault(name.casefold(), name)
         images = [image_snapshot(image, magazine.id, copy, warnings)
@@ -150,6 +192,8 @@ def snapshot_records(db: Session, magazine: CollectionMagazine, settings: Magazi
         if value is not None:
             record.valuation_note = "Stored estimate; valuation date unknown."
         result.append(record)
+    if tick:
+        tick(len(rows), len(rows))
     return sorted(result, key=record_order), warnings
 
 
@@ -192,7 +236,9 @@ def get_status(db: Session, user_tag: str, include_draft: bool = True) -> Magazi
     draft = load_payload(magazine.draft_payload)
     active = draft or current
     settings = active.settings if active else MagazineSettings()
-    latest, _ = snapshot_records(db, magazine, settings, copy=False)
+    busy = magazine.status in BUSY
+    # Comparing against the collection touches every image file; skip it while a job is running.
+    latest = [] if busy else snapshot_records(db, magazine, settings, copy=False)[0]
     # Snapshot file names are internal; public images are served through a user-scoped endpoint.
     public_draft = draft.model_copy(deep=True) if draft and include_draft else None
     if public_draft:
@@ -204,9 +250,10 @@ def get_status(db: Session, user_tag: str, include_draft: bool = True) -> Magazi
         error=magazine.error, edition=magazine.edition, page_count=magazine.page_count,
         record_count=len(current.records) if current else 0, published_at=magazine.published_at,
         has_pdf=bool(magazine.current_pdf), draft_version=magazine.draft_version,
-        changes=compare_records(current.records if current else [], latest),
-        draft=public_draft, settings=settings,
-        estimated_cost_eur=cost_estimate(len(latest), len({record.group for record in latest})),
+        changes=MagazineChanges() if busy else compare_records(current.records if current else [], latest),
+        draft=public_draft, settings=settings, progress=progress_of(magazine.id) if busy else None,
+        estimated_cost_eur=cost_estimate(len(latest), len({record.group for record in latest})) if not busy
+        else cost_estimate(len(active.records), len(active.artists)) if active else 0,
         warnings=active.warnings if active else [],
     )
 
@@ -318,7 +365,8 @@ def research_text(query: str, instruction: str, budget: ResearchBudget,
     return answer, sources
 
 
-def prepare_draft(db: Session, magazine: CollectionMagazine, settings: MagazineSettings) -> MagazineDraft:
+def prepare_draft(db: Session, magazine: CollectionMagazine, settings: MagazineSettings,
+                  tick: Callable[[int, int], None] | None = None) -> MagazineDraft:
     previous = load_payload(magazine.draft_payload) or load_payload(magazine.current_payload)
     if previous:
         settings = settings.model_copy(update={
@@ -326,7 +374,7 @@ def prepare_draft(db: Session, magazine: CollectionMagazine, settings: MagazineS
             for key in ("title", "subtitle", "display_name", "preface", "cover_image_id", "include_notes")
             if key not in settings.model_fields_set
         })
-    records, warnings = snapshot_records(db, magazine, settings, copy=True)
+    records, warnings = snapshot_records(db, magazine, settings, copy=True, tick=tick)
     if not records:
         raise ValueError("The selected collection is empty")
     old_records = {record.id: record for record in previous.records} if previous else {}
@@ -485,16 +533,33 @@ def fail_job(magazine_id: str, token: str, message: str) -> None:
 
 
 def run_preparation(magazine_id: str, token: str, settings: MagazineSettings) -> None:
+    snapshot_label = "Freezing collection data and images"
+    research_label = "Researching artists, releases and values"
+    # Research is bounded to a few steps, so the snapshot is the larger share only when research is off.
+    snapshot_share = 35.0 if settings.research else 100.0
     try:
-        check_job(magazine_id, token, "Freezing collection data and images")
+        set_progress(magazine_id, snapshot_label, 0, 0, 0, snapshot_share)
+        check_job(magazine_id, token, snapshot_label)
+
+        def snapshot_tick(done: int, total: int) -> None:
+            set_progress(magazine_id, snapshot_label, done, total, 0, snapshot_share)
+            if done % 20 == 0:
+                check_job(magazine_id, token)  # keeps cancellation responsive on large collections
+
         with session() as db:
             if db.bind is not None and db.bind.dialect.name == "postgresql":
                 db.connection(execution_options={"isolation_level": "REPEATABLE READ"})
             magazine = db.query(CollectionMagazine).filter_by(id=magazine_id).one()
-            draft = prepare_draft(db, magazine, settings)
-        check_job(magazine_id, token, "Researching artists, releases and values")
-        enrich_draft(draft, lambda: check_job(magazine_id, token,
-                                             f"Researching artists and records ({draft.steps_used}/20 steps)"))
+            draft = prepare_draft(db, magazine, settings, tick=snapshot_tick)
+        check_job(magazine_id, token, research_label)
+        set_progress(magazine_id, "Researching (steps used)", 0, STEP_LIMIT, snapshot_share, 100 - snapshot_share)
+
+        def research_tick() -> None:
+            set_progress(magazine_id, "Researching (steps used)", draft.steps_used, STEP_LIMIT,
+                         snapshot_share, 100 - snapshot_share)
+            check_job(magazine_id, token, f"Researching artists and records ({draft.steps_used}/{STEP_LIMIT} steps)")
+
+        enrich_draft(draft, research_tick)
         with session() as db:
             magazine = db.query(CollectionMagazine).filter_by(id=magazine_id).with_for_update().one()
             if magazine.job_token != token or magazine.status not in BUSY:
@@ -508,6 +573,8 @@ def run_preparation(magazine_id: str, token: str, settings: MagazineSettings) ->
     except Exception:
         logger.exception("Magazine preparation failed: %s", magazine_id)
         fail_job(magazine_id, token, "Preparation failed. Your previous edition is unchanged. Please retry.")
+    finally:
+        clear_progress(magazine_id)
 
 
 def run_render(magazine_id: str, token: str) -> None:
@@ -515,6 +582,8 @@ def run_render(magazine_id: str, token: str) -> None:
     pdf_complete = False
     try:
         from backend.magazine_pdf import render_magazine
+        label = "Typesetting pages and building contents"
+        set_progress(magazine_id, label, 0, 0)
         check_job(magazine_id, token, "Typesetting magazine and building contents")
         with session() as db:
             magazine = db.query(CollectionMagazine).filter_by(id=magazine_id).one()
@@ -523,7 +592,8 @@ def run_render(magazine_id: str, token: str) -> None:
         if draft is None:
             raise ValueError("No editorial draft exists")
         pages, warnings = render_magazine(draft, magazine_id, target, edition,
-                                         lambda: check_job(magazine_id, token))
+                                         lambda: check_job(magazine_id, token),
+                                         lambda done, total: set_progress(magazine_id, label, done, total))
         pdf_complete = True
         draft.warnings = list(dict.fromkeys(draft.warnings + warnings))
         with session() as db:
@@ -554,6 +624,8 @@ def run_render(magazine_id: str, token: str) -> None:
             cleanup_assets(magazine_id, draft, immediate=True)
         except OSError:
             logger.exception("Magazine published successfully, but obsolete asset cleanup failed: %s", magazine_id)
+    finally:
+        clear_progress(magazine_id)
 
 
 def cleanup_assets(magazine_id: str, payload: MagazineDraft | None, immediate: bool = False) -> None:

@@ -49,6 +49,43 @@
 .wide, .check { grid-column: 1 / -1; }
 .notice { background: rgba(165, 180, 252, 0.1); border-radius: 8px; padding: 12px; line-height: 1.5; }
 .error { color: #fda4af; overflow-wrap: anywhere; }
+
+/* Progress of a running job. Colours fall back so the same rules work with and without design tokens. */
+.progressBlock { margin-bottom: 10px; }
+.progressCompact { flex: 1 1 100%; }
+.track {
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-3, rgba(255, 255, 255, 0.18));
+}
+.bar {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent, #8b93ff);
+  transition: width 0.6s ease;
+}
+.indeterminate {
+  width: 35%;
+  animation: slide 1.3s ease-in-out infinite;
+}
+.progressText {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+.progressText span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.progressText span:last-child { flex: none; opacity: 0.85; }
+@keyframes slide {
+  0% { margin-left: -35%; }
+  100% { margin-left: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .indeterminate { animation: none; width: 100%; opacity: 0.5; }
+}
 .record { border-left: 2px solid #646da0; padding-left: 14px; }
 .images { display: flex; gap: 8px; overflow-x: auto; padding: 8px 0; }
 .images img { width: 140px; height: 140px; object-fit: contain; background: #101021; }

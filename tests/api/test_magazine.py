@@ -661,6 +661,67 @@ def test_overlong_text_is_shortened_to_stay_on_its_half_page(environment):
     assert len(cell_pages) == 1
 
 
+def test_job_progress_math_is_bounded_and_monotonic_per_stage():
+    job = service.JobProgress("x", done=5, total=10, base=35.0, span=65.0)
+    assert job.percent() == 67.5
+    assert service.JobProgress("x").percent() is None  # nothing measurable yet
+    assert service.JobProgress("x", done=50, total=10, base=35.0, span=65.0).percent() == 99.0
+
+
+def test_status_reports_progress_only_while_a_job_runs(environment):
+    env = environment
+    add_record(env)
+    env.client.post("/api/magazine/prepare?user_tag=alice", json={"research": False})
+    queued = status(env)
+    assert queued["status"] == "preparing"
+    assert queued["progress"]["label"] == "Waiting to start" and queued["progress"]["percent"] is None
+    env.executor.drain()
+    finished = status(env)
+    assert finished["status"] == "draft" and finished["progress"] is None
+    assert finished["id"] not in service.PROGRESS
+
+
+def test_preparation_and_typesetting_report_measurable_progress(environment, monkeypatch):
+    env = environment
+    for index in range(5):
+        add_record(env, title=f"Album {index}", images=1)
+    seen = []
+    original = service.set_progress
+
+    def record(magazine_id, label, done=0, total=0, base=0.0, span=100.0):
+        seen.append((label, done, total, base, span))
+        original(magazine_id, label, done, total, base, span)
+
+    monkeypatch.setattr(service, "set_progress", record)
+    prepare(env)
+    freezing = [item for item in seen if item[0] == "Freezing collection data and images" and item[2]]
+    assert [item[1] for item in freezing] == sorted(item[1] for item in freezing)
+    assert freezing[-1][1:3] == (5, 5)
+    assert freezing[-1][4] == 100.0  # without research the snapshot is the whole job
+
+    seen.clear()
+    publish(env)
+    typesetting = [item for item in seen if item[0].startswith("Typesetting") and item[2]]
+    assert typesetting and all(done <= total for _, done, total, *_ in typesetting)
+    assert typesetting[-1][1] > typesetting[0][1]
+
+
+def test_research_share_of_the_progress_is_reserved_when_enabled(environment, monkeypatch):
+    env = environment
+    add_record(env)
+    seen = []
+    original = service.set_progress
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-not-a-real-key")
+    monkeypatch.setattr("backend.agent.metadata.lookup_discogs_metadata", lambda *a, **k: None)
+    monkeypatch.setattr("backend.agent.metadata.lookup_musicbrainz_metadata", lambda *a, **k: None)
+    monkeypatch.setattr(service, "research_text", lambda *a, **k: (_ for _ in ()).throw(ValueError("offline")))
+    monkeypatch.setattr(service, "set_progress", lambda mid, *args: (seen.append(args), original(mid, *args)))
+    prepare(env, research=True, consent=True)
+    assert any(args[0].startswith("Freezing") and args[4] == 35.0 for args in seen)
+    assert any(args[0].startswith("Researching") and args[2] == service.STEP_LIMIT and args[3] == 35.0
+               for args in seen)
+
+
 def test_lost_commit_acknowledgement_does_not_delete_the_published_pdf(environment, monkeypatch):
     env = environment
     add_record(env)

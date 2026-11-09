@@ -14,7 +14,7 @@ from backend.magazine_models import (
     MagazineApproval, MagazineArtist, MagazineDraftEdit, MagazineSettings, MagazineStatus,
 )
 from backend.magazine_service import (
-    BUSY, EXECUTOR, asset_path, collection_records, delete_magazine_files,
+    BUSY, EXECUTOR, asset_path, clear_progress, collection_records, delete_magazine_files, set_progress,
     get_status, load_payload, magazine_directory, record_order, run_preparation, run_render,
 )
 
@@ -37,9 +37,11 @@ def find_magazine(db: Session, user_tag: str) -> CollectionMagazine:
 
 
 def submit_job(db: Session, magazine: CollectionMagazine, worker: Callable[..., None], *args: object) -> None:
+    set_progress(magazine.id, "Waiting to start")
     try:
         EXECUTOR.submit(worker, *args)
     except RuntimeError:
+        clear_progress(magazine.id)
         logger.exception("Magazine worker is unavailable: %s", magazine.id)
         magazine.status, magazine.phase = "failed", "Worker unavailable"
         magazine.error = "Background processing is unavailable. Your previous edition is unchanged. Retry later."

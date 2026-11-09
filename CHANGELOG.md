@@ -1,4 +1,13 @@
 # Changelog
+## [2.3.2] - 2026-11-09 - Visible progress for magazine jobs
+
+### Added
+- **Job progress** (`backend/magazine_service.py`, `GET /api/magazine` → `progress`) — label, items done/total, percentage and elapsed time for freezing the collection, research steps and typesetting.
+- **Progress bar** (`frontend/src/components/CollectionMagazine.tsx`) — percentage, counts and elapsed time while a magazine job runs; also shown when the panel is collapsed; indeterminate (no fake percentage) until measurable.
+
+### Changed
+- Status polling no longer re-reads every image file while a job runs.
+
 ## [2.3.1] - 2026-11-09 - Landscape half-page magazine and stored analysis
 
 ### Changed

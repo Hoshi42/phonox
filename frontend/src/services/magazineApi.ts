@@ -56,11 +56,20 @@ export interface MagazineDraft {
   steps_used: number
 }
 
+export interface MagazineProgress {
+  label: string
+  done: number
+  total: number
+  percent: number | null
+  elapsed_seconds: number
+}
+
 export interface MagazineStatus {
   id: string | null
   user_tag: string
   status: string
   phase: string
+  progress: MagazineProgress | null
   error: string | null
   edition: number
   page_count: number

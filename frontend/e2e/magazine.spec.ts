@@ -8,7 +8,7 @@ const defaultMagazineSettings: MagazineSettings = {
 
 function magazine(user: string, overrides: Partial<MagazineStatus> = {}): MagazineStatus {
   return {
-    id: null, user_tag: user, status: 'not_created', phase: '', error: null,
+    id: null, user_tag: user, status: 'not_created', phase: '', progress: null, error: null,
     edition: 0, page_count: 0, record_count: 0, published_at: null, has_pdf: false,
     draft_version: 0, changes: { added: 0, changed: 0, removed: 0 },
     draft: null, settings: { ...defaultMagazineSettings, title: `${user}'s magazine` },
@@ -142,4 +142,29 @@ test('update errors are visible and do not remove the existing PDF', async ({ pa
   await page.getByRole('button', { name: 'Update magazine / prepare draft' }).click()
   await expect(page.getByRole('alert')).toContainText('Research provider unavailable')
   await expect(page.getByRole('link', { name: 'Open magazine' })).toBeVisible()
+})
+
+test('a running job shows measurable progress and elapsed time, also while collapsed', async ({ page }) => {
+  let progress: MagazineStatus['progress'] = {
+    label: 'Freezing collection data and images', done: 120, total: 366, percent: 12.5, elapsed_seconds: 75,
+  }
+  await page.route('**/api/magazine**', route => route.fulfill({ json: magazine('alice', {
+    id: 'm', status: 'preparing', phase: 'Freezing collection data and images', progress,
+  }) }))
+  await openCollection(page)
+  const bar = page.getByRole('progressbar')
+  await expect(bar).toHaveAttribute('aria-valuenow', '12.5')
+  await expect(page.getByText('120 of 366')).toBeVisible()
+  await expect(page.getByText(/1:15/)).toBeVisible()
+  await expect(page.getByText('Freezing collection data and images').first()).toBeVisible()
+
+  // The bar is still there when the panel is collapsed.
+  await page.getByRole('button', { name: /PDF Magazine/ }).click()
+  await expect(page.getByRole('progressbar')).toHaveCount(1)
+  await page.getByRole('button', { name: /PDF Magazine/ }).click()
+
+  // Nothing measurable yet: indeterminate, no fake percentage.
+  progress = { label: 'Waiting to start', done: 0, total: 0, percent: null, elapsed_seconds: 2 }
+  await expect(page.getByRole('progressbar')).not.toHaveAttribute('aria-valuenow', /.+/, { timeout: 8000 })
+  await expect(page.getByText('Waiting to start').first()).toBeVisible()
 })

@@ -93,6 +93,7 @@ class MagazineDocument(BaseDocTemplate):
                          title=draft.settings.title, author=draft.settings.display_name or "Phonox")
         self.check = check
         self.magazine_title = draft.settings.title
+        self.on_page: Callable[[int], None] | None = None
 
         def frame(x: float, width: float, frame_id: str) -> Frame:
             return Frame(x, MARGIN_BOTTOM, width, FRAME_HEIGHT, id=frame_id,
@@ -119,6 +120,8 @@ class MagazineDocument(BaseDocTemplate):
 
     def draw_page(self, canvas, doc):
         self.check()
+        if self.on_page:
+            self.on_page(doc.page)
         canvas.setFillColor(PAPER)
         canvas.rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, stroke=0, fill=1)
         canvas.setFont("MagazineBody", 7.5)
@@ -460,7 +463,8 @@ def overview(draft: MagazineDraft, heading_style: ParagraphStyle) -> list[Flowab
 
 
 def render_magazine(draft: MagazineDraft, magazine_id: str, target: Path, edition: int,
-                    check: Callable[[], None]) -> tuple[int, list[str]]:
+                    check: Callable[[], None],
+                    progress: Callable[[int, int], None] | None = None) -> tuple[int, list[str]]:
     register_fonts()
     _IMAGE_CACHE.clear()
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -488,6 +492,18 @@ def render_magazine(draft: MagazineDraft, magazine_id: str, target: Path, editio
     story.extend([toc, NextPageTemplate("text"), PageBreak()])
     story.extend(overview(draft, heading))
     cells, sources = list_cells(draft, magazine_id)
+    if progress:
+        # The document is typeset in several passes (contents need page numbers); estimate three.
+        estimate = max(1, (len(cells) + 1) // 2 + 8)
+        state = {"last": 0, "pass": 0}
+
+        def on_page(page: int) -> None:
+            if page <= state["last"]:
+                state["pass"] += 1
+            state["last"] = page
+            progress(min(3 * estimate, state["pass"] * estimate + page), 3 * estimate)
+
+        document.on_page = on_page
     story.extend([NextPageTemplate("cells"), PageBreak()])
     for position, cell in enumerate(cells):
         check()

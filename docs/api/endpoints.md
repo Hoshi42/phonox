@@ -19,6 +19,10 @@ Returns `id`, `user_tag`, `status`, `phase`, `error`, `has_pdf`, `edition`,
 `page_count`, `record_count`, `published_at`, `changes` (`added`, `changed`,
 `removed`), `settings`, `draft_version`, optional `draft`, `warnings`,
 `research_step_limit` and `estimated_cost_eur`.
+While a job runs, `progress` reports it: `label`, `done`, `total`, `percent` (null while nothing is
+measurable) and `elapsed_seconds`. Preparation covers freezing the collection (records processed) and,
+with research enabled, the research steps (of 20); publishing counts typeset pages. `progress` is kept in
+memory of the single API process and is null when no job runs. While a job runs, `changes` is not computed.
 Set `include_draft=false` to omit editorial content. Status values are
 `not_created`, `preparing`, `draft`, `rendering`, `complete`, `failed` and
 `cancelled`. Opening a completed PDF never starts research.

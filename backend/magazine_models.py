@@ -86,11 +86,21 @@ class MagazineChanges(BaseModel):
     removed: int = 0
 
 
+class MagazineProgress(BaseModel):
+    """Progress of the running job; percent is None while nothing measurable has started."""
+    label: str
+    done: int = 0
+    total: int = 0
+    percent: float | None = None
+    elapsed_seconds: int = 0
+
+
 class MagazineStatus(BaseModel):
     id: str | None = None
     user_tag: str
     status: str = "not_created"
     phase: str = ""
+    progress: MagazineProgress | None = None
     error: str | None = None
     edition: int = 0
     page_count: int = 0
