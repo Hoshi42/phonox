@@ -99,7 +99,9 @@ class VinylState(TypedDict, total=False):
     image_features: dict  # {embeddings, colors, ocr_text}
     vision_extraction: dict  # Claude 3 output: {artist, title, year, label, catalog_number, genres, confidence}
     websearch_results: List[dict]  # Tavily search results
-    
+    collect_market_data: bool  # Run the market-price web research during lookup
+    market_research: dict  # Result of that research: {query, search_results, scraped_content}
+
     # Evidence & Scoring
     evidence_chain: List[Evidence]  # Append-only history of evidence
     confidence: float  # Overall confidence (0.0-1.0)

@@ -96,6 +96,18 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Database tables created/verified")
         magazine_maintenance(recover=True)
 
+        from backend.agent.metadata import musicbrainz_enabled
+
+        logger.info(
+            "Models: vision=%s aggregation=%s enhancement=%s chat=%s | MusicBrainz=%s Discogs token=%s",
+            os.getenv("ANTHROPIC_VISION_MODEL"),
+            os.getenv("ANTHROPIC_AGGREGATION_MODEL"),
+            os.getenv("ANTHROPIC_ENHANCEMENT_MODEL"),
+            os.getenv("ANTHROPIC_CHAT_MODEL"),
+            "on" if musicbrainz_enabled() else "off",
+            "set" if os.getenv("DISCOGS_TOKEN", "").strip() else "not set",
+        )
+
         # Initialize LangGraph chat agent (creates checkpoint tables, compiles graph)
         from backend.agent.chat_agent import init_chat_agent
         init_chat_agent(DATABASE_URL)

@@ -576,5 +576,129 @@ def test_full_flow_high_confidence():
     assert isinstance(result["confidence"], float)
 
 
+def test_vision_extraction_analyzes_images_in_parallel_and_keeps_order():
+    """Images are analyzed concurrently, but results keep the upload order."""
+    import threading
+    import time
+
+    barrier = threading.Barrier(2, timeout=5)
+
+    def fake_extract(image_base64, **kwargs):
+        barrier.wait()  # only passes if both images are being analyzed at the same time
+        if image_base64 == "first":
+            time.sleep(0.05)  # finish later than the second image
+        return {"artist": "Danzig", "title": "Danzig", "confidence": 0.9 if image_base64 == "first" else 0.8,
+                "all_visible_text": image_base64}
+
+    state: VinylState = {
+        "validation_passed": True,
+        "images": [
+            {"path": "a.jpg", "content": "first", "content_type": "image/jpeg"},
+            {"path": "b.jpg", "content": "second", "content_type": "image/jpeg"},
+        ],
+        "evidence_chain": [],
+    }
+
+    with patch("backend.agent.graph.extract_vinyl_metadata_with_retry", side_effect=fake_extract), \
+         patch("backend.agent.graph.aggregate_with_llm", side_effect=lambda results: dict(results[0])):
+        result = vision_extraction_node(state)
+
+    images = result["vision_extraction"]["image_results"]
+    assert [item["image_index"] for item in images] == [1, 2]
+    assert [item["image_path"] for item in images] == ["a.jpg", "b.jpg"]
+
+
+def test_lookup_passes_pressing_hints_and_collects_market_research(empty_state):
+    """Catalog number etc. reach Discogs; market research runs in the same step when requested."""
+    empty_state["vision_extraction"] = {
+        "artist": "Danzig", "title": "Danzig", "year": 1988, "label": "Def American",
+        "catalog_number": "DEF 24208", "barcode": None,
+    }
+    empty_state["evidence_chain"] = []
+    empty_state["collect_market_data"] = True
+    discogs = {"artist": "Danzig", "title": "Danzig", "discogs_release_id": 6205435,
+               "exact_match": True, "marketplace": {"lowest_price": 167.0}, "confidence": 0.92}
+
+    with patch("backend.agent.graph.lookup_metadata_from_both", return_value=(discogs, None)) as lookup, \
+         patch("backend.agent.graph.search_spotify_album", return_value=None), \
+         patch("backend.agent.graph._run_market_research", return_value={"search_results": [1]}) as market:
+        result = lookup_metadata_node(empty_state)
+
+    assert lookup.call_args.kwargs == {"catalog_number": "DEF 24208", "barcode": None,
+                                       "year": 1988, "label": "Def American"}
+    assert market.call_args.args[0] == "Danzig Danzig vinyl record price DEF 24208 1988"
+    assert result["market_research"] == {"search_results": [1]}
+    data = result["evidence_chain"][0]["data"]
+    assert data["discogs_release_id"] == 6205435
+    assert data["marketplace"] == {"lowest_price": 167.0}
+
+
+def test_lookup_skips_market_research_unless_requested(empty_state):
+    empty_state["vision_extraction"] = {"artist": "Danzig", "title": "Danzig"}
+    empty_state["evidence_chain"] = []
+
+    with patch("backend.agent.graph.lookup_metadata_from_both", return_value=(None, None)), \
+         patch("backend.agent.graph.search_spotify_album", return_value=None), \
+         patch("backend.agent.graph._run_market_research") as market:
+        result = lookup_metadata_node(empty_state)
+
+    market.assert_not_called()
+    assert "market_research" not in result
+
+
+def test_market_research_failure_does_not_break_lookup(empty_state):
+    empty_state["vision_extraction"] = {"artist": "Danzig", "title": "Danzig"}
+    empty_state["evidence_chain"] = []
+    empty_state["collect_market_data"] = True
+
+    with patch("backend.agent.graph.lookup_metadata_from_both", return_value=(None, None)), \
+         patch("backend.agent.graph.search_spotify_album", return_value={"spotify_url": "https://open.spotify.com/album/x"}), \
+         patch("backend.agent.graph._run_market_research", side_effect=RuntimeError("tavily down")):
+        result = lookup_metadata_node(empty_state)
+
+    assert "market_research" not in result
+    assert result["vision_extraction"]["spotify_url"] == "https://open.spotify.com/album/x"
+
+
+def test_lookup_takes_missing_title_from_exact_discogs_match(empty_state):
+    """A label photo gives artist + catalog number; the exact pressing supplies the title."""
+    empty_state["vision_extraction"] = {"artist": "DANZIG", "title": None, "catalog_number": "DEF 24208"}
+    empty_state["evidence_chain"] = []
+    empty_state["collect_market_data"] = True
+    discogs = {"artist": "Danzig", "title": "Danzig", "exact_match": True, "confidence": 0.92}
+
+    with patch("backend.agent.graph.lookup_metadata_from_both", return_value=(discogs, None)), \
+         patch("backend.agent.graph.search_spotify_album", return_value=None) as spotify, \
+         patch("backend.agent.graph._run_market_research", return_value={"search_results": []}) as market:
+        result = lookup_metadata_node(empty_state)
+
+    assert result["vision_extraction"]["title"] == "Danzig"
+    spotify.assert_called_once_with("DANZIG", "Danzig")
+    assert market.call_args.args[0] == "DANZIG Danzig vinyl record price DEF 24208"
+
+
+def test_lookup_does_not_guess_a_title_from_an_unconfirmed_match(empty_state):
+    empty_state["vision_extraction"] = {"artist": "DANZIG", "title": None, "catalog_number": "DEF 24208"}
+    empty_state["evidence_chain"] = []
+    discogs = {"artist": "Danzig", "title": "Something Else", "exact_match": False, "confidence": 0.85}
+
+    with patch("backend.agent.graph.lookup_metadata_from_both", return_value=(discogs, None)), \
+         patch("backend.agent.graph.search_spotify_album", return_value=None) as spotify:
+        result = lookup_metadata_node(empty_state)
+
+    assert result["vision_extraction"]["title"] is None
+    spotify.assert_not_called()
+
+
+def test_lookup_needs_artist_and_title_or_identifier(empty_state):
+    empty_state["vision_extraction"] = {"artist": "DANZIG", "title": None}
+    empty_state["evidence_chain"] = []
+
+    with patch("backend.agent.graph.lookup_metadata_from_both") as lookup:
+        lookup_metadata_node(empty_state)
+
+    lookup.assert_not_called()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

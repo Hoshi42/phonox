@@ -61,11 +61,11 @@ For best results, use photos that show:
 
 After upload, Phonox automatically:
 1. **Uploads images** - Displays progress for each image
-2. **AI Vision Analysis** - Analyzes cover art and labels with Claude Vision
+2. **AI Vision Analysis** - Analyzes cover art and labels with Claude Vision (all images in parallel)
 3. **Barcode Detection** - Extracts UPC/EAN barcodes if visible
-4. **Web Search** - Searches Discogs, MusicBrainz, and other sources
+4. **Exact Pressing Lookup** - Matches the release on Discogs by catalog number or barcode (a label photo is enough, the title is filled in from the match), then falls back to artist and title. Discogs marketplace figures (lowest price, copies for sale) feed the valuation. MusicBrainz is skipped unless `MUSICBRAINZ_ENABLED=true`.
 5. **Metadata Extraction** - Retrieves artist, title, year, label, catalog number
-6. **Notes** - Adds a short summary of visible evidence and any identification uncertainty
+6. **Notes** - Adds a readable market analysis: estimated value and range, the matched Discogs pressing, current Discogs prices and the factors that affect the price (falls back to a short summary of the visible evidence if no valuation is possible)
 7. **Results Display** - Shows identified record in VinylCard
 
 Results display in the VinylCard:

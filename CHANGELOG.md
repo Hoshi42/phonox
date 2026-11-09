@@ -1,4 +1,23 @@
 # Changelog
+## [2.5.0] - 2026-11-09 - Exact pressings, Discogs prices, faster analysis
+
+### Added
+- **Exact pressing match** (`backend/agent/metadata.py`) — Discogs is searched by catalog number, then barcode, then artist/title; hits are ranked by identifier match, vinyl format, year, label and title (unofficial releases rank lower). A label photo with only artist and catalog number is enough: the exact match supplies the missing title. The result carries `discogs_release_id`, `discogs_url`, `country`, `format`, `exact_match` and `match_basis`.
+- **Discogs marketplace data in the valuation** (`backend/api/routes.py`) — lowest price (in EUR), copies for sale, have/want and, with a token and filled-out seller settings, price suggestions are given to the valuation as the primary price signal. Example (Danzig, DEF 24208): estimate €135–150 with a €95–230 range instead of €95 with €20–310.
+- **Startup log of effective settings** (`backend/main.py`) — models, MusicBrainz state and whether a Discogs token is set.
+
+### Changed
+- **Notes show the market analysis** (`backend/agent/valuation.py`, `backend/api/routes.py`) — after an analysis the Notes field holds a readable market analysis (estimate and range, matched Discogs pressing, Discogs prices, price factors, summary) instead of the vision agent's technical reasoning, which remains the fallback when no valuation is possible. The same text replaces the raw `ESTIMATED_VALUE: … PRICE_RANGE: …` answer in the chat message. Notes entered by the user are never overwritten.
+- **MusicBrainz is off by default** (`MUSICBRAINZ_ENABLED=false`) — the public endpoint answers 503 intermittently. It is skipped in analysis and in the magazine research.
+- **Parallel steps** (`backend/agent/graph.py`) — all images are analyzed concurrently; Discogs, the Spotify lookup and the market-price web search run side by side. A 3-image scan's vision step now takes ~7 s (a 2-image scan took ~17 s sequentially).
+- **No Discogs page scraping** (`backend/tools/web_tools.py`) — those pages always returned 403; the API is used instead.
+- **Enhancer input** — only core release fields are sent, not the marketplace data.
+
+### Fixed
+- **Configured models were ignored** (`docker-compose.yml`) — `ANTHROPIC_VISION_MODEL`, `ANTHROPIC_AGGREGATION_MODEL`, `ANTHROPIC_ENHANCEMENT_MODEL` and `ANTHROPIC_CHAT_MODEL` from `.env` never reached the container, so the code defaults ran (including Opus 4.5 for the enhancer). All four are now passed through.
+- **Thinking blocks** (`backend/agent/llm_utils.py`) — the 5.5 models can return a thinking block before the answer. Reading `content[0].text` made the metadata enhancer and valuation fail silently and one vision image fail with "No JSON found". Answers are now read from all text blocks, and `max_tokens` leaves room for thinking.
+- **Valuation prompt** (`backend/api/routes.py`) — it stated an image confidence of 0% because it read the value before it was stored.
+
 ## [2.4.3] - 2026-11-09 - Chat no longer hangs after a failed scan
 
 ### Fixed

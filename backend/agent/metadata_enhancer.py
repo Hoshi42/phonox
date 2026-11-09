@@ -19,6 +19,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 from anthropic import Anthropic
 
+from backend.agent.llm_utils import response_text as response_text_of
 logger = logging.getLogger(__name__)
 
 
@@ -116,7 +117,7 @@ Focus on HIGH CONFIDENCE enhancements only."""
 
             response = self.client.messages.create(
                 model=enhancement_model,
-                max_tokens=1000,
+                max_tokens=2500,
                 messages=[
                     {
                         "role": "user",
@@ -125,7 +126,7 @@ Focus on HIGH CONFIDENCE enhancements only."""
                 ],
             )
 
-            response_text = response.content[0].text
+            response_text = response_text_of(response)
 
             # Parse JSON response
             try:

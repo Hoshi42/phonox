@@ -120,6 +120,10 @@ visible draft warnings, not fabricated portraits or prices.
 
 The existing `ANTHROPIC_CHAT_MODEL`, `ANTHROPIC_API_KEY`, `DISCOGS_TOKEN` and
 `TAVILY_API_KEY` configuration is reused; no new secrets are required.
+Image analysis uses `ANTHROPIC_VISION_MODEL`, `ANTHROPIC_AGGREGATION_MODEL` and
+`ANTHROPIC_ENHANCEMENT_MODEL`; all of them, `DISCOGS_TOKEN` and
+`MUSICBRAINZ_ENABLED` (default `false`) are passed to the container by
+`docker-compose.yml`, and the backend logs the effective models at startup.
 See [API request examples](../docs/api/endpoints.md#collection-magazine).
 
 **Deployment:** rebuild the backend (`docker compose up -d --build backend`) to

@@ -16,6 +16,7 @@ Phase 1.1 Implementation (Weeks 2-3)
 import logging
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Literal, List, Dict, Any, Tuple, Optional
 
@@ -27,6 +28,7 @@ from backend.agent.vision import extract_vinyl_metadata, extract_vinyl_metadata_
 from backend.agent.metadata import lookup_metadata_from_both
 from backend.agent.websearch import search_vinyl_metadata, search_vinyl_by_barcode, search_spotify_album
 from backend.agent.metadata_enhancer import MetadataEnhancer
+from backend.agent.llm_utils import response_text as response_text_of
 
 logger = logging.getLogger(__name__)
 
@@ -103,11 +105,11 @@ Return ONLY valid JSON:
         aggregation_model = os.getenv("ANTHROPIC_AGGREGATION_MODEL", "claude-sonnet-4-6")
         response = anthropic_client.messages.create(
             model=aggregation_model,
-            max_tokens=1500,
+            max_tokens=3000,
             messages=[{"role": "user", "content": aggregation_prompt}]
         )
         
-        response_text = response.content[0].text if response.content else ""
+        response_text = response_text_of(response)
         
         # Parse JSON from response
         json_start = response_text.find("{")
@@ -358,60 +360,58 @@ def vision_extraction_node(state: VinylState) -> VinylState:
         logger.warning("vision_extraction: No images provided")
         return state
 
-    # Process ALL images and aggregate results for better accuracy
+    # Process ALL images (in parallel - they are independent) and aggregate results for better accuracy
     all_results = []
     best_confidence = 0.0
     best_result = None
     extraction_errors = []
-    
+
+    def analyze_image(idx: int, image: Dict[str, Any]) -> Dict[str, Any]:
+        """Analyze one image; returns {"result": ...} or {"error": ...} or {} if skipped."""
+        logger.info(f"vision_extraction: Processing image {idx + 1}/{len(images)}: {image.get('path')}")
+
+        image_content = image.get("content", "")
+        image_format = image.get("content_type", "image/jpeg").replace("image/", "")
+
+        if not image_content:
+            logger.warning(f"vision_extraction: No content for image {idx + 1}")
+            return {}
+
+        logger.info(f"vision_extraction: Analyzing image {idx + 1} (format: {image_format})...")
+        try:
+            result = extract_vinyl_metadata_with_retry(
+                image_base64=image_content,
+                image_format=image_format,
+                fallback_on_error=False,  # No fallback - we want real errors
+                max_retries=3,  # Retry up to 3 times
+                base_delay=1.0,  # Start with 1 second, then 2, then 4
+                image_context={'image_index': idx + 1, 'total_images': len(images)},
+            )
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"vision_extraction: Error on image {idx + 1}: {error_msg}")
+            return {"error": {"image": idx + 1, "error": error_msg}}
+
+        result["image_index"] = idx + 1
+        result["image_path"] = image.get("path", f"image_{idx + 1}")
+        return {"result": result}
+
     try:
-        for idx, image in enumerate(images):
-            logger.info(f"vision_extraction: Processing image {idx + 1}/{len(images)}: {image.get('path')}")
-            
-            # Extract image data
-            image_content = image.get("content", "")
-            image_format = image.get("content_type", "image/jpeg").replace("image/", "")
-            
-            if not image_content:
-                logger.warning(f"vision_extraction: No content for image {idx + 1}")
-                continue
-                
-            # Call Claude 3 Sonnet for metadata extraction with retry logic
-            logger.info(f"vision_extraction: Analyzing image {idx + 1} with Claude 3 Sonnet (format: {image_format})...")
-            try:
-                # Prepare image context for optimized prompts
-                image_context = {
-                    'image_index': idx + 1,
-                    'total_images': len(images),
-                    'previous_results': best_result  # Pass best result so far for context
-                }
-                
-                result = extract_vinyl_metadata_with_retry(
-                    image_base64=image_content,
-                    image_format=image_format,
-                    fallback_on_error=False,  # No fallback - we want real errors
-                    max_retries=3,  # Retry up to 3 times
-                    base_delay=1.0,  # Start with 1 second, then 2, then 4
-                    image_context=image_context  # Pass context for optimized prompts
-                )
-            except Exception as e:
-                error_msg = str(e)
-                logger.error(f"vision_extraction: Error on image {idx + 1}: {error_msg}")
-                extraction_errors.append({
-                    "image": idx + 1,
-                    "error": error_msg
-                })
-                continue
-            
-            result["image_index"] = idx + 1
-            result["image_path"] = image.get("path", f"image_{idx + 1}")
-            all_results.append(result)
-            
-            # Track the result with highest confidence
-            confidence = result.get("confidence", 0.0)
-            if confidence > best_confidence:
-                best_confidence = confidence
-                best_result = result
+        with ThreadPoolExecutor(max_workers=min(len(images), 4)) as pool:
+            outcomes = list(pool.map(lambda item: analyze_image(*item), enumerate(images)))
+
+        for outcome in outcomes:
+            if "error" in outcome:
+                extraction_errors.append(outcome["error"])
+            elif "result" in outcome:
+                result = outcome["result"]
+                all_results.append(result)
+
+                # Track the result with highest confidence
+                confidence = result.get("confidence", 0.0)
+                if confidence > best_confidence:
+                    best_confidence = confidence
+                    best_result = result
         
         # Multi-image aggregation: Let Claude intelligently merge all results
         if best_result and all_results:
@@ -506,9 +506,41 @@ def vision_extraction_node(state: VinylState) -> VinylState:
     return state
 
 
+_market_tools: Any = None
+
+
+def _market_research_query(vision_data: Dict[str, Any]) -> Optional[str]:
+    """Web search query for market prices, or None when the record is not identified."""
+    artist = vision_data.get("artist")
+    title = vision_data.get("title")
+    if not artist or not title or "ERROR" in (artist, title):
+        return None
+    query = f"{artist} {title} vinyl record price"
+    if vision_data.get("catalog_number"):
+        query += f" {vision_data['catalog_number']}"
+    if vision_data.get("year"):
+        query += f" {vision_data['year']}"
+    return query
+
+
+def _run_market_research(query: str) -> Dict[str, Any]:
+    """Search the web for prices (and scrape the top pages) for the valuation step."""
+    global _market_tools
+    if _market_tools is None:
+        from backend.tools import EnhancedChatTools
+
+        _market_tools = EnhancedChatTools()
+    logger.info(f"market_research: Searching for: {query}")
+    return _market_tools.search_and_scrape(query, scrape_results=True)
+
+
 def lookup_metadata_node(state: VinylState) -> VinylState:
     """
-    Query Discogs and MusicBrainz for metadata.
+    Query Discogs (and MusicBrainz, if enabled) for metadata.
+
+    Catalog number, barcode, year and label read from the images are passed on so
+    Discogs can match the exact pressing. When the caller sets collect_market_data,
+    the market-price web research runs alongside, stored as market_research.
 
     Returns structured evidence with:
     - Source (discogs, musicbrainz)
@@ -522,65 +554,110 @@ def lookup_metadata_node(state: VinylState) -> VinylState:
 
     # Get artist + title from vision extraction
     vision_data = state.get("vision_extraction", {})
-    artist = vision_data.get("artist", "")
-    title = vision_data.get("title", "")
+    artist = vision_data.get("artist") or ""
+    title = vision_data.get("title") or ""
 
-    if not artist or not title:
+    # A catalog number or barcode identifies the pressing even when the title is unreadable
+    has_identifier = bool(vision_data.get("catalog_number") or vision_data.get("barcode"))
+    if not artist or (not title and not has_identifier):
         logger.warning("lookup_metadata: Insufficient data for metadata lookup")
         return state
 
-    try:
-        # Query both Discogs and MusicBrainz
-        discogs_result, musicbrainz_result = lookup_metadata_from_both(artist, title)
+    # Discogs (+ MusicBrainz if enabled), the Spotify link and - when requested - the
+    # market-price research are independent, so they run in parallel.
+    market_query = _market_research_query(vision_data) if state.get("collect_market_data") else None
 
-        # Add Discogs evidence if found
-        if discogs_result:
-            discogs_evidence: Evidence = {
-                "source": EvidenceType.DISCOGS,
-                "confidence": discogs_result.get("confidence", 0.85),
-                "data": {
-                    "artist": discogs_result.get("artist"),
-                    "title": discogs_result.get("title"),
-                    "year": discogs_result.get("year"),
-                    "label": discogs_result.get("label"),
-                    "catalog_number": discogs_result.get("catalog_number"),
-                    "genres": discogs_result.get("genres", []),
-                },
-                "timestamp": datetime.now(),
-            }
-            evidence_chain.append(discogs_evidence)
-            logger.info(f"lookup_metadata: Added Discogs evidence for {artist} - {title}")
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        databases_future = pool.submit(
+            lookup_metadata_from_both,
+            artist,
+            title,
+            catalog_number=vision_data.get("catalog_number"),
+            barcode=vision_data.get("barcode"),
+            year=vision_data.get("year"),
+            label=vision_data.get("label"),
+        )
+        spotify_future = pool.submit(search_spotify_album, artist, title) if title else None
+        market_future = pool.submit(_run_market_research, market_query) if market_query else None
 
-        # Add MusicBrainz evidence if found
-        if musicbrainz_result:
-            musicbrainz_evidence: Evidence = {
-                "source": EvidenceType.MUSICBRAINZ,
-                "confidence": musicbrainz_result.get("confidence", 0.80),
-                "data": {
-                    "artist": musicbrainz_result.get("artist"),
-                    "title": musicbrainz_result.get("title"),
-                    "year": musicbrainz_result.get("year"),
-                    "label": musicbrainz_result.get("label"),
-                    "catalog_number": musicbrainz_result.get("catalog_number"),
-                    "genres": musicbrainz_result.get("genres", []),
-                },
-                "timestamp": datetime.now(),
-            }
-            evidence_chain.append(musicbrainz_evidence)
-            logger.info(f"lookup_metadata: Added MusicBrainz evidence for {artist} - {title}")
+        try:
+            discogs_result, musicbrainz_result = databases_future.result()
 
-    except Exception as e:
-        logger.error(f"lookup_metadata: Error querying metadata APIs: {e}")
+            # Add Discogs evidence if found
+            if discogs_result:
+                discogs_evidence: Evidence = {
+                    "source": EvidenceType.DISCOGS,
+                    "confidence": discogs_result.get("confidence", 0.85),
+                    "data": {
+                        "artist": discogs_result.get("artist"),
+                        "title": discogs_result.get("title"),
+                        "year": discogs_result.get("year"),
+                        "label": discogs_result.get("label"),
+                        "catalog_number": discogs_result.get("catalog_number"),
+                        "genres": discogs_result.get("genres", []),
+                        "discogs_release_id": discogs_result.get("discogs_release_id"),
+                        "discogs_url": discogs_result.get("discogs_url"),
+                        "country": discogs_result.get("country"),
+                        "format": discogs_result.get("format"),
+                        "exact_match": discogs_result.get("exact_match"),
+                        "match_basis": discogs_result.get("match_basis"),
+                        "marketplace": discogs_result.get("marketplace"),
+                    },
+                    "timestamp": datetime.now(),
+                }
+                evidence_chain.append(discogs_evidence)
+                logger.info(f"lookup_metadata: Added Discogs evidence for {artist} - {title}")
 
-    # Try to find Spotify album link
-    try:
-        spotify_result = search_spotify_album(artist, title)
-        if spotify_result:
-            # Add the Spotify URL to the vision_extraction data
-            state["vision_extraction"]["spotify_url"] = spotify_result["spotify_url"]
-            logger.info(f"lookup_metadata: Found Spotify album: {spotify_result['spotify_url']}")
-    except Exception as e:
-        logger.warning(f"lookup_metadata: Spotify search failed: {e}")
+                # An exact pressing match supplies the title the images did not show
+                if not title and discogs_result.get("exact_match") and discogs_result.get("title"):
+                    state["vision_extraction"]["title"] = discogs_result["title"]
+                    logger.info(f"lookup_metadata: Title taken from exact Discogs match: {discogs_result['title']}")
+
+            # Add MusicBrainz evidence if found
+            if musicbrainz_result:
+                musicbrainz_evidence: Evidence = {
+                    "source": EvidenceType.MUSICBRAINZ,
+                    "confidence": musicbrainz_result.get("confidence", 0.80),
+                    "data": {
+                        "artist": musicbrainz_result.get("artist"),
+                        "title": musicbrainz_result.get("title"),
+                        "year": musicbrainz_result.get("year"),
+                        "label": musicbrainz_result.get("label"),
+                        "catalog_number": musicbrainz_result.get("catalog_number"),
+                        "genres": musicbrainz_result.get("genres", []),
+                    },
+                    "timestamp": datetime.now(),
+                }
+                evidence_chain.append(musicbrainz_evidence)
+                logger.info(f"lookup_metadata: Added MusicBrainz evidence for {artist} - {title}")
+
+        except Exception as e:
+            logger.error(f"lookup_metadata: Error querying metadata APIs: {e}")
+
+        # Spotify and market research need the title; start them now if Discogs just supplied it
+        resolved_title = state["vision_extraction"].get("title")
+        if spotify_future is None and resolved_title:
+            spotify_future = pool.submit(search_spotify_album, artist, resolved_title)
+        if market_future is None and state.get("collect_market_data"):
+            market_query = _market_research_query(state["vision_extraction"])
+            if market_query:
+                market_future = pool.submit(_run_market_research, market_query)
+
+        # Try to find Spotify album link
+        try:
+            spotify_result = spotify_future.result() if spotify_future else None
+            if spotify_result:
+                # Add the Spotify URL to the vision_extraction data
+                state["vision_extraction"]["spotify_url"] = spotify_result["spotify_url"]
+                logger.info(f"lookup_metadata: Found Spotify album: {spotify_result['spotify_url']}")
+        except Exception as e:
+            logger.warning(f"lookup_metadata: Spotify search failed: {e}")
+
+        if market_future:
+            try:
+                state["market_research"] = market_future.result()
+            except Exception as e:
+                logger.warning(f"lookup_metadata: Market research failed: {e}")
 
     state["evidence_chain"] = evidence_chain
 
@@ -731,7 +808,11 @@ def metadata_synthesis_node(state: VinylState) -> VinylState:
         # existing_metadata = external source (authoritative for discographic fields)
         # new_metadata = vision data (fills in physical attributes: barcode, condition)
         enhanced, new_confidence, changes = enhancer.enhance_metadata(
-            existing_metadata=best_external,
+            existing_metadata={
+                key: best_external.get(key)
+                for key in ("artist", "title", "year", "label", "catalog_number", "genres")
+                if key in best_external
+            },
             new_metadata=vision_data,
             existing_confidence=best_external.get("confidence", 0.8),
         )

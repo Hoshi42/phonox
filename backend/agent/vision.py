@@ -17,6 +17,7 @@ from io import BytesIO
 
 from anthropic import Anthropic
 from backend.agent.barcode_utils import validate_barcode, validate_catalog_number, format_barcode_for_search
+from backend.agent.llm_utils import response_text as response_text_of
 
 # Claude API timeout configuration
 CLAUDE_API_TIMEOUT = int(os.getenv("CLAUDE_API_TIMEOUT", "60"))  # seconds, default 60s
@@ -456,7 +457,7 @@ CRITICAL:
         # Try with the model name - Claude Sonnet 4.5 (vision capable)
         message = client.messages.create(
             model=vision_model,
-            max_tokens=1500,  # Increased for detailed chain-of-thought analysis
+            max_tokens=3000,  # Thinking tokens of newer models count towards this limit
             system=system_prompt,  # Expert context for better analysis
             timeout=CLAUDE_API_TIMEOUT,  # Configurable timeout from environment
             messages=cast(
@@ -483,13 +484,8 @@ CRITICAL:
             ),
         )
 
-        # Parse the response
-        response_text: str = ""
-        
-        if message.content and len(message.content) > 0:
-            first_content = message.content[0]
-            if hasattr(first_content, "text"):
-                response_text = first_content.text  # type: ignore
+        # Parse the response (newer models may put a thinking block first)
+        response_text: str = response_text_of(message)
 
         logger.debug(f"Claude 3 response: {response_text}")
 

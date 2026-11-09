@@ -133,7 +133,8 @@ Set a title, subtitle, optional display name and optional cover photograph.
 Leave the initial foreword empty for a factual proposal. Private collector notes
 are excluded unless explicitly enabled.
 
-**Research and cost consent:** available Discogs, MusicBrainz and web search
+**Research and cost consent:** available Discogs, web search (and MusicBrainz, if
+`MUSICBRAINZ_ENABLED=true`)
 sources are used after you approve the external data transfer and cost allowance.
 Only necessary artist/album/release details leave Phonox, not your name, private
 notes or photographs. Each job has 20 research/AI steps and at most 1,200 output

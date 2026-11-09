@@ -407,6 +407,7 @@ def test_budget_is_hard_and_all_providers_are_bounded(environment, monkeypatch):
         return service.ResearchAnswer(text=text, used_sources=[0],
                                       value_eur=None), [source]
 
+    monkeypatch.setenv("MUSICBRAINZ_ENABLED", "true")
     monkeypatch.setattr("backend.agent.metadata.lookup_discogs_metadata", lookup)
     monkeypatch.setattr("backend.agent.metadata.lookup_musicbrainz_metadata", lookup)
     monkeypatch.setattr(service, "research_text", research)

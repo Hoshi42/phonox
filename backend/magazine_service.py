@@ -434,7 +434,12 @@ def prepare_draft(db: Session, magazine: CollectionMagazine, settings: MagazineS
 
 
 def enrich_draft(draft: MagazineDraft, check: Callable[[], None]) -> None:
-    from backend.agent.metadata import lookup_discogs_metadata, lookup_musicbrainz_metadata, MetadataError
+    from backend.agent.metadata import (
+        lookup_discogs_metadata,
+        lookup_musicbrainz_metadata,
+        musicbrainz_enabled,
+        MetadataError,
+    )
 
     if not draft.settings.research:
         draft.warnings.append("External research was disabled; only available collection data is used.")
@@ -482,6 +487,8 @@ def enrich_draft(draft: MagazineDraft, check: Callable[[], None]) -> None:
             ("Discogs", lookup_discogs_metadata, "https://www.discogs.com/search/?q="),
             ("MusicBrainz", lookup_musicbrainz_metadata, "https://musicbrainz.org/search?type=release&query="),
         ]:
+            if label == "MusicBrainz" and not musicbrainz_enabled():
+                continue
             try:
                 budget.reserve()
                 metadata = lookup(record.artist, record.title, fallback_on_error=False)

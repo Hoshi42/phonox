@@ -40,7 +40,9 @@ from backend.api.models import (
 )
 from backend.agent.graph import build_agent_graph
 from backend.agent.state import VinylState
-from backend.agent.metadata import estimate_vinyl_value
+from backend.agent.metadata import estimate_vinyl_value, format_discogs_market_context
+from backend.agent.llm_utils import response_text as response_text_of
+from backend.agent.valuation import format_market_notes
 from backend.agent.metadata_enhancer import MetadataEnhancer
 from backend.agent.chat_agent import get_chat_graph
 from backend.tools import EnhancedChatTools
@@ -55,6 +57,14 @@ anthropic_client = Anthropic()
 chat_tools = EnhancedChatTools()
 
 router = APIRouter(prefix="/api/v1", tags=["vinyl"])
+
+
+def _discogs_evidence_data(result_state: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Data of the Discogs evidence collected by the graph, if any."""
+    for evidence in result_state.get("evidence_chain") or []:
+        if str(getattr(evidence.get("source"), "value", evidence.get("source"))) == "discogs":
+            return evidence.get("data")
+    return None
 
 
 def _serialize_evidence_chain(evidence_chain: List[dict]) -> List[dict]:
@@ -162,6 +172,7 @@ async def identify_vinyl(
         # In a real implementation, this would trigger an async Celery task
         # Initialize variable outside try block to ensure it's always defined
         image_analysis_intermediate_results = None
+        market_notes: Optional[str] = None
         
         try:
             # Initialize agent graph
@@ -190,6 +201,7 @@ async def identify_vinyl(
                 "confidence": 0.0,
                 "auto_commit": False,
                 "needs_review": True,
+                "collect_market_data": True,
             }
 
             # Invoke graph (config thread_id not used but kept for future expansion)
@@ -230,11 +242,13 @@ async def identify_vinyl(
                         
                         logger.info(f"Web search query for image analysis: {search_query}")
                         
-                        # Perform web search
-                        search_results = chat_tools.search_and_scrape(
-                            search_query,
-                            scrape_results=True
-                        )
+                        # Reuse the research the graph already ran in parallel with the Discogs lookup
+                        search_results = result_state.get("market_research")
+                        if not search_results:
+                            search_results = chat_tools.search_and_scrape(
+                                search_query,
+                                scrape_results=True
+                            )
                         
                         search_results_count = len(search_results.get("search_results", []))
                         logger.info(f"Image analysis web search found {search_results_count} results")
@@ -251,6 +265,17 @@ async def identify_vinyl(
                                 if content.get("success"):
                                     market_context += f"- {content.get('title', '')}: {content.get('content', '')}\n"
                         
+                        # Discogs data for the matched pressing (prices, copies for sale, demand)
+                        discogs_context = format_discogs_market_context(_discogs_evidence_data(result_state))
+                        if discogs_context:
+                            discogs_context = (
+                                "\nDiscogs data (Discogs marketplace API, reflects real current listings for the matched "
+                                "pressing): treat it as the primary price signal and use the web results only to "
+                                "cross-check or when it is missing. If the pressing is not confirmed, say so and widen "
+                                "the price range.\n" + discogs_context
+                            )
+                            logger.info(f"Valuation uses Discogs data:\n{discogs_context}")
+
                         # Build record context
                         record_context = f"""
 Vinyl Record Details:
@@ -260,8 +285,9 @@ Vinyl Record Details:
 - Label: {vinyl_record.label or 'Unknown'}
 - Catalog Number: {vinyl_record.catalog_number or 'Unknown'}
 - Genres: {', '.join(vinyl_record.get_genres()) if hasattr(vinyl_record, 'get_genres') else 'Unknown'}
-- Image Analysis Confidence: {vinyl_record.confidence * 100:.0f}%
+- Image Analysis Confidence: {(result_state.get("confidence") or 0.0) * 100:.0f}%
 - Format: Vinyl LP
+{discogs_context}
 """
                         
                         # Use Claude Haiku to analyze market data
@@ -290,7 +316,7 @@ EXPLANATION: [brief explanation]"""
                             chat_model = os.getenv("ANTHROPIC_CHAT_MODEL", "claude-haiku-4-5-20251001")
                             response = anthropic_client.messages.create(
                                 model=chat_model,
-                                max_tokens=500,
+                                max_tokens=1500,
                                 messages=[
                                     {
                                         "role": "user",
@@ -299,7 +325,7 @@ EXPLANATION: [brief explanation]"""
                                 ],
                             )
                             
-                            valuation_text = response.content[0].text
+                            valuation_text = response_text_of(response)
                             logger.info(f"Claude valuation during image analysis: {valuation_text[:200]}")
                             
                             # Parse Claude's response
@@ -357,11 +383,14 @@ EXPLANATION: [brief explanation]"""
                                 vinyl_record.estimated_value_eur = estimated_value
                                 logger.info(f"Image analysis: Web-based value estimate for {vinyl_record.artist} - {vinyl_record.title}: €{estimated_value}")
                                 
+                                # Readable market analysis for the Notes field and the chat message
+                                market_notes = format_market_notes(valuation_text, _discogs_evidence_data(result_state))
+
                                 # Create intermediate results for response
                                 image_analysis_intermediate_results = {
                                     "search_query": search_query,
                                     "search_results_count": search_results_count,
-                                    "claude_analysis": valuation_text,
+                                    "claude_analysis": market_notes or valuation_text,
                                     "search_sources": [
                                         {
                                             "title": result.get("title", ""),
@@ -396,9 +425,13 @@ EXPLANATION: [brief explanation]"""
             if not vinyl_record.condition and vision_data:
                 vinyl_record.condition = vision_data.get("condition")
 
-            # Auto-populate notes with the analysis reasoning from the vision agent
-            if vision_data and vision_data.get("reasoning") and not vinyl_record.user_notes:
-                vinyl_record.user_notes = vision_data["reasoning"]
+            # Notes: the market analysis is what matters to the user; the vision agent's
+            # reasoning is the fallback when no valuation could be made
+            if not vinyl_record.user_notes:
+                if market_notes:
+                    vinyl_record.user_notes = market_notes
+                elif vision_data and vision_data.get("reasoning"):
+                    vinyl_record.user_notes = vision_data["reasoning"]
 
             # Handle errors
             if result_state.get("error"):
@@ -841,7 +874,7 @@ async def general_chat(
                 messages=messages_for_claude,
             )
             return {
-                "message": response.content[0].text,
+                "message": response_text_of(response),
                 "search_results": [],
                 "sources_used": 0,
                 "web_enhanced": False,
@@ -1307,7 +1340,7 @@ EXPLANATION: [brief explanation]"""
                         chat_model = os.getenv("ANTHROPIC_CHAT_MODEL", "claude-haiku-4-5-20251001")
                         response = anthropic_client.messages.create(
                             model=chat_model,
-                            max_tokens=500,
+                            max_tokens=1500,
                             messages=[
                                 {
                                     "role": "user",
@@ -1316,7 +1349,7 @@ EXPLANATION: [brief explanation]"""
                             ],
                         )
                         
-                        valuation_text = response.content[0].text
+                        valuation_text = response_text_of(response)
                         logger.info(f"Claude valuation during reanalysis: {valuation_text[:200]}")
                         
                         # Parse Claude's response
@@ -1547,7 +1580,7 @@ EXPLANATION: [brief explanation]"""
             chat_model = os.getenv("ANTHROPIC_CHAT_MODEL", "claude-haiku-4-5-20251001")
             response = anthropic_client.messages.create(
                 model=chat_model,
-                max_tokens=500,
+                max_tokens=1500,
                 messages=[
                     {
                         "role": "user",
@@ -1556,7 +1589,7 @@ EXPLANATION: [brief explanation]"""
                 ],
             )
             
-            valuation_text = response.content[0].text
+            valuation_text = response_text_of(response)
             logger.info(f"Claude valuation response: {valuation_text[:200]}")
             
             # Parse Claude's response

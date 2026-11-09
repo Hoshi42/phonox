@@ -9,8 +9,10 @@ Cost: Free (both APIs are free to use)
 Note: Requires internet connectivity; handles timeouts gracefully
 """
 
+import difflib
 import logging
 import os
+import re
 import requests
 from typing import Dict, List, Optional, Any, Tuple
 from urllib.parse import quote
@@ -41,6 +43,14 @@ MUSICBRAINZ_HEADERS = {
 # Timeout for API calls
 API_TIMEOUT = 5  # seconds
 
+# Number of Discogs search hits ranked when looking for the exact pressing
+DISCOGS_CANDIDATES = 25
+
+
+def musicbrainz_enabled() -> bool:
+    """MusicBrainz is opt-in: its public endpoint answers 503 intermittently."""
+    return os.getenv("MUSICBRAINZ_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
+
 
 class MetadataError(Exception):
     """Raised when metadata lookup fails."""
@@ -48,73 +58,270 @@ class MetadataError(Exception):
     pass
 
 
+def _normalize_catno(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]", "", str(value or "").lower())
+
+
+def _normalize_barcode(value: Any) -> str:
+    return re.sub(r"\D", "", str(value or ""))
+
+
+def _discogs_search(params: Dict[str, str]) -> List[Dict[str, Any]]:
+    """Run one Discogs database search and return its result list."""
+    response = requests.get(
+        f"{DISCOGS_API_BASE}/database/search",
+        params={"type": "release", "per_page": str(DISCOGS_CANDIDATES), **params},
+        timeout=API_TIMEOUT,
+        headers=_discogs_headers(),
+    )
+    response.raise_for_status()
+    try:
+        data = response.json()
+    finally:
+        response.close()
+    return data.get("results", [])
+
+
+def _score_discogs_candidate(
+    candidate: Dict[str, Any],
+    artist: str,
+    title: str,
+    catalog_number: Optional[str],
+    barcode: Optional[str],
+    year: Optional[int],
+    label: Optional[str],
+) -> Tuple[float, Optional[str]]:
+    """
+    Score one Discogs search hit against what was read from the record.
+
+    Returns (score, exact_basis) where exact_basis is "catalog_number" or
+    "barcode" when that identifier matches the hit exactly, otherwise None.
+    """
+    score = 0.0
+    basis: Optional[str] = None
+
+    wanted_catno = _normalize_catno(catalog_number)
+    if wanted_catno and wanted_catno == _normalize_catno(candidate.get("catno")):
+        score += 100
+        basis = "catalog_number"
+
+    wanted_barcode = _normalize_barcode(barcode)
+    if len(wanted_barcode) >= 8:
+        candidate_barcodes = {_normalize_barcode(b) for b in candidate.get("barcode") or []}
+        if wanted_barcode in candidate_barcodes:
+            score += 100
+            basis = basis or "barcode"
+
+    formats = " ".join(str(f) for f in candidate.get("format") or []).lower()
+    if "vinyl" in formats:
+        score += 10
+        if "lp" in formats:
+            score += 5
+    elif formats:
+        score -= 20
+    if "unofficial" in formats:
+        score -= 15
+
+    if year and str(candidate.get("year") or "") == str(year):
+        score += 15
+
+    # Several Discogs entries often describe the same pressing; prefer the most-owned one
+    have = (candidate.get("community") or {}).get("have") or 0
+    score += 3 * min(have, 2000) / 2000
+
+    wanted_label = (label or "").lower()
+    if wanted_label and any(
+        wanted_label in str(name).lower() or str(name).lower() in wanted_label
+        for name in candidate.get("label") or []
+    ):
+        score += 10
+
+    candidate_title = str(candidate.get("title") or "").lower()
+    score += 20 * difflib.SequenceMatcher(None, candidate_title, f"{artist} - {title}".lower()).ratio()
+
+    return score, basis
+
+
+def _find_discogs_release(
+    artist: str,
+    title: str,
+    catalog_number: Optional[str],
+    barcode: Optional[str],
+    year: Optional[int],
+    label: Optional[str],
+) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """
+    Find the best Discogs release, preferring the exact pressing.
+
+    Searches by catalog number, then barcode, then artist/title, and stops as
+    soon as a hit matches an identifier exactly.
+    """
+    searches: List[Dict[str, str]] = []
+    if catalog_number and _normalize_catno(catalog_number):
+        searches.append({"catno": catalog_number, "artist": artist})
+    if len(_normalize_barcode(barcode)) >= 8:
+        searches.append({"barcode": _normalize_barcode(barcode)})
+    if title:
+        searches.append({"artist": artist, "release_title": title})
+
+    seen: Dict[Any, Tuple[float, Optional[str], Dict[str, Any]]] = {}
+    last_error: Optional[Exception] = None
+    for params in searches:
+        try:
+            results = _discogs_search(params)
+        except Exception as e:
+            last_error = e
+            logger.warning(f"Discogs search {list(params)} failed: {e}")
+            continue
+
+        exact_found = False
+        for hit in results:
+            if not hit.get("id") or hit["id"] in seen:
+                continue
+            score, basis = _score_discogs_candidate(hit, artist, title, catalog_number, barcode, year, label)
+            seen[hit["id"]] = (score, basis, hit)
+            exact_found = exact_found or basis is not None
+        if exact_found:
+            break
+
+    if not seen:
+        if last_error:
+            raise last_error
+        return None, None
+    _, basis, best = max(seen.values(), key=lambda item: item[0])
+    return best, basis
+
+
+def _extract_discogs_market(release_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Marketplace and community figures from a Discogs release (priced in EUR)."""
+    community = release_data.get("community") or {}
+    rating = community.get("rating") or {}
+    lowest = release_data.get("lowest_price")
+    return {
+        "currency": "EUR",
+        "lowest_price": float(lowest) if isinstance(lowest, (int, float)) else None,
+        "num_for_sale": release_data.get("num_for_sale"),
+        "have": community.get("have"),
+        "want": community.get("want"),
+        "rating_average": rating.get("average"),
+        "price_suggestions": None,
+    }
+
+
+def _fetch_discogs_price_suggestions(release_id: Any) -> Optional[Dict[str, float]]:
+    """Per-condition price suggestions. Needs a token and filled-out Discogs seller settings."""
+    if not os.getenv("DISCOGS_TOKEN", "").strip():
+        return None
+    try:
+        response = requests.get(
+            f"{DISCOGS_API_BASE}/marketplace/price_suggestions/{release_id}",
+            timeout=API_TIMEOUT,
+            headers=_discogs_headers(),
+        )
+        if response.status_code != 200:
+            logger.info(f"Discogs price suggestions unavailable (HTTP {response.status_code})")
+            return None
+        try:
+            data = response.json()
+        finally:
+            response.close()
+        return {
+            condition: round(float(entry["value"]), 2)
+            for condition, entry in data.items()
+            if isinstance(entry, dict) and entry.get("value") is not None
+        } or None
+    except Exception as e:
+        logger.info(f"Discogs price suggestions failed: {e}")
+        return None
+
+
+def format_discogs_market_context(discogs: Optional[Dict[str, Any]]) -> str:
+    """Describe Discogs pressing and marketplace data for a valuation prompt."""
+    if not discogs or not discogs.get("discogs_release_id"):
+        return ""
+    market = discogs.get("marketplace") or {}
+    pressing = "EXACT pressing (catalog number/barcode matched)" if discogs.get("exact_match") else (
+        "closest release by artist/title (pressing NOT confirmed)"
+    )
+    lines = [
+        f"Discogs release {discogs['discogs_release_id']}: {pressing}",
+        f"- Release: {discogs.get('artist')} - {discogs.get('title')}, {discogs.get('year') or 'year unknown'}, "
+        f"{discogs.get('label') or 'label unknown'}, cat# {discogs.get('catalog_number') or 'unknown'}, "
+        f"{discogs.get('country') or 'country unknown'}, {discogs.get('format') or 'format unknown'}",
+    ]
+    if market.get("lowest_price") is not None:
+        lines.append(
+            f"- Lowest price currently listed on Discogs: €{market['lowest_price']:.2f} "
+            f"({market.get('num_for_sale') or 0} copies for sale)"
+        )
+    elif market.get("num_for_sale") == 0:
+        lines.append("- No copies currently for sale on Discogs")
+    if market.get("have") is not None:
+        lines.append(f"- Collection/wantlist: {market.get('have')} have, {market.get('want')} want")
+    if market.get("price_suggestions"):
+        suggestions = ", ".join(f"{cond}: €{value:.2f}" for cond, value in market["price_suggestions"].items())
+        lines.append(f"- Discogs price suggestions by condition: {suggestions}")
+    if discogs.get("discogs_url"):
+        lines.append(f"- URL: {discogs['discogs_url']}")
+    return "\n".join(lines)
+
+
 def lookup_discogs_metadata(
     artist: str,
     title: str,
     fallback_on_error: bool = True,
+    catalog_number: Optional[str] = None,
+    barcode: Optional[str] = None,
+    year: Optional[int] = None,
+    label: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Lookup vinyl record metadata from Discogs API.
+
+    When a catalog number or barcode is given, the exact pressing is searched
+    first; otherwise (or if nothing matches) the best artist/title hit is used.
+    The release's marketplace figures are returned under "marketplace".
 
     Args:
         artist: Artist or group name
         title: Album/release title
         fallback_on_error: If True, return None on error; if False, raise exception
+        catalog_number: Catalog number read from the record (optional)
+        barcode: Barcode read from the record (optional)
+        year: Release year read from the record (optional)
+        label: Label read from the record (optional)
 
     Returns:
-        Dict with keys: artist, title, year, label, catalog_number, genres, confidence
+        Dict with keys: artist, title, year, label, catalog_number, genres, confidence,
+        discogs_release_id, discogs_url, country, format, exact_match, match_basis, marketplace.
         Returns None if not found or error occurred
 
     Raises:
         MetadataError: If lookup fails and fallback_on_error=False
     """
-    if not artist or not title:
+    if not artist:
+        raise ValueError("Artist and title are required")
+    if not title and not (_normalize_catno(catalog_number) or len(_normalize_barcode(barcode)) >= 8):
         raise ValueError("Artist and title are required")
 
     try:
-        logger.info(f"Discogs lookup: {artist} - {title}")
-
-        # Search for the release
-        search_query = f"{artist} {title}"
-        search_url = f"{DISCOGS_API_BASE}/database/search"
-        params: Dict[str, str] = {
-            "q": search_query,
-            "type": "release",
-            "per_page": "1",
-        }
-
-        response = requests.get(
-            search_url,
-            params=params,
-            timeout=API_TIMEOUT,
-            headers=_discogs_headers(),
+        logger.info(
+            f"Discogs lookup: {artist} - {title} "
+            f"(cat#: {catalog_number or '-'}, barcode: {barcode or '-'}, year: {year or '-'})"
         )
-        response.raise_for_status()
 
-        try:
-            data = response.json()
-        finally:
-            # Always close connection to free resources
-            response.close()
-        
-        results = data.get("results", [])
-
-        if not results:
+        release, match_basis = _find_discogs_release(artist, title, catalog_number, barcode, year, label)
+        if not release:
             logger.warning(f"Discogs: No results for {artist} - {title}")
             return None
 
-        # Get the first result
-        release = results[0]
         release_id = release.get("id")
 
-        if not release_id:
-            logger.warning("Discogs: No release ID found")
-            return None
-
-        # Fetch detailed release information
+        # Fetch detailed release information (marketplace figures priced in EUR)
         release_url = f"{DISCOGS_API_BASE}/releases/{release_id}"
         detail_response = requests.get(
             release_url,
+            params={"curr_abbr": "EUR"},
             timeout=API_TIMEOUT,
             headers=_discogs_headers(),
         )
@@ -126,18 +333,43 @@ def lookup_discogs_metadata(
             # Always close connection to free resources
             detail_response.close()
 
+        catalog = _extract_discogs_catalog(release_data)
+        if not match_basis and catalog_number and any(
+            _normalize_catno(item.get("catno")) == _normalize_catno(catalog_number)
+            for item in release_data.get("labels") or []
+        ):
+            match_basis = "catalog_number"
+
+        market = _extract_discogs_market(release_data)
+        market["price_suggestions"] = _fetch_discogs_price_suggestions(release_id)
+        formats = release_data.get("formats") or []
+        format_text = ", ".join(
+            [str(formats[0].get("name"))] + [str(d) for d in formats[0].get("descriptions", [])]
+        ) if formats and formats[0].get("name") else None
+
         # Extract metadata
         metadata = {
             "artist": _extract_discogs_artist(release_data),
             "title": release_data.get("title", title),
             "year": release_data.get("year"),
             "label": _extract_discogs_label(release_data),
-            "catalog_number": _extract_discogs_catalog(release_data),
+            "catalog_number": catalog,
             "genres": release_data.get("genres", []),
-            "confidence": 0.85,  # Discogs is reliable
+            "confidence": 0.92 if match_basis else 0.85,  # An identifier match confirms the pressing
+            "discogs_release_id": release_id,
+            "discogs_url": release_data.get("uri") or f"https://www.discogs.com/release/{release_id}",
+            "country": release_data.get("country"),
+            "format": format_text,
+            "exact_match": match_basis is not None,
+            "match_basis": match_basis or "artist_title",
+            "marketplace": market,
         }
 
-        logger.info(f"Discogs: Found {metadata['artist']} - {metadata['title']}")
+        logger.info(
+            f"Discogs: Found {metadata['artist']} - {metadata['title']} "
+            f"(release {release_id}, match: {metadata['match_basis']}, cat# {catalog}, "
+            f"lowest €{market['lowest_price']}, {market['num_for_sale']} for sale)"
+        )
         return metadata
 
     except Exception as e:
@@ -170,6 +402,10 @@ def lookup_musicbrainz_metadata(
     """
     if not artist or not title:
         raise ValueError("Artist and title are required")
+
+    if not musicbrainz_enabled():
+        logger.debug("MusicBrainz lookup skipped (set MUSICBRAINZ_ENABLED=true to enable)")
+        return None
 
     try:
         logger.info(f"MusicBrainz lookup: {artist} - {title}")
@@ -230,21 +466,39 @@ def lookup_musicbrainz_metadata(
 def lookup_metadata_from_both(
     artist: str,
     title: str,
+    catalog_number: Optional[str] = None,
+    barcode: Optional[str] = None,
+    year: Optional[int] = None,
+    label: Optional[str] = None,
 ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
     """
-    Lookup metadata from both Discogs and MusicBrainz.
+    Lookup metadata from Discogs and (if enabled) MusicBrainz.
 
     Discogs is queried unauthenticated (25 req/min) or with a token if
-    DISCOGS_TOKEN is set in the environment (60 req/min).
+    DISCOGS_TOKEN is set in the environment (60 req/min). The optional
+    catalog number, barcode, year and label narrow Discogs down to the exact
+    pressing. MusicBrainz is skipped unless MUSICBRAINZ_ENABLED is true.
 
     Args:
         artist: Artist or group name
         title: Album/release title
+        catalog_number: Catalog number read from the record (optional)
+        barcode: Barcode read from the record (optional)
+        year: Release year read from the record (optional)
+        label: Label read from the record (optional)
 
     Returns:
         Tuple of (discogs_result, musicbrainz_result)
     """
-    discogs_result = lookup_discogs_metadata(artist, title, fallback_on_error=True)
+    discogs_result = lookup_discogs_metadata(
+        artist,
+        title,
+        fallback_on_error=True,
+        catalog_number=catalog_number,
+        barcode=barcode,
+        year=year,
+        label=label,
+    )
     musicbrainz_result = lookup_musicbrainz_metadata(artist, title, fallback_on_error=True)
 
     return discogs_result, musicbrainz_result
