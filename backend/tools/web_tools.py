@@ -55,12 +55,21 @@ class WebSearchTool:
             essential_terms.append(term)
         return ' '.join(essential_terms[:6])  # Limit to first 6 terms
 
-    def search(self, query: str, max_results: int = WEBSEARCH_MAX_RESULTS) -> List[Dict[str, Any]]:
-        """Search the web using Tavily API with smart fallback strategy."""
+    def search(
+        self,
+        query: str,
+        max_results: int = WEBSEARCH_MAX_RESULTS,
+        restrict_domains: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """Search the web using Tavily API with smart fallback strategy.
+
+        restrict_domains=False skips the Discogs/MusicBrainz/AllMusic-only pass,
+        which is needed for general questions and market-price lookups.
+        """
         results: List[Dict[str, Any]] = []
 
         # Primary: Tavily with domain restrictions (if configured)
-        if self.client:
+        if self.client and restrict_domains:
             try:
                 logger.info(f"Searching Tavily (domain-restricted) for: {query}")
                 response = self.client.search(
@@ -165,7 +174,7 @@ class WebSearchTool:
     def search_vinyl_prices(self, artist: str, title: str) -> List[Dict[str, Any]]:
         """Search for vinyl record pricing information."""
         query = f"{artist} {title} vinyl record value price market"
-        return self.search(query, max_results=4)
+        return self.search(query, max_results=4, restrict_domains=False)
 
     def _duckduckgo_search(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
         """DuckDuckGo search using the DDGS library (no API key required)."""
@@ -330,10 +339,12 @@ class EnhancedChatTools:
         self.search_tool = WebSearchTool()
         self.scraping_tool = WebScrapingTool()
     
-    def search_and_scrape(self, query: str, scrape_results: bool = True) -> Dict[str, Any]:
+    def search_and_scrape(
+        self, query: str, scrape_results: bool = True, restrict_domains: bool = True
+    ) -> Dict[str, Any]:
         """Search the web and optionally scrape the top results."""
         # Perform search
-        search_results = self.search_tool.search(query)
+        search_results = self.search_tool.search(query, restrict_domains=restrict_domains)
         
         response = {
             "query": query,
@@ -350,6 +361,27 @@ class EnhancedChatTools:
         
         return response
     
+    def get_vinyl_price_info(self, artist: str, title: str) -> List[Dict[str, Any]]:
+        """Price search limited to results that actually mention the record."""
+        results = self.search_tool.search_vinyl_prices(artist, title)
+        return [r for r in results if self._mentions_record(r, artist, title)]
+
+    @staticmethod
+    def _mentions_record(result: Dict[str, Any], artist: str, title: str) -> bool:
+        """True if the result text contains the title words and at least one artist word."""
+        text = " ".join(
+            str(result.get(k, "")) for k in ("title", "content", "url")
+        ).lower()
+        text = re.sub(r"[^a-z0-9äöüß]+", " ", text)
+        words = lambda s: [w for w in re.sub(r"[^a-z0-9äöüß]+", " ", s.lower()).split() if len(w) > 2]
+        title_words, artist_words = words(title), words(artist)
+        if title_words and not all(w in text for w in title_words):
+            return False
+        # Long titles are distinctive enough; short ones also need an artist match
+        if len(title_words) >= 3:
+            return True
+        return not artist_words or any(w in text for w in artist_words)
+
     def get_vinyl_comprehensive_info(self, artist: str, title: str) -> Dict[str, Any]:
         """Get comprehensive information about a vinyl record."""
         # Search for general info

@@ -680,7 +680,7 @@ async def review_vinyl(
 
 
 @router.post("/identify/{record_id}/chat", response_model=Dict[str, Any])
-async def chat_with_agent(
+def chat_with_agent(
     record_id: str,
     request: ChatRequest,
     db: Session = Depends(get_db),
@@ -723,7 +723,7 @@ async def chat_with_agent(
         result = graph.invoke(
             {"messages": [HumanMessage(content=request.message)]},
             config={
-                "recursion_limit": 6,
+                "recursion_limit": 10,
                 "configurable": {
                     "thread_id": thread_id,
                     "db": db,
@@ -838,7 +838,7 @@ async def chat_with_agent(
 
 
 @router.post("/chat", response_model=Dict[str, Any])
-async def general_chat(
+def general_chat(
     request: ChatRequest,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -891,7 +891,7 @@ async def general_chat(
         result = graph.invoke(
             {"messages": [HumanMessage(content=request.message)]},
             config={
-                "recursion_limit": 6,
+                "recursion_limit": 10,
                 "configurable": {
                     "thread_id": thread_id,
                     "db": db,

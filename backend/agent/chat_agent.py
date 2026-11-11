@@ -74,13 +74,31 @@ def _get_chat_tools():
     return _chat_tools
 
 
+def _open_tool_session(config: Optional[RunnableConfig]):
+    """Return a dedicated DB session for one tool call, or None if no DB is available.
+
+    LangGraph's ToolNode runs parallel tool calls in separate threads, and a SQLAlchemy
+    Session is not thread-safe, so the request-scoped session must not be shared.
+    """
+    injected = (config or {}).get("configurable", {}).get("db")
+    if injected is None:
+        return None
+    from backend import database
+
+    if database.SessionLocal is None:
+        return injected
+    return database.SessionLocal()
+
+
 # ── Tools ─────────────────────────────────────────────────────────────────
 @tool
 def web_search(query: str, config: RunnableConfig) -> str:
     """Search the web for information about vinyl records, music history,
     pressings, labels, artists, and collecting tips."""
     try:
-        results = _get_chat_tools().search_and_scrape(query, scrape_results=False)
+        results = _get_chat_tools().search_and_scrape(
+            query, scrape_results=False, restrict_domains=False
+        )
         items = results.get("search_results", [])[:5]
         if not items:
             return "No web results found for that query."
@@ -97,13 +115,16 @@ def search_vinyl_prices(artist: str, title: str, config: RunnableConfig) -> str:
     """Get current market pricing and valuation data for a specific vinyl record.
     Use when the user asks about value, price, worth, or market conditions."""
     try:
-        info = _get_chat_tools().get_vinyl_comprehensive_info(artist, title)
-        parts = []
-        for r in (info.get("pricing_info") or [])[:4]:
-            parts.append(f"**{r['title']}**\n{r.get('content', '')[:300]}")
-        for r in (info.get("general_info") or [])[:2]:
-            parts.append(f"**{r['title']}**\n{r.get('content', '')[:200]}")
-        return "\n\n".join(parts) if parts else "No pricing data found."
+        results = _get_chat_tools().get_vinyl_price_info(artist, title)
+        if not results:
+            return (
+                f"No reliable pricing data found for {artist} – {title}. "
+                "Do not guess a price; tell the user no market data was found."
+            )
+        return "\n\n".join(
+            f"**{r['title']}** ({r.get('url', '')})\n{r.get('content', '')[:300]}"
+            for r in results[:4]
+        )
     except Exception as e:
         logger.error(f"search_vinyl_prices tool error: {e}")
         return f"Price lookup unavailable: {e}"
@@ -151,7 +172,7 @@ def query_collection(
     count_only: set true for 'how many' questions — returns count + stats without listing records
     limit: max records to return (1–50, default 10)
     """
-    db = (config or {}).get("configurable", {}).get("db")
+    db = _open_tool_session(config)
     if db is None:
         return "Collection database not available in this context."
     try:
@@ -248,6 +269,8 @@ def query_collection(
     except Exception as e:
         logger.error(f"query_collection tool error: {e}")
         return f"Collection query failed: {e}"
+    finally:
+        db.close()
 
 
 
@@ -338,7 +361,7 @@ def quiz_collection(
     import json as _json
     import random
 
-    db = (config or {}).get("configurable", {}).get("db")
+    db = _open_tool_session(config)
     if db is None:
         return "Collection database not available in this context."
 
@@ -407,6 +430,8 @@ def quiz_collection(
     except Exception as e:
         logger.error(f"quiz_collection tool error: {e}")
         return f"Quiz generation failed: {e}"
+    finally:
+        db.close()
 
 
 _TOOLS = [web_search, search_vinyl_prices, query_collection, quiz_collection]
@@ -544,9 +569,19 @@ _graph = None
 def init_chat_agent(database_url: str) -> None:
     """Call once at app startup. Creates LangGraph tables and compiles the graph."""
     global _checkpointer, _graph
-    import psycopg
-    conn = psycopg.connect(database_url, autocommit=True)
-    _checkpointer = PostgresSaver(conn)
+    from psycopg.rows import dict_row
+    from psycopg_pool import ConnectionPool
+
+    # A pool survives dropped connections and serves concurrent chat requests
+    pool = ConnectionPool(
+        conninfo=database_url,
+        min_size=1,
+        max_size=int(os.getenv("CHAT_CHECKPOINT_POOL_SIZE", "5")),
+        kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
+        check=ConnectionPool.check_connection,
+        open=True,
+    )
+    _checkpointer = PostgresSaver(pool)
     _checkpointer.setup()
     _graph = _compile_graph(_checkpointer)
     logger.info("✅ Chat agent initialized (LangGraph ReAct + PostgresSaver)")
