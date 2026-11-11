@@ -155,14 +155,20 @@ def discogs_market_value(
             label=label or None,
         )
         if not discogs:
-            return f"No Discogs release found for {artist} – {title}."
+            return (
+                f"No Discogs release found for {artist} – {title}. "
+                "Use search_vinyl_prices or web_search for price information instead."
+            )
         return (
             format_discogs_market_context(discogs)
             + "\nThese are asking prices of current listings, not completed sales."
         )
     except Exception as e:
         logger.error(f"discogs_market_value tool error: {e}")
-        return f"Discogs lookup unavailable: {e}"
+        return (
+            f"Discogs lookup unavailable: {e}. "
+            "Use search_vinyl_prices or web_search for price information instead."
+        )
 
 
 _QUERY_COLLECTION_MAX_LIMIT = 50  # hard cap to protect LLM token budget
