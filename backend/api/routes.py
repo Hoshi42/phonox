@@ -742,7 +742,7 @@ def chat_with_agent(
 
         # Extract response — last message is the agent's text reply
         from langchain_core.messages import ToolMessage, AIMessage, HumanMessage as HMsg
-        _web_tools = {"web_search", "search_vinyl_prices"}
+        _web_tools = {"web_search", "search_vinyl_prices", "discogs_market_value"}
         _collection_tools = {"query_collection", "quiz_collection"}
 
         # Only inspect the CURRENT turn (messages after the last HumanMessage)
@@ -909,7 +909,7 @@ def general_chat(
         )
 
         from langchain_core.messages import ToolMessage, AIMessage, HumanMessage as HMsg
-        _web_tools = {"web_search", "search_vinyl_prices"}
+        _web_tools = {"web_search", "search_vinyl_prices", "discogs_market_value"}
         _collection_tools = {"query_collection", "quiz_collection"}
 
         # Only inspect the CURRENT turn (messages after the last HumanMessage)

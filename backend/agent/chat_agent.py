@@ -42,6 +42,8 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 from typing_extensions import TypedDict
 
+from backend.agent.metadata import format_discogs_market_context, lookup_discogs_metadata
+
 logger = logging.getLogger(__name__)
 
 # ── Limits ────────────────────────────────────────────────────────────────
@@ -128,6 +130,39 @@ def search_vinyl_prices(artist: str, title: str, config: RunnableConfig) -> str:
     except Exception as e:
         logger.error(f"search_vinyl_prices tool error: {e}")
         return f"Price lookup unavailable: {e}"
+
+
+@tool
+def discogs_market_value(
+    artist: str,
+    title: str,
+    config: RunnableConfig,
+    catalog_number: str = "",
+    barcode: str = "",
+    year: int = 0,
+    label: str = "",
+) -> str:
+    """Get live Discogs marketplace data (lowest listed price, copies for sale, demand)
+    for a specific record. Pass catalog_number/barcode/year/label whenever known: they
+    identify the exact pressing. Use first when the user asks about price or value."""
+    try:
+        discogs = lookup_discogs_metadata(
+            artist,
+            title,
+            catalog_number=catalog_number or None,
+            barcode=barcode or None,
+            year=year or None,
+            label=label or None,
+        )
+        if not discogs:
+            return f"No Discogs release found for {artist} – {title}."
+        return (
+            format_discogs_market_context(discogs)
+            + "\nThese are asking prices of current listings, not completed sales."
+        )
+    except Exception as e:
+        logger.error(f"discogs_market_value tool error: {e}")
+        return f"Discogs lookup unavailable: {e}"
 
 
 _QUERY_COLLECTION_MAX_LIMIT = 50  # hard cap to protect LLM token budget
@@ -434,7 +469,7 @@ def quiz_collection(
         db.close()
 
 
-_TOOLS = [web_search, search_vinyl_prices, query_collection, quiz_collection]
+_TOOLS = [web_search, search_vinyl_prices, discogs_market_value, query_collection, quiz_collection]
 
 
 # ── System prompts ────────────────────────────────────────────────────────
@@ -451,7 +486,9 @@ def _record_system_prompt(meta: dict) -> str:
         "Always reply in the same language the user writes in.\n\n"
         "You are a helpful vinyl record assistant with access to web search and collection tools.\n\n"
         "Use tools when the user asks about:\n"
-        "- Current prices / market value → use search_vinyl_prices\n"
+        "- Current prices / market value → use discogs_market_value first (pass the record's "
+        "catalog number, barcode, year and label), then search_vinyl_prices for sold prices "
+        "and context; the stored Estimated Value below comes from the last scan\n"
         "- General info, history, pressings, labels → use web_search\n"
         "- Their collection statistics or other records → use query_collection\n"
         "- Quiz / trivia about their collection → use quiz_collection\n\n"
@@ -490,7 +527,8 @@ def _general_system_prompt() -> str:
         "You are a knowledgeable vinyl record expert assistant with access to tools.\n\n"
         "Available tools:\n"
         "- web_search: find information about any vinyl-related topic\n"
-        "- search_vinyl_prices: get current market pricing for specific records\n"
+        "- discogs_market_value: live Discogs listings (lowest price, copies for sale) for a record\n"
+        "- search_vinyl_prices: get market pricing context for specific records\n"
         "- query_collection: query the user's vinyl collection database\n"
         "- quiz_collection: generate a multiple-choice quiz from the collection\n\n"
         "query_collection usage guidelines:\n"
