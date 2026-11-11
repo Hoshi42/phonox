@@ -40,6 +40,7 @@ from backend.api.models import (
 )
 from backend.agent.graph import build_agent_graph
 from backend.agent.state import VinylState
+from backend.agent.barcode_utils import has_valid_check_digit
 from backend.agent.metadata import estimate_vinyl_value, format_discogs_market_context
 from backend.agent.llm_utils import response_text as response_text_of, content_text
 from backend.agent.valuation import format_market_notes
@@ -65,6 +66,19 @@ def _discogs_evidence_data(result_state: Dict[str, Any]) -> Optional[Dict[str, A
         if str(getattr(evidence.get("source"), "value", evidence.get("source"))) == "discogs":
             return evidence.get("data")
     return None
+
+
+def _discogs_valuation_context(result_state: Dict[str, Any]) -> str:
+    """Discogs pressing/marketplace block for a valuation prompt ("" when unavailable)."""
+    discogs_context = format_discogs_market_context(_discogs_evidence_data(result_state))
+    if not discogs_context:
+        return ""
+    return (
+        "\nDiscogs data (Discogs marketplace API, reflects real current listings for the matched "
+        "pressing): treat it as the primary price signal and use the web results only to "
+        "cross-check or when it is missing. If the pressing is not confirmed, say so and widen "
+        "the price range.\n" + discogs_context
+    )
 
 
 def _serialize_evidence_chain(evidence_chain: List[dict]) -> List[dict]:
@@ -271,14 +285,8 @@ async def identify_vinyl(
                                     market_context += f"- {content.get('title', '')}: {content.get('content', '')}\n"
                         
                         # Discogs data for the matched pressing (prices, copies for sale, demand)
-                        discogs_context = format_discogs_market_context(_discogs_evidence_data(result_state))
+                        discogs_context = _discogs_valuation_context(result_state)
                         if discogs_context:
-                            discogs_context = (
-                                "\nDiscogs data (Discogs marketplace API, reflects real current listings for the matched "
-                                "pressing): treat it as the primary price signal and use the web results only to "
-                                "cross-check or when it is missing. If the pressing is not confirmed, say so and widen "
-                                "the price range.\n" + discogs_context
-                            )
                             logger.info(f"Valuation uses Discogs data:\n{discogs_context}")
 
                         # Build record context
@@ -1250,6 +1258,25 @@ async def reanalyze_vinyl(
                 enhanced_metadata = new_metadata
                 new_confidence = analysis_confidence
 
+            # A stored barcode that fails the check digit is a past misread: take the fresh reading instead
+            stored_barcode = enhanced_metadata.get("barcode")
+            if stored_barcode and not has_valid_check_digit(stored_barcode):
+                fresh_barcode = new_metadata.get("barcode")
+                logger.info(f"Replacing invalid stored barcode {stored_barcode!r} with {fresh_barcode!r}")
+                enhanced_metadata["barcode"] = fresh_barcode
+
+            # An exact Discogs match (catalog number/barcode) outranks stored values, which may stem
+            # from earlier misreads (track title as album title, barcode digits as catalog number)
+            discogs_data = _discogs_evidence_data(result_state)
+            if discogs_data and discogs_data.get("exact_match"):
+                for field in ("artist", "title", "catalog_number"):
+                    value = discogs_data.get(field)
+                    if value and enhanced_metadata.get(field) != value:
+                        logger.info(
+                            f"Exact Discogs match overrides {field}: {enhanced_metadata.get(field)!r} -> {value!r}"
+                        )
+                        enhanced_metadata[field] = value
+
             logger.info(f"✅ Analysis complete with {len(files)} images (confidence: {new_confidence:.2f})")
             
             # Preserve existing Spotify URL if the graph didn't find a new one
@@ -1306,6 +1333,10 @@ async def reanalyze_vinyl(
                             if content.get("success"):
                                 market_context += f"- {content.get('title', '')}: {content.get('content', '')}\n"
                     
+                    discogs_context = _discogs_valuation_context(result_state)
+                    if discogs_context:
+                        logger.info(f"Reanalysis valuation uses Discogs data:\n{discogs_context}")
+
                     # Build record context
                     record_context = f"""
 Vinyl Record Details:
@@ -1317,6 +1348,7 @@ Vinyl Record Details:
 - Genres: {', '.join(enhanced_metadata.get('genres', [])) if enhanced_metadata.get('genres') else 'Unknown'}
 - Image Analysis Confidence: {new_confidence * 100:.0f}%
 - Format: Vinyl LP
+{discogs_context}
 """
                     
                     # Use Claude Haiku to analyze market data

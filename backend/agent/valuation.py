@@ -53,6 +53,8 @@ def _pressing_line(discogs: Dict[str, Any]) -> str:
     if discogs.get("exact_match"):
         basis = "barcode" if discogs.get("match_basis") == "barcode" else "catalog number"
         line = f"Pressing: Discogs release {discogs['discogs_release_id']}, exact match by {basis}"
+    elif discogs.get("probable_match"):
+        line = f"Pressing: Discogs release {discogs['discogs_release_id']}, probable match (title, label, year, format)"
     else:
         line = f"Pressing: closest Discogs release {discogs['discogs_release_id']} (not confirmed)"
     return f"{line} ({details})" if details else line

@@ -16,7 +16,7 @@ from typing import Optional, Dict, Any, cast
 from io import BytesIO
 
 from anthropic import Anthropic
-from backend.agent.barcode_utils import validate_barcode, validate_catalog_number, format_barcode_for_search
+from backend.agent.barcode_utils import validate_barcode, validate_catalog_number, format_barcode_for_search, has_valid_check_digit
 from backend.agent.llm_utils import response_text as response_text_of
 
 # Claude API timeout configuration
@@ -395,15 +395,18 @@ STEP 4: MAP TO METADATA FIELDS
 - Artist/Group Name: The LARGEST text (even if artistic/stylized)
 - Album Title: Second-largest or red/colored text below artist
 - Record Label: Smaller text, often distinctive
-- Catalog Number: Alphanumeric codes
+- Catalog Number: Alphanumeric code printed with label/cat. wording (e.g. "MAT 04110", "V6-8399"), usually on the spine, label or small print; null if not visible - never derive it from the barcode
 - Release Year: 4-digit numbers
 - Genres: Based on cover style (e.g., punk, metal, jazz)
 
 STEP 5: FIND BARCODES
 Look for UPC/EAN barcodes:
 - Black and white vertical lines pattern (|||||| structure)
-- Usually 12-13 digit numbers
-- Common locations: corners, edges, inside covers
+- Usually 12-13 digit numbers printed UNDER the bars, often split into groups (e.g. "6 73799 37101 1")
+- Common locations: corners (often top/bottom right on the back cover), edges, inside covers
+- Read the digits one by one exactly as printed and give your best reading, but NEVER invent or "repair" digits to make a number look valid (it is verified by check digit afterwards, a wrong guess is discarded).
+- Set "barcode" to null if the digits are not legible at all, or if there is no barcode: records from before the late 1970s usually have none, so never invent one.
+- The barcode digits are NOT a catalog number: never copy them into "catalog_number".
 
 STEP 6: ASSESS PHYSICAL CONDITION
 Examine for visible wear:
@@ -531,6 +534,9 @@ CRITICAL:
             # Validate and clean barcode if present
             if metadata.get("barcode"):
                 is_valid, cleaned_barcode, error = validate_barcode(metadata["barcode"])
+                if is_valid and cleaned_barcode and not has_valid_check_digit(cleaned_barcode):
+                    # A misread digit would break the exact Discogs match; better no barcode than a wrong one
+                    is_valid, error = False, "check digit does not match (misread)"
                 if is_valid and cleaned_barcode:
                     metadata["barcode"] = cleaned_barcode
                     logger.info(f"Vision extraction: Valid barcode detected: {cleaned_barcode}")

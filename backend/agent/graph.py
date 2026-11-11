@@ -25,6 +25,7 @@ from anthropic import Anthropic
 
 from backend.agent.state import VinylState, Evidence, EvidenceType
 from backend.agent.vision import extract_vinyl_metadata, extract_vinyl_metadata_with_retry
+from backend.agent.barcode_decoder import decode_barcode
 from backend.agent.metadata import lookup_metadata_from_both
 from backend.agent.websearch import search_vinyl_metadata, search_vinyl_by_barcode, search_spotify_album
 from backend.agent.metadata_enhancer import MetadataEnhancer
@@ -76,7 +77,7 @@ RULES:
 2. **Year**: If all agree, use that. If conflict, choose highest confidence.
 3. **Label**: Choose highest confidence value.
 4. **Catalog Number**: If multiple found, include all (they might be different editions).
-5. **Barcode**: Include all valid barcodes found (12-13 digits).
+5. **Barcode**: Include all valid barcodes found (12-13 digits). Only use barcodes that appear unchanged in the individual results; never alter, combine or invent digits. If the results disagree on a barcode, keep the one that appears in the most results, or null.
 6. **Genres**: Merge all genres, remove duplicates, keep lowercase normalized.
 7. **Condition**: Choose WORST condition seen across all images (most conservative assessment). Use Goldmine scale: M, NM, VG+, VG, G+, G, F, P.
 8. **Confidence**: Calculate as weighted average of all image confidences.
@@ -388,19 +389,31 @@ def vision_extraction_node(state: VinylState) -> VinylState:
 
         logger.info(f"vision_extraction: Analyzing image {idx + 1} (format: {image_format})...")
         try:
-            result = extract_vinyl_metadata_with_retry(
-                image_base64=image_content,
-                image_format=image_format,
-                fallback_on_error=False,  # No fallback - we want real errors
-                max_retries=3,  # Retry up to 3 times
-                base_delay=1.0,  # Start with 1 second, then 2, then 4
-                image_context={'image_index': idx + 1, 'total_images': len(images)},
-            )
+            # Decode the barcode from the bars while the LLM reads the image
+            with ThreadPoolExecutor(max_workers=1) as decoder_pool:
+                decoded_future = decoder_pool.submit(decode_barcode, image_content)
+                result = extract_vinyl_metadata_with_retry(
+                    image_base64=image_content,
+                    image_format=image_format,
+                    fallback_on_error=False,  # No fallback - we want real errors
+                    max_retries=3,  # Retry up to 3 times
+                    base_delay=1.0,  # Start with 1 second, then 2, then 4
+                    image_context={'image_index': idx + 1, 'total_images': len(images)},
+                )
+                decoded_barcode = decoded_future.result()
         except Exception as e:
             error_msg = str(e)
             logger.error(f"vision_extraction: Error on image {idx + 1}: {error_msg}")
             return {"error": {"image": idx + 1, "error": error_msg}}
 
+        if decoded_barcode:
+            if result.get("barcode") != decoded_barcode:
+                logger.info(
+                    f"vision_extraction: Image {idx + 1} barcode decoded from bars: {decoded_barcode} "
+                    f"(LLM read: {result.get('barcode')})"
+                )
+            result["barcode"] = decoded_barcode
+            result["barcode_decoded"] = True
         result["image_index"] = idx + 1
         result["image_path"] = image.get("path", f"image_{idx + 1}")
         return {"result": result}
@@ -428,6 +441,12 @@ def vision_extraction_node(state: VinylState) -> VinylState:
             
             # Use LLM-based aggregation for intelligent merging
             vision_results = aggregate_with_llm(all_results)
+
+            # A barcode decoded from the bars is authoritative: the aggregation LLM must not alter it
+            decoded_barcodes = [r["barcode"] for r in all_results if r.get("barcode_decoded") and r.get("barcode")]
+            if decoded_barcodes:
+                vision_results["barcode"] = max(set(decoded_barcodes), key=decoded_barcodes.count)
+                vision_results["all_barcodes"] = sorted(set(decoded_barcodes))
             
             # Preserve per-image results for reference
             vision_results["processed_images"] = len(all_results)
@@ -615,6 +634,7 @@ def lookup_metadata_node(state: VinylState) -> VinylState:
                         "country": discogs_result.get("country"),
                         "format": discogs_result.get("format"),
                         "exact_match": discogs_result.get("exact_match"),
+                        "probable_match": discogs_result.get("probable_match"),
                         "match_basis": discogs_result.get("match_basis"),
                         "marketplace": discogs_result.get("marketplace"),
                     },
@@ -842,6 +862,11 @@ def metadata_synthesis_node(state: VinylState) -> VinylState:
                       "image_results", "processed_images", "all_barcodes", "all_catalog_numbers",
                       "spotify_url", "_quality_issues"):
             if vision_data.get(field) is not None and enhanced.get(field) is None:
+                enhanced[field] = vision_data[field]
+
+        # The LLM merge may drop identifiers it did not echo back: never lose what the images showed
+        for field in ("catalog_number", "barcode", "year", "label", "genres"):
+            if not enhanced.get(field) and vision_data.get(field):
                 enhanced[field] = vision_data[field]
 
         # Keep vision confidence if it's higher (vision was more certain)

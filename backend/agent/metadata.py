@@ -66,6 +66,17 @@ def _normalize_barcode(value: Any) -> str:
     return re.sub(r"\D", "", str(value or ""))
 
 
+def _barcodes_match(read: str, listed: str) -> bool:
+    """Barcodes match exactly, or differ only by a missing/extra leading or check digit (misread or
+    UPC/EAN notation differences, e.g. 673799371011 vs the Discogs entry 67379937101)."""
+    if not read or not listed:
+        return False
+    if read == listed:
+        return True
+    shorter, longer = sorted((read, listed), key=len)
+    return len(shorter) >= 10 and len(longer) - len(shorter) <= 2 and shorter in longer
+
+
 def _discogs_search(params: Dict[str, str]) -> List[Dict[str, Any]]:
     """Run one Discogs database search and return its result list."""
     response = requests.get(
@@ -108,7 +119,7 @@ def _score_discogs_candidate(
     wanted_barcode = _normalize_barcode(barcode)
     if len(wanted_barcode) >= 8:
         candidate_barcodes = {_normalize_barcode(b) for b in candidate.get("barcode") or []}
-        if wanted_barcode in candidate_barcodes:
+        if any(_barcodes_match(wanted_barcode, b) for b in candidate_barcodes):
             score += 100
             basis = basis or "barcode"
 
@@ -240,9 +251,15 @@ def format_discogs_market_context(discogs: Optional[Dict[str, Any]]) -> str:
     if not discogs or not discogs.get("discogs_release_id"):
         return ""
     market = discogs.get("marketplace") or {}
-    pressing = "EXACT pressing (catalog number/barcode matched)" if discogs.get("exact_match") else (
-        "closest release by artist/title (pressing NOT confirmed)"
-    )
+    if discogs.get("exact_match"):
+        pressing = "EXACT pressing (catalog number/barcode matched)"
+    elif discogs.get("probable_match"):
+        pressing = (
+            "PROBABLE pressing (title, label, year and vinyl format all match what was read from the record; "
+            "no barcode/catalog confirmation). Treat its prices as applicable; only widen the range slightly"
+        )
+    else:
+        pressing = "closest release by artist/title (pressing NOT confirmed)"
     lines = [
         f"Discogs release {discogs['discogs_release_id']}: {pressing}",
         f"- Release: {discogs.get('artist')} - {discogs.get('title')}, {discogs.get('year') or 'year unknown'}, "
@@ -255,7 +272,10 @@ def format_discogs_market_context(discogs: Optional[Dict[str, Any]]) -> str:
             f"({market.get('num_for_sale') or 0} copies for sale)"
         )
     elif market.get("num_for_sale") == 0:
-        lines.append("- No copies currently for sale on Discogs")
+        lines.append(
+            "- No active listings for this specific release on Discogs. This is NOT a lack of price data: "
+            "estimate the value from the web search results (sold prices, Low/Median/Last Sold stats)."
+        )
     if market.get("have") is not None:
         lines.append(f"- Collection/wantlist: {market.get('have')} have, {market.get('want')} want")
     if market.get("price_suggestions"):
@@ -361,6 +381,7 @@ def lookup_discogs_metadata(
             "country": release_data.get("country"),
             "format": format_text,
             "exact_match": match_basis is not None,
+            "probable_match": match_basis is None and _is_probable_match(release_data, title, year, label),
             "match_basis": match_basis or "artist_title",
             "marketplace": market,
         }
@@ -515,6 +536,28 @@ def _extract_discogs_artist(release: Dict[str, Any]) -> str:
     if artists:
         return artists[0].get("name", "Unknown")
     return release.get("title", "Unknown").split(" - ")[0] if " - " in release.get("title", "") else "Unknown"
+
+
+def _is_probable_match(
+    release_data: Dict[str, Any], title: str, year: Optional[int], label: Optional[str]
+) -> bool:
+    """
+    A release found only by artist/title is a probable match when title, year, label and
+    vinyl format all agree with what was read from the record (no identifier needed).
+    """
+    if not (title and year and label):
+        return False
+    title_ratio = difflib.SequenceMatcher(
+        None, str(release_data.get("title") or "").lower(), title.lower()
+    ).ratio()
+    if title_ratio < 0.9 or str(release_data.get("year") or "") != str(year):
+        return False
+    wanted_label = label.lower()
+    label_names = [str(item.get("name") or "").lower() for item in release_data.get("labels") or []]
+    if not any(wanted_label in name or name in wanted_label for name in label_names if name):
+        return False
+    formats = release_data.get("formats") or []
+    return any(str(f.get("name") or "").lower() == "vinyl" for f in formats)
 
 
 def _extract_discogs_label(release: Dict[str, Any]) -> str:

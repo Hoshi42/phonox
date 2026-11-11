@@ -60,6 +60,16 @@ def validate_barcode(barcode: str) -> Tuple[bool, Optional[str], Optional[str]]:
     return True, cleaned, None
 
 
+def has_valid_check_digit(barcode: str) -> bool:
+    """True when a 12-digit UPC-A or 13-digit EAN-13 carries a correct check digit."""
+    digits = re.sub(r"\D", "", barcode or "")
+    if len(digits) not in (12, 13):
+        return False
+    values = [int(c) for c in digits.zfill(13)]
+    total = sum(v * (3 if i % 2 else 1) for i, v in enumerate(values[:-1]))
+    return (10 - total % 10) % 10 == values[-1]
+
+
 def format_barcode_for_search(barcode: str) -> Optional[str]:
     """
     Format a barcode for optimal search results.

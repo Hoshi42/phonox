@@ -117,7 +117,7 @@ Focus on HIGH CONFIDENCE enhancements only."""
 
             response = self.client.messages.create(
                 model=enhancement_model,
-                max_tokens=2500,
+                max_tokens=8000,  # newer models count thinking tokens too; 2500 truncated the JSON
                 messages=[
                     {
                         "role": "user",
