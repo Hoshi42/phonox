@@ -62,6 +62,11 @@ def _normalize_catno(value: Any) -> str:
     return re.sub(r"[^a-z0-9]", "", str(value or "").lower())
 
 
+def _catalog_number_variants(value: Optional[str]) -> List[str]:
+    """Split catalog numbers joined by the metadata merge separator."""
+    return [part.strip() for part in re.split(r"\s+/\s+", value or "") if part.strip()]
+
+
 def _normalize_barcode(value: Any) -> str:
     return re.sub(r"\D", "", str(value or ""))
 
@@ -111,8 +116,12 @@ def _score_discogs_candidate(
     score = 0.0
     basis: Optional[str] = None
 
-    wanted_catno = _normalize_catno(catalog_number)
-    if wanted_catno and wanted_catno == _normalize_catno(candidate.get("catno")):
+    wanted_catnos = {
+        _normalize_catno(part)
+        for part in _catalog_number_variants(catalog_number)
+        if _normalize_catno(part)
+    }
+    if _normalize_catno(candidate.get("catno")) in wanted_catnos:
         score += 100
         basis = "catalog_number"
 
@@ -168,8 +177,9 @@ def _find_discogs_release(
     soon as a hit matches an identifier exactly.
     """
     searches: List[Dict[str, str]] = []
-    if catalog_number and _normalize_catno(catalog_number):
-        searches.append({"catno": catalog_number, "artist": artist})
+    for catalog_variant in _catalog_number_variants(catalog_number):
+        if _normalize_catno(catalog_variant):
+            searches.append({"catno": catalog_variant, "artist": artist})
     if len(_normalize_barcode(barcode)) >= 8:
         searches.append({"barcode": _normalize_barcode(barcode)})
     if title:

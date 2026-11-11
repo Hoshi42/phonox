@@ -86,6 +86,37 @@ class TestDiscogsExactPressing:
         first_search = mock_get.call_args_list[0]
         assert first_search.kwargs["params"]["catno"] == "DEF 24208"
 
+    def test_combined_catalog_numbers_are_searched_individually(self):
+        hit = {
+            "id": 8,
+            "title": "Danzig - Danzig",
+            "year": "1988",
+            "catno": "BYO 014",
+            "format": ["Vinyl", "LP", "Album"],
+            "label": ["BYO Records"],
+        }
+        with patch("backend.agent.metadata.requests.get") as mock_get:
+            mock_get.side_effect = [
+                _response({"results": []}),
+                _response({"results": []}),
+                _response({"results": [hit]}),
+                _response({**DANZIG_RELEASE, "id": 8}),
+            ]
+
+            result = lookup_discogs_metadata(
+                "Danzig",
+                "Danzig",
+                catalog_number="BYO LP07252/05 / EFA LP07252 08 / BYO 014 / LP07252",
+            )
+
+        assert result["discogs_release_id"] == 8
+        assert result["exact_match"] is True
+        assert result["match_basis"] == "catalog_number"
+        assert [
+            call.kwargs["params"].get("catno")
+            for call in mock_get.call_args_list[:3]
+        ] == ["BYO LP07252/05", "EFA LP07252 08", "BYO 014"]
+
     def test_marketplace_figures_are_returned_in_eur(self):
         with patch("backend.agent.metadata.requests.get") as mock_get:
             mock_get.side_effect = [_response(DANZIG_HITS), _response(DANZIG_RELEASE)]

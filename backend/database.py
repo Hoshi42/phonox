@@ -5,15 +5,64 @@ import logging
 import os
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Any as ColumnType
-from sqlalchemy import Column, String, Float, Boolean, DateTime, Text, Integer, LargeBinary, ForeignKey
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    LargeBinary,
+    String,
+    Text,
+    inspect,
+    text,
+)
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.engine import Engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, relationship
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
 Base = declarative_base()  # type: ignore[misc]
 
 logger = logging.getLogger(__name__)
+
+CATALOG_NUMBER_MAX_LENGTH = 255
+
+
+def ensure_catalog_number_capacity(engine: Engine) -> None:
+    """Widen the existing PostgreSQL catalog-number column without losing data."""
+    if engine.dialect.name != "postgresql":
+        return
+
+    column = next(
+        (
+            item
+            for item in inspect(engine).get_columns("vinyl_records")
+            if item["name"] == "catalog_number"
+        ),
+        None,
+    )
+    if column is None:
+        raise RuntimeError("vinyl_records.catalog_number column is missing")
+
+    current_length = getattr(column["type"], "length", None)
+    if current_length is None or current_length >= CATALOG_NUMBER_MAX_LENGTH:
+        return
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "ALTER TABLE vinyl_records "
+                f"ALTER COLUMN catalog_number TYPE VARCHAR({CATALOG_NUMBER_MAX_LENGTH})"
+            )
+        )
+    logger.info(
+        "Expanded vinyl_records.catalog_number from VARCHAR(%s) to VARCHAR(%s)",
+        current_length,
+        CATALOG_NUMBER_MAX_LENGTH,
+    )
 
 
 class VinylRecord(Base):  # type: ignore[misc,valid-type]
@@ -33,7 +82,7 @@ class VinylRecord(Base):  # type: ignore[misc,valid-type]
     year: ColumnType = Column(Integer, nullable=True)
     label: ColumnType = Column(String(255), nullable=True)
     spotify_url: ColumnType = Column(String(500), nullable=True)
-    catalog_number: ColumnType = Column(String(50), nullable=True)
+    catalog_number: ColumnType = Column(String(CATALOG_NUMBER_MAX_LENGTH), nullable=True)
     barcode: ColumnType = Column(String(20), nullable=True)  # UPC/EAN barcodes typically 12-13 digits
     genres: ColumnType = Column(Text, nullable=True)  # JSON array stored as string
 

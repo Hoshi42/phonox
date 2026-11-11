@@ -1,4 +1,9 @@
 # Changelog
+## [2.5.3] - 2026-11-11 - Handle combined catalog numbers
+
+### Fixed
+- **Long or combined catalog numbers** (`backend/database.py`, `backend/agent/metadata.py`, `backend/main.py`) — widened `catalog_number` to 255 characters, migrates existing PostgreSQL databases at startup, and searches each combined code separately on Discogs.
+
 ## [2.5.2] - 2026-11-09 - Chat answers with web search
 
 ### Fixed
