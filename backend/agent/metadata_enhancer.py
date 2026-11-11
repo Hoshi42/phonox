@@ -1,34 +1,102 @@
 """
-Intelligent metadata enhancement for vinyl records.
+Metadata merging for vinyl records.
 
-This module provides functions to intelligently enhance existing vinyl record metadata
-with new information from additional image analysis.
+Merges existing record metadata (a stored record or an external source such as Discogs)
+with newly extracted metadata (image analysis) using fixed, deterministic rules. The
+rules need no LLM call: they are fast, free and reproducible.
 
-Instead of re-analyzing all images, we:
-1. Analyze only NEW images
-2. Extract NEW metadata from them
-3. Compare with existing metadata
-4. Intelligently merge/enhance using Claude
-5. Only update fields with high-confidence new information
+Rules (existing data was already verified, so it wins conflicts):
+- Artist/Title: keep existing; take new only when existing is missing
+- Year/Label: fill only when existing is missing
+- Catalog number: keep existing, append a different new one separated by " / "
+- Barcode: only with a valid UPC/EAN check digit; replaces a missing or invalid one
+- Genres: union, existing first
+- Condition: the worst of both (Goldmine scale), with the matching notes
 """
 
+import difflib
 import logging
-import json
-import os
-from typing import Dict, Any, List, Optional, Tuple
-from datetime import datetime
-from anthropic import Anthropic
+import re
+from typing import Any, Dict, List, Optional, Tuple
 
-from backend.agent.llm_utils import response_text as response_text_of
+from backend.agent.barcode_utils import has_valid_check_digit
+
 logger = logging.getLogger(__name__)
+
+# Best to worst (Goldmine)
+CONDITION_ORDER = ["M", "NM", "VG+", "VG", "G+", "G", "F", "P"]
+_CONDITION_NAMES = {
+    "mint": "M",
+    "near mint": "NM",
+    "very good plus": "VG+",
+    "very good": "VG",
+    "good plus": "G+",
+    "good": "G",
+    "fair": "F",
+    "poor": "P",
+}
+_PLACEHOLDERS = {"", "unknown", "n/a", "none", "null"}
+_SIMILAR = 0.9
+_CONFLICT = 0.85
+
+
+def _is_missing(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, (list, tuple, set, dict)):
+        return not value
+    return str(value).strip().lower() in _PLACEHOLDERS
+
+
+def _normalize(value: Any) -> str:
+    return re.sub(r"[^0-9a-z]", "", str(value or "").lower())
+
+
+def _similarity(a: Any, b: Any) -> float:
+    return difflib.SequenceMatcher(None, _normalize(a), _normalize(b)).ratio()
+
+
+def _condition_rank(value: Any) -> Optional[int]:
+    """Index into CONDITION_ORDER (higher = worse), or None when not recognisable."""
+    text = str(value or "").strip()
+    if not text:
+        return None
+    code = re.search(r"\(([A-Za-z+]+)\)", text)
+    candidates = [code.group(1).upper()] if code else []
+    candidates.append(text.upper())
+    candidates.append(_CONDITION_NAMES.get(re.sub(r"\s*\(.*\)", "", text).strip().lower(), ""))
+    for candidate in candidates:
+        if candidate in CONDITION_ORDER:
+            return CONDITION_ORDER.index(candidate)
+    return None
+
+
+def _merge_catalog(existing: Any, new: Any) -> Optional[str]:
+    if _is_missing(new):
+        return None if _is_missing(existing) else str(existing)
+    if _is_missing(existing):
+        return str(new)
+    existing_norm, new_norm = _normalize(existing), _normalize(new)
+    if not new_norm or new_norm in existing_norm:
+        return str(existing)
+    if existing_norm in new_norm:
+        return str(new)
+    return f"{existing} / {new}"
+
+
+def _merge_genres(existing: Any, new: Any) -> List[str]:
+    merged: List[str] = []
+    seen = set()
+    for genre in list(existing or []) + list(new or []):
+        key = str(genre).strip().lower()
+        if key and key not in seen:
+            seen.add(key)
+            merged.append(str(genre).strip())
+    return merged
 
 
 class MetadataEnhancer:
-    """Intelligent metadata enhancement using Claude."""
-
-    def __init__(self):
-        """Initialize with Anthropic client."""
-        self.client = Anthropic()
+    """Deterministic merge of existing and newly extracted record metadata."""
 
     def enhance_metadata(
         self,
@@ -37,141 +105,85 @@ class MetadataEnhancer:
         existing_confidence: float = 0.5,
     ) -> Tuple[Dict[str, Any], float, List[str]]:
         """
-        Intelligently enhance existing metadata with new information.
-
-        Uses Claude to merge metadata with conflict resolution and confidence tracking.
+        Merge new metadata into existing metadata.
 
         Args:
             existing_metadata: Current metadata (artist, title, year, label, genres, etc.)
-            new_metadata: New metadata extracted from additional images
+            new_metadata: New metadata extracted from images
             existing_confidence: Current confidence level (0.0-1.0)
 
         Returns:
-            Tuple of (enhanced_metadata, new_confidence, changes_made)
+            Tuple of (merged_metadata, confidence, changes_made)
         """
         if not new_metadata:
             return existing_metadata, existing_confidence, []
 
-        # Build context for Claude
-        enhancement_prompt = f"""You are a vinyl record metadata expert. Your task is to intelligently merge new metadata discoveries with existing record information.
+        merged = dict(existing_metadata)
+        changes: List[str] = []
+        bonus = 0.0
 
-EXISTING METADATA (from previous analysis):
-{json.dumps(existing_metadata, indent=2, default=str)}
+        def fill(field: str, value: Any, reason: str) -> None:
+            if value is not None and merged.get(field) != value:
+                merged[field] = value
+                changes.append(f"{field}: {reason} ({value})")
 
-NEW METADATA (from additional images):
-{json.dumps(new_metadata, indent=2, default=str)}
+        # Artist/Title: existing wins; disagreement is a conflict, agreement raises confidence
+        for field in ("artist", "title"):
+            old, new = existing_metadata.get(field), new_metadata.get(field)
+            if _is_missing(old):
+                if not _is_missing(new):
+                    fill(field, new, "filled from new data")
+            elif not _is_missing(new):
+                similarity = _similarity(old, new)
+                if similarity >= _SIMILAR:
+                    bonus += 0.03
+                elif similarity < _CONFLICT:
+                    bonus -= 0.10
+                    changes.append(f"{field}: conflict, kept existing '{old}' (new: '{new}')")
 
-TASK: Analyze both metadata sets and produce an enhanced metadata object with:
-1. ONLY fields that should be updated (where new info is better/more certain)
-2. A confidence score for each field (0.0-1.0)
-3. Explanation for changes
+        # Year/Label: only fill gaps; agreement raises confidence
+        for field in ("year", "label"):
+            old, new = existing_metadata.get(field), new_metadata.get(field)
+            if _is_missing(old):
+                if not _is_missing(new):
+                    fill(field, new, "filled from new data")
+            elif not _is_missing(new) and _similarity(old, new) >= _SIMILAR:
+                bonus += 0.03
 
-RULES FOR MERGING:
-- Artist/Title: Only update if new data is EXACTLY the same (spelling, case, capitalization)
-- Year: Only update if existing is missing AND new is present
-- Label: Only update if existing is missing AND new is present
-- Catalog Number: Keep existing if present, add new if different (separate with "/")
-- Barcode: Only update if existing is missing AND new is valid (12-13 digits)
-- Genres: Merge lists intelligently (avoid duplicates, keep consistent style)
-- Condition: If both have condition, use WORST condition (most conservative assessment). Goldmine scale: M, NM, VG+, VG, G+, G, F, P
-- Confidence: Calculate overall confidence based on agreement level
+        catalog = _merge_catalog(existing_metadata.get("catalog_number"), new_metadata.get("catalog_number"))
+        if catalog and catalog != existing_metadata.get("catalog_number"):
+            fill("catalog_number", catalog, "added")
 
-IMPORTANT: Be CONSERVATIVE - only enhance if you're confident (>0.80) the new data is correct.
-If there are conflicts, prefer the existing data (it was already verified).
+        # Barcode: a number that fails the check digit is a misread and never wins
+        old_barcode, new_barcode = existing_metadata.get("barcode"), new_metadata.get("barcode")
+        if not (old_barcode and has_valid_check_digit(old_barcode)):
+            if new_barcode and has_valid_check_digit(new_barcode):
+                fill("barcode", new_barcode, "filled from new data")
+            elif old_barcode:
+                merged["barcode"] = None
+                changes.append(f"barcode: dropped invalid {old_barcode}")
 
-Return ONLY a valid JSON object with this structure:
-{{{{
-    "enhanced_metadata": {{{{
-        "artist": "value or null",
-        "title": "value or null",
-        "year": null,
-        "label": "value or null",
-        "catalog_number": "value or null",
-        "barcode": "value or null",
-        "genres": ["genre1", "genre2"] or null,
-        "condition": "Near Mint (NM)" or null,
-        "condition_notes": "description of wear" or null
-    }}}},
-    "field_confidences": {{{{
-        "artist": 0.95,
-        "title": 0.95,
-        "year": 0.8,
-        "label": 0.85,
-        "catalog_number": 0.9,
-        "barcode": 0.85,
-        "genres": 0.75,
-        "condition": 0.8
-    }}}},
-    "overall_confidence": 0.87,
-    "changes": [
-        "Field: explanation of what changed and why",
-        "..."
-    ]
-}}}}
+        genres = _merge_genres(existing_metadata.get("genres"), new_metadata.get("genres"))
+        if genres and genres != list(existing_metadata.get("genres") or []):
+            fill("genres", genres, "merged")
 
-Focus on HIGH CONFIDENCE enhancements only."""
+        # Condition: the more conservative (worse) assessment, together with its notes
+        old_condition, new_condition = existing_metadata.get("condition"), new_metadata.get("condition")
+        old_rank, new_rank = _condition_rank(old_condition), _condition_rank(new_condition)
+        use_new = (
+            not _is_missing(new_condition)
+            and (_is_missing(old_condition) or old_rank is None or (new_rank is not None and new_rank > old_rank))
+        )
+        if use_new:
+            fill("condition", new_condition, "worse or first assessment")
+            if new_metadata.get("condition_notes"):
+                merged["condition_notes"] = new_metadata["condition_notes"]
+        elif _is_missing(existing_metadata.get("condition_notes")) and new_metadata.get("condition_notes"):
+            merged["condition_notes"] = new_metadata["condition_notes"]
 
-        try:
-            logger.info("Calling Claude for intelligent metadata enhancement")
-            enhancement_model = os.getenv("ANTHROPIC_ENHANCEMENT_MODEL", "claude-opus-4-5")
-
-            response = self.client.messages.create(
-                model=enhancement_model,
-                max_tokens=8000,  # newer models count thinking tokens too; 2500 truncated the JSON
-                messages=[
-                    {
-                        "role": "user",
-                        "content": enhancement_prompt,
-                    }
-                ],
-            )
-
-            response_text = response_text_of(response)
-
-            # Parse JSON response
-            try:
-                result = json.loads(response_text)
-            except json.JSONDecodeError:
-                # Try to extract JSON from response
-                start_idx = response_text.find("{")
-                end_idx = response_text.rfind("}") + 1
-                if start_idx >= 0 and end_idx > start_idx:
-                    result = json.loads(response_text[start_idx:end_idx])
-                else:
-                    logger.error(f"Failed to parse Claude response: {response_text[:500]}")
-                    return existing_metadata, existing_confidence, []
-
-            # Extract enhanced metadata
-            enhanced = result.get("enhanced_metadata", {})
-            field_confidences = result.get("field_confidences", {})
-            overall_confidence = result.get("overall_confidence", existing_confidence)
-            changes = result.get("changes", [])
-
-            # Merge with existing metadata (only update non-null new values)
-            merged_metadata = existing_metadata.copy()
-            applied_changes = []
-            change_index = 0
-
-            for field, value in enhanced.items():
-                if value is not None and value != existing_metadata.get(field):
-                    merged_metadata[field] = value
-                    confidence = field_confidences.get(field, 0.7)
-                    description = changes[change_index] if change_index < len(changes) else f"{field}: Updated"
-                    applied_changes.append(f"{field}: {description} (confidence: {confidence:.0%})")
-                    change_index += 1
-
-            # Calculate new overall confidence
-            # Boost confidence if metadata was consistent between old and new
-            consistency_bonus = 0.05 if applied_changes else 0.10
-            new_confidence = min(1.0, (existing_confidence + overall_confidence) / 2 + consistency_bonus)
-
-            logger.info(f"Enhanced metadata with {len(applied_changes)} changes. New confidence: {new_confidence:.2f}")
-
-            return merged_metadata, new_confidence, applied_changes
-
-        except Exception as e:
-            logger.error(f"Error enhancing metadata: {e}")
-            return existing_metadata, existing_confidence, []
+        confidence = max(0.0, min(1.0, existing_confidence + bonus))
+        logger.info(f"Merged metadata with {len(changes)} changes. Confidence: {confidence:.2f}")
+        return merged, confidence, changes
 
     def detect_metadata_conflicts(
         self,

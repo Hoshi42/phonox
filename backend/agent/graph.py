@@ -798,7 +798,7 @@ def metadata_synthesis_node(state: VinylState) -> VinylState:
     """
     Synthesize vision extraction results with external evidence (Discogs/MusicBrainz).
 
-    Uses Claude Opus via MetadataEnhancer to intelligently merge:
+    Uses MetadataEnhancer (deterministic rules, no LLM call) to merge:
     - External evidence (authoritative for artist/title/year/label)
     - Vision extraction (authoritative for condition/barcode/catalog_number)
 
@@ -864,7 +864,7 @@ def metadata_synthesis_node(state: VinylState) -> VinylState:
             if vision_data.get(field) is not None and enhanced.get(field) is None:
                 enhanced[field] = vision_data[field]
 
-        # The LLM merge may drop identifiers it did not echo back: never lose what the images showed
+        # Never lose what the images showed: fill identifiers the merge left empty
         for field in ("catalog_number", "barcode", "year", "label", "genres"):
             if not enhanced.get(field) and vision_data.get(field):
                 enhanced[field] = vision_data[field]

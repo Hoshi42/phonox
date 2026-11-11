@@ -212,7 +212,7 @@ Full CLI Reference:
 | Image analysis | `ANTHROPIC_VISION_MODEL` | `claude-sonnet-5-5` |
 | Chat and market valuation | `ANTHROPIC_CHAT_MODEL` | `claude-haiku-5-5` |
 | Multi-image aggregation | `ANTHROPIC_AGGREGATION_MODEL` | `claude-sonnet-5-5` |
-| Metadata enhancement | `ANTHROPIC_ENHANCEMENT_MODEL` | `claude-opus-5-5` |
+| Metadata enhancement | rule-based, no LLM call (`ANTHROPIC_ENHANCEMENT_MODEL` is no longer used) | - |
 
 These are the recommendations in `.env.example`, not a guarantee of the running
 backend's effective configuration. Model variables must reach the backend process;

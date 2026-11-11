@@ -17,7 +17,7 @@ for every request or platform.
 | `ANTHROPIC_CHAT_MODEL` | `claude-haiku-5-5` | From $0.10 | From $0.50 |
 | `ANTHROPIC_VISION_MODEL` | `claude-sonnet-5-5` | $2.00 | $10.00 |
 | `ANTHROPIC_AGGREGATION_MODEL` | `claude-sonnet-5-5` | $2.00 | $10.00 |
-| `ANTHROPIC_ENHANCEMENT_MODEL` | `claude-opus-5-5` | $4.00 | $20.00 |
+| `ANTHROPIC_ENHANCEMENT_MODEL` | No longer used (rule-based merge) | - | - |
 
 Sources:
 
@@ -39,7 +39,7 @@ certify all vision, aggregation and enhancement paths against the new models.
 |---|---|---|
 | Per-image extraction | `ANTHROPIC_VISION_MODEL` | Image input, extraction prompt and response |
 | Multi-image merging | `ANTHROPIC_AGGREGATION_MODEL` | Extracted metadata, merge prompt and response |
-| Metadata enrichment / re-analysis | `ANTHROPIC_ENHANCEMENT_MODEL` | Existing metadata, new evidence and response |
+| Metadata enrichment / re-analysis | none (rule-based merge) | No model call; `ANTHROPIC_ENHANCEMENT_MODEL` is no longer used |
 | Chat | `ANTHROPIC_CHAT_MODEL` | Conversation context; tool use may require multiple model turns |
 | Market valuation | `ANTHROPIC_CHAT_MODEL` | Search results, valuation prompt and response |
 | Collection analysis | `ANTHROPIC_CHAT_MODEL` | Collection size, prompt and potentially long response |

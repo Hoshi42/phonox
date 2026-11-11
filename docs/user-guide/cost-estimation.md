@@ -72,11 +72,8 @@ Check artist, pressing, barcode and condition accuracy on representative
 records before switching. There is no project benchmark establishing identical
 quality across models.
 
-For less expensive metadata enhancement, evaluate:
-
-```env
-ANTHROPIC_ENHANCEMENT_MODEL=claude-sonnet-5-5
-```
+For less expensive image analysis, evaluate the Sonnet or Haiku tier for the vision
+and aggregation models. Metadata enhancement makes no model call any more.
 
 At the published rates, Sonnet costs half as much as Opus 5.5 for the same
 number of input and output tokens.

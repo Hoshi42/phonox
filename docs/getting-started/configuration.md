@@ -204,7 +204,7 @@ fallbacks automatically.
 | Variable | Recommended model | Purpose |
 |---|---|---|
 | `ANTHROPIC_AGGREGATION_MODEL` | `claude-sonnet-5-5` | Merge results from multiple images |
-| `ANTHROPIC_ENHANCEMENT_MODEL` | `claude-opus-5-5` | Resolve metadata conflicts during enhancement |
+| `ANTHROPIC_ENHANCEMENT_MODEL` | `claude-opus-5-5` | No longer used: metadata merging is rule-based and makes no LLM call |
 
 For lower enhancement costs, evaluate `claude-sonnet-5-5` as an alternative to
 Opus. See [model pricing and estimation](../architecture/cost-model.md).

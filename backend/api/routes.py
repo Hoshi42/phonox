@@ -1207,7 +1207,7 @@ async def reanalyze_vinyl(
                     error="Image analysis could not produce confidence score. Check that valid vinyl record images were provided.",
                 )
             
-            # STEP 3: Merge new analysis results with existing DB metadata via MetadataEnhancer (Opus)
+            # STEP 3: Merge new analysis results with existing DB metadata (deterministic rules)
             # Preserves user-validated fields; fills gaps from the fresh analysis
             existing_metadata: Dict[str, Any] = {}
             existing_record = None  # initialised here so STEP 4 always has a reference
@@ -1238,7 +1238,7 @@ async def reanalyze_vinyl(
             # Only run MetadataEnhancer if we have meaningful existing metadata to merge with
             if existing_metadata.get("artist") and existing_metadata.get("title"):
                 try:
-                    logger.info("Running MetadataEnhancer (Opus) to merge existing DB metadata with new analysis")
+                    logger.info("Running MetadataEnhancer to merge existing DB metadata with new analysis")
                     enhancer = MetadataEnhancer()
                     enhanced_metadata, new_confidence, changes = enhancer.enhance_metadata(
                         existing_metadata=existing_metadata,
