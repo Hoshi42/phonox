@@ -28,6 +28,20 @@ import { CollectionQuery, EMPTY_QUERY, GroupBy } from './features/collection'
 import { apiClient } from './api/client'
 import { registerApiClient, RegisterRecord } from './services/registerApi'
 
+const TAB_STORAGE_KEY = 'phonox_active_tab'
+const TABS: Tab[] = ['collection', 'capture', 'discover', 'profile']
+
+// Mobile browsers may reload the page while the camera is open; sessionStorage lets the app resume on the same tab.
+function readStoredTab(): Tab {
+  try {
+    const stored = sessionStorage.getItem(TAB_STORAGE_KEY) as Tab | null
+    if (stored && TABS.includes(stored)) return stored
+  } catch {
+    // Storage can be unavailable (private mode); fall back to the default tab.
+  }
+  return 'collection'
+}
+
 // Environment configuration
 const POLL_INTERVAL = parseInt(import.meta.env.VITE_POLL_INTERVAL || '2000', 10)
 
@@ -98,8 +112,15 @@ function App() {
   const [registerLoading, setRegisterLoading] = useState(false)
   const [currentUser, setCurrentUser] = useState(() => localStorage.getItem('phonox_username') || '')
   const [isCheckingValue, setIsCheckingValue] = useState(false)
-  const [tab, setTab] = useState<Tab>('collection')
+  const [tab, setTab] = useState<Tab>(readStoredTab)
   const [sheetOpen, setSheetOpen] = useState(false)
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(TAB_STORAGE_KEY, tab)
+    } catch {
+      // Ignore storage errors; persistence is best effort.
+    }
+  }, [tab])
   const [query, setQuery] = useState<CollectionQuery>(EMPTY_QUERY)
   const { preference: theme, setPreference: setTheme } = useTheme()
   const metadataUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)

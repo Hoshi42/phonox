@@ -29,6 +29,12 @@ import styles from './ChatPanel.module.css'
 // Constants for chat history management
 const MAX_MESSAGE_PAIRS = 10 // Keep last 10 message pairs (prompt + response)
 const MAX_MESSAGES = MAX_MESSAGE_PAIRS * 2 // 20 total messages max
+
+const CAPTURE_PENDING_KEY = 'phonox_capture_pending'
+
+const clearCapturePending = () => {
+  try { sessionStorage.removeItem(CAPTURE_PENDING_KEY) } catch { /* best effort */ }
+}
 const CHAT_HISTORY_STORAGE_KEY = 'phonox_chat_history'
 const GENERAL_CHAT_THREAD_KEY = 'phonox_general_chat_thread_id'
 
@@ -214,6 +220,28 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({
   useEffect(() => {
     saveChatHistory(record?.record_id, messages)
   }, [messages, record?.record_id])
+
+  // A phone may discard this page while the camera app is open. The flag survives the reload,
+  // which lets us tell the user why the photo is missing instead of silently dropping it.
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(CAPTURE_PENDING_KEY)) {
+        sessionStorage.removeItem(CAPTURE_PENDING_KEY)
+        setMessages(prev => enforceMessageLimit([...prev, {
+          role: 'system',
+          content: '⚠️ The page was reloaded while the camera was open, so the photo was lost. Please try again or pick the photo from your gallery.',
+          timestamp: new Date().toISOString(),
+        }], MAX_MESSAGES))
+      }
+    } catch {
+      return undefined
+    }
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') clearCapturePending()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
 
   // Switch chat context when record changes
   useEffect(() => {
@@ -467,6 +495,7 @@ The vinyl card has been updated with all the details. You can edit any informati
   }, [analyzing])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    clearCapturePending()
     if (e.target.files) {
       handleImageUpload(Array.from(e.target.files))
       // Reset the input value to allow selecting the same files again (mobile fix)
@@ -496,7 +525,10 @@ The vinyl card has been updated with all the details. You can edit any informati
             🗑️
           </button>
           <button 
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => {
+              try { sessionStorage.setItem(CAPTURE_PENDING_KEY, '1') } catch { /* best effort */ }
+              fileInputRef.current?.click()
+            }}
             className={styles.uploadBtn}
             title="Upload images"
           >
