@@ -250,9 +250,10 @@ export default function CollectionMagazine({ user, records }: Props) {
                 <div className={`${styles.notice} ${styles.wide}`}>
                   <p>
                     Planning allowance: approximately EUR {status?.estimated_cost_eur.toFixed(2) || '0.00'}.
-                    This is not a provider quote. Hard limit: 20 research/AI steps per job,
-                    at most 1,200 output tokens per AI call. MusicBrainz, Discogs and available
-                    web search providers are used within this budget. An update can continue unfinished research.
+                    This is not a provider quote. Hard limit: {status?.research_step_limit ?? 0} AI calls
+                    per job (each covers up to 5 artists and 8 albums), at most 3,000 output tokens per call.
+                    Wikipedia, MusicBrainz, Discogs and available web search providers supply the facts;
+                    Discogs marketplace data provides the value estimates. An update can continue unfinished research.
                   </p>
                   <p>Only artist, album and necessary release details go to external providers, never your name or private notes.</p>
                   <label className={styles.check}>

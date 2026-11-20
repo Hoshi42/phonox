@@ -44,6 +44,7 @@ export interface MagazineRecord {
 export interface MagazineArtist {
   name: string
   portrait: string
+  facts?: string
   sources: MagazineSource[]
 }
 
@@ -54,6 +55,7 @@ export interface MagazineDraft {
   artists: MagazineArtist[]
   warnings: string[]
   steps_used: number
+  step_limit?: number
 }
 
 export interface MagazineProgress {

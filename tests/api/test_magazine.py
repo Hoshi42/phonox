@@ -22,6 +22,7 @@ from backend.api.magazine import router
 from backend.api.register import router as register_router
 from backend.database import Base, CollectionMagazine, VinylImage, VinylRecord, get_db
 from backend.magazine_models import MagazineDraft, MagazineSettings
+from backend.magazine_sources import ArtistBackground
 
 
 class DeferredExecutor:
@@ -45,6 +46,7 @@ def environment(tmp_path, monkeypatch):
     executor = DeferredExecutor()
     monkeypatch.setattr(database, "SessionLocal", factory)
     monkeypatch.setattr(service, "MAGAZINE_ROOT", tmp_path / "magazines")
+    monkeypatch.setattr(service, "DISCOGS_INTERVAL_SECONDS", 0)
     monkeypatch.setattr("backend.api.magazine.EXECUTOR", executor)
     app = FastAPI()
     app.include_router(router)
@@ -162,7 +164,7 @@ def page_text(document, index):
     return document.pages[index].extract_text()
 
 
-def test_landscape_half_page_magazine_structure_images_fonts_links(environment):
+def test_landscape_compact_magazine_structure_images_fonts_links(environment):
     env = environment
     for artist in ("Artist One", "Artist Two", "Artist Three"):
         for index in range(2):
@@ -187,9 +189,13 @@ def test_landscape_half_page_magazine_structure_images_fonts_links(environment):
         assert entry.title in document.pages[destination].extract_text()
     album_entries = [entry for entry in entries if " Album " in entry.title]
     assert len(album_entries) == 6
-    # Every album owns one half page, so a page never carries more than two albums.
+    # Compact cards, and a contents page that lists only the initial letters of the artists.
     per_page = Counter(document.get_destination_page_number(entry) for entry in album_entries)
-    assert max(per_page.values()) == 2 and len(per_page) == 3
+    assert max(per_page.values()) <= 6
+    assert result["page_count"] <= 5
+    contents = document.pages[1].extract_text()
+    assert " Album " not in contents and "Artist One" not in contents and "\nA\n" in contents
+    assert any(entry.title == "Artist One" for entry in entries)  # artists stay reachable as bookmarks
     assert sum(len(page.images) for page in document.pages) >= 12  # both views of all six albums
     for page in document.pages:
         for font in page["/Resources"].get("/Font", {}).values():
@@ -386,37 +392,140 @@ def test_missing_and_corrupt_images_are_reported_without_false_changes(environme
     assert status(env)["changes"]["changed"] == 0
 
 
-def test_budget_is_hard_and_all_providers_are_bounded(environment, monkeypatch):
+def stub_research(monkeypatch, calls, release_id=None):
+    def research(units, budget):
+        budget.reserve()
+        calls.append(units)
+        source = service.MagazineSource(title="Source", url="https://example.org/music", accessed_at=service.utc_now())
+        text = "Original researched editorial text about the record and its sound. " * 3
+        artists = [service.ArtistText(artist=unit.owner, facts="German band · 1968–1975",
+                                      portrait="Original portrait text about this band and its history. " * 6)
+                   for unit in units if unit.subject]
+        count = sum(len(unit.albums) for unit in units)
+        answer = service.ResearchAnswer(artists=artists, used_sources=[0],
+                                        albums=[service.AlbumText(index=index, text=text) for index in range(count)])
+        return answer, {unit.owner: [source] for unit in units}
+
+    def lookup(artist, title, fallback_on_error, **kwargs):
+        calls.append("search")
+        return {"artist": artist, "title": title, "exact_match": True, "discogs_url": "https://www.discogs.com/release/1",
+                "marketplace": {"lowest_price": 20.0, "num_for_sale": 3}}
+
+    def by_id(release, exact_match=False, probable_match=False):
+        calls.append("release")
+        return {"exact_match": exact_match, "probable_match": probable_match,
+                "marketplace": {"lowest_price": 20.0, "num_for_sale": 3}}
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-not-a-real-key")
+    monkeypatch.setattr("backend.agent.metadata.lookup_discogs_metadata", lookup)
+    monkeypatch.setattr("backend.agent.metadata.lookup_discogs_release", by_id)
+    monkeypatch.setattr("backend.magazine_sources.artist_background", lambda name, pace=None: ArtistBackground())
+    monkeypatch.setattr(service, "research_chapter", research)
+
+
+def test_research_bundles_artists_per_ai_call_and_fills_every_chapter(environment, monkeypatch):
     env = environment
     for index in range(8):
         add_record(env, artist=f"Artist {index}", title=f"Album {index}")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-not-a-real-key")
+        add_record(env, artist=f"Artist {index}", title=f"Second {index}")
     calls = []
+    stub_research(monkeypatch, calls)
+    draft = prepare(env, research=True, consent=True)["draft"]
+    jobs = [call for call in calls if isinstance(call, list)]
+    assert draft["steps_used"] == draft["step_limit"] == len(jobs) == 2  # 16 albums, at most 8 per call
+    assert all(len(job) <= service.ARTISTS_PER_CALL for job in jobs)
+    assert calls.count("search") == 16
+    assert all(artist["portrait"] and artist["facts"] and artist["researched"] for artist in draft["artists"])
+    assert all(record["description"] and record["sources"] for record in draft["records"])
+    assert all(record["value_eur"] == 20 and record["value_kind"] == "researched" for record in draft["records"])
+    assert draft["lookups_total"] == draft["lookups_done"] == 16
+    assert not any("budget" in warning.lower() for warning in draft["warnings"])
+    assert "PRIVATE COLLECTOR NOTE" not in json.dumps(draft)
+    # A second update has nothing left to research, and the fresh values are not looked up again.
+    calls.clear()
+    publish(env)
+    assert prepare(env, research=True, consent=True)["draft"]["steps_used"] == 0
+    assert calls == []
 
-    def lookup(artist, title, fallback_on_error):
-        calls.append("database")
-        return {"artist": artist, "title": title}
 
-    def research(query, instruction, budget, candidates=None):
-        budget.reserve()
-        calls.append("search")
-        budget.reserve()
-        calls.append("ai")
-        source = service.MagazineSource(title="Source", url="https://example.org/music", accessed_at=service.utc_now())
-        text = "Original researched editorial text. " * (40 if "portrait" in instruction else 25)
-        return service.ResearchAnswer(text=text, used_sources=[0],
-                                      value_eur=None), [source]
+def test_research_budget_is_a_hard_ceiling_and_the_update_continues(environment, monkeypatch):
+    env = environment
+    for index in range(7):
+        add_record(env, artist=f"Artist {index}", title=f"Album {index}")
+    calls = []
+    stub_research(monkeypatch, calls)
+    monkeypatch.setattr(service, "MAX_STEPS", 1)
+    draft = prepare(env, research=True, consent=True, refresh_values=False)["draft"]
+    assert draft["steps_used"] == draft["step_limit"] == 1
+    assert any("budget" in warning.lower() for warning in draft["warnings"])
+    assert sum(1 for artist in draft["artists"] if artist["researched"]) == service.ARTISTS_PER_CALL
+    publish(env)
+    monkeypatch.setattr(service, "MAX_STEPS", 300)
+    assert prepare(env, research=True, consent=True, refresh_values=False)["draft"]["steps_used"] == 1
 
-    monkeypatch.setenv("MUSICBRAINZ_ENABLED", "true")
-    monkeypatch.setattr("backend.agent.metadata.lookup_discogs_metadata", lookup)
-    monkeypatch.setattr("backend.agent.metadata.lookup_musicbrainz_metadata", lookup)
-    monkeypatch.setattr(service, "research_text", research)
-    prepared = prepare(env, research=True, consent=True)
-    assert prepared["draft"]["steps_used"] == 20
-    assert len(calls) == 20
-    assert calls.count("database") == 2
-    assert any("budget" in warning.lower() for warning in prepared["draft"]["warnings"])
-    assert "PRIVATE COLLECTOR NOTE" not in json.dumps(prepared["draft"])
+
+def test_public_summary_is_the_portrait_and_the_ai_only_writes_album_texts(environment, monkeypatch):
+    env = environment
+    add_record(env)
+    calls = []
+    stub_research(monkeypatch, calls)
+    summary = "Artist One (pronounced /x/) are a fictional group that recorded jazz in small rooms. " * 5
+    source = service.MagazineSource(title="Wikipedia: Artist One", url="https://en.wikipedia.org/wiki/Artist_One",
+                                    accessed_at=service.utc_now())
+    monkeypatch.setattr("backend.magazine_sources.artist_background",
+                        lambda name, pace=None: ArtistBackground(summary=summary, summary_source=source))
+    draft = prepare(env, research=True, consent=True)["draft"]
+    artist = draft["artists"][0]
+    assert artist["portrait"].startswith("Artist One are a fictional group") and artist["researched"]
+    assert artist["sources"][0]["url"].endswith("Artist_One")
+    assert all(unit.subject is None for job in calls if isinstance(job, list) for unit in job)  # no AI portrait
+    assert draft["records"][0]["description"] and draft["steps_used"] == 1
+
+
+def test_failed_research_falls_back_to_public_summary_and_values_stay_optional(environment, monkeypatch):
+    env = environment
+    add_record(env)
+    calls = []
+    stub_research(monkeypatch, calls)
+    summary = "Artist One are a fictional group that recorded jazz in small rooms. " * 5
+    source = service.MagazineSource(title="Wikipedia: Artist One", url="https://en.wikipedia.org/wiki/Artist_One",
+                                    accessed_at=service.utc_now())
+    monkeypatch.setattr("backend.magazine_sources.artist_background",
+                        lambda name, pace=None: ArtistBackground(summary=summary, summary_source=source))
+    monkeypatch.delenv("ANTHROPIC_API_KEY")
+    draft = prepare(env, research=True, consent=True)["draft"]
+    artist = draft["artists"][0]
+    assert artist["portrait"].startswith("Artist One are a fictional group") and artist["researched"]
+    assert artist["sources"][0]["url"].endswith("Artist_One")
+    assert draft["steps_used"] == 0 and "search" in calls
+    assert draft["records"][0]["value_eur"] == 20  # database values need no AI
+    assert any("AI research unavailable" in warning for warning in draft["warnings"])
+
+
+def test_values_use_the_stored_discogs_release_and_survive_rate_limiting(environment, monkeypatch):
+    env = environment
+    record_id = add_record(env)
+    with env.db() as db:
+        db.get(VinylRecord, record_id).evidence_chain = json.dumps([
+            {"source": "discogs", "data": {"discogs_release_id": 4711, "exact_match": True}}])
+        db.commit()
+    calls = []
+    stub_research(monkeypatch, calls)
+    monkeypatch.setattr(service.time, "sleep", lambda seconds: None)
+    from backend.agent.metadata import MetadataError
+    attempts = []
+
+    def by_id(release, exact_match=False, probable_match=False):
+        attempts.append(release)
+        if len(attempts) == 1:
+            raise MetadataError("Discogs release lookup failed: 429 Client Error: Too Many Requests")
+        return {"exact_match": exact_match, "marketplace": {"lowest_price": 31.0, "num_for_sale": 2}}
+
+    monkeypatch.setattr("backend.agent.metadata.lookup_discogs_release", by_id)
+    draft = prepare(env, research=True, consent=True)["draft"]
+    assert attempts == [4711, 4711] and "search" not in calls  # one retry after the 429, never a search
+    assert draft["records"][0]["discogs_release_id"] == 4711 and draft["records"][0]["value_eur"] == 31
+    assert not any("Discogs became unavailable" in warning for warning in draft["warnings"])
 
 
 def test_researched_values_keep_actual_dates_on_update(environment, monkeypatch):
@@ -457,9 +566,10 @@ def test_long_titles_and_hundred_record_collection(environment):
     prepare(env, title="A long magazine title " * 8)
     result = publish(env)
     assert result["record_count"] == 100
-    # Identical test images are stored once per page, so count unique images per half-page pair.
-    assert sum(len(page.images) for page in reader(env).pages) >= 250
-    assert result["page_count"] < 80  # two albums per landscape page
+    # Identical test images are stored once per page, so count the unique cover and two views per page.
+    assert sum(len(page.images) for page in reader(env).pages) >= 60
+    assert result["page_count"] < 40  # four albums per landscape page
+    assert result["page_count"] == len(reader(env).pages)
     assert len([entry for entry in outline_entries(reader(env).outline) if "Édition vinyl" in entry.title]) == 100
 
 
@@ -475,7 +585,7 @@ def test_automatic_foreword_is_updated_but_user_text_is_preserved(environment):
     assert updated["draft"]["settings"]["title"] == "My custom magazine"
 
 
-def test_hard_ai_limits_source_validation_and_no_invented_prices(environment, monkeypatch):
+def test_hard_ai_limits_and_source_validation(environment, monkeypatch):
     env = environment
     add_record(env)
     with env.db() as db:
@@ -483,7 +593,10 @@ def test_hard_ai_limits_source_validation_and_no_invented_prices(environment, mo
         db.add(magazine)
         db.flush()
         draft = service.prepare_draft(db, magazine, MagazineSettings(research=False))
+    draft.step_limit = 1
     calls = []
+    reply = {"artists": [], "albums": [{"index": 0, "text": "An original text based on the supplied sources."}],
+             "used_sources": [0]}
 
     class Client:
         def __init__(self, **kwargs):
@@ -498,28 +611,72 @@ def test_hard_ai_limits_source_validation_and_no_invented_prices(environment, mo
 
         def create(self, **kwargs):
             calls.append(kwargs)
-            return SimpleNamespace(
-                content=[SimpleNamespace(type="text", text=json.dumps({
-                    "text": "An original text based on the supplied sources.",
-                    "used_sources": [0], "value_eur": 500, "valuation_basis": "album_level",
-                }))], stop_reason="end_turn")
+            return SimpleNamespace(content=[SimpleNamespace(type="text", text=json.dumps(reply))], stop_reason="end_turn")
 
     monkeypatch.setattr(service, "Anthropic", Client)
     monkeypatch.setattr("backend.tools.web_tools.WebSearchTool.search", lambda *args, **kwargs: [{
         "title": "Music history", "url": "https://example.org/history", "content": "Release history. " * 4000,
     }])
     budget = service.ResearchBudget(draft, lambda: None)
-    answer, sources = service.research_text("Artist Album", "Describe the record.", budget)
-    assert draft.steps_used == 2
-    assert calls[0]["max_tokens"] == 1200
+    units = service.research_units(draft, draft.artists[0], wants_portrait=False)
+    answer, sources = service.research_chapter(units, budget)
+    assert draft.steps_used == 1
+    assert calls[0]["max_tokens"] == service.OUTPUT_TOKEN_LIMIT
     assert len(calls[0]["messages"][0]["content"].encode()) <= service.INPUT_BYTE_LIMIT
-    assert answer.value_eur is None and answer.valuation_basis == "insufficient"
-    assert sources[0].url == "https://example.org/history"
+    assert answer.albums[0].text.startswith("An original text") and not hasattr(answer, "value_eur")
+    assert sources[units[0].owner][0].url == "https://example.org/history"
     assert "PRIVATE COLLECTOR NOTE" not in json.dumps(calls)
-    draft.steps_used = 20
     with pytest.raises(ValueError, match="limit"):
         budget.reserve()
-    assert draft.steps_used == 20
+    assert draft.steps_used == 1
+    draft.step_limit = 2
+    reply["used_sources"] = [7]  # a reference to evidence that was never supplied
+    with pytest.raises(ValueError, match="source references"):
+        service.research_chapter(units, budget)
+
+
+def test_text_is_clipped_to_whole_sentences():
+    text = "First sentence is here. " * 20
+    clipped = service.clip_words(text, 30)
+    assert clipped.endswith("here.") and len(clipped.split()) <= 30
+    assert service.clip_words("Short text.", 30) == "Short text."
+
+
+def test_research_units_batch_albums_per_artist_and_jobs_share_calls(environment):
+    env = environment
+    for index in range(service.ALBUMS_PER_CALL + 2):
+        add_record(env, artist="Artist One", title=f"Album {index}")
+    add_record(env, artist="Various Artists", title="Sampler A")
+    add_record(env, artist="Various Artists", title="Sampler B")
+    for name in ("Artist Two", "Artist Three"):
+        add_record(env, artist=name, title="Only Album")
+    draft = MagazineDraft.model_validate(prepare(env)["draft"])
+    units = {artist.name: service.research_units(draft, artist) for artist in draft.artists}
+    batches = units["Artist One"]
+    assert [len(unit.albums) for unit in batches] == [service.ALBUMS_PER_CALL, 2]
+    assert [unit.subject for unit in batches] == ["Artist One", None]  # the portrait is written once
+    compilation = units[service.COMPILATIONS]
+    assert [len(unit.albums) for unit in compilation] == [1, 1] and all(unit.subject is None for unit in compilation)
+    jobs = service.pack_jobs([unit for chapter in units.values() for unit in chapter])
+    assert all(len(job) <= service.ARTISTS_PER_CALL and sum(len(unit.albums) for unit in job) <= service.ALBUMS_PER_CALL
+               for job in jobs)
+    assert sum(len(job) for job in jobs) == sum(len(chapter) for chapter in units.values())
+
+
+def test_discogs_values_need_a_matching_pressing_and_prefer_the_copy_condition():
+    market = {"lowest_price": 18.0, "num_for_sale": 4,
+              "price_suggestions": {"Very Good Plus (VG+)": 30.0, "Mint (M)": 80.0}}
+    assert service.discogs_value({"exact_match": False, "marketplace": market}, "VG+") is None
+    assert service.discogs_value({"exact_match": True, "marketplace": market}, "vg+")[0] == 30.0
+    value, note = service.discogs_value({"probable_match": True, "marketplace": market}, "good")
+    assert value == 18.0 and "probable pressing" in note
+    assert service.discogs_value({"exact_match": True, "marketplace": {}}, None) is None
+
+
+def test_public_summaries_are_only_taken_from_matching_music_pages():
+    from backend.magazine_sources import _is_same_artist
+    assert _is_same_artist("Can (band)", "Can") and _is_same_artist("Neu!", "neu!")
+    assert not _is_same_artist("Can (verb)", "Can") and not _is_same_artist("Canada", "Can")
 
 
 def test_image_modification_is_detected_and_export_does_not_write_collection(environment):
@@ -619,7 +776,7 @@ def test_portrait_half_page_and_downscaled_images(environment):
     publish(env)
     document = reader(env)
     texts = [page.extract_text() for page in document.pages]
-    cell_page = next(text for text in texts if "ARTIST ONE" in text)
+    cell_page = next(text for text in texts if "Artist One" in text and "This sample portrait" in text)
     assert "This sample portrait" in cell_page and "First Album" in cell_page  # portrait and album share the page
     # The 3840x5400 source is resampled to what a half-page cell needs, far below the original size.
     widths = [image.image.width for page in document.pages for image in page.images]
@@ -643,7 +800,7 @@ def test_old_placeholder_texts_never_reach_the_pdf(environment):
     assert "not available yet" not in text and "ARTIST\n" not in text
 
 
-def test_overlong_text_is_shortened_to_stay_on_its_half_page(environment):
+def test_overlong_text_is_shortened_to_stay_within_its_card(environment):
     env = environment
     record_id = add_record(env, images=1)
     prepared = prepare(env)
@@ -657,7 +814,7 @@ def test_overlong_text_is_shortened_to_stay_on_its_half_page(environment):
     result = publish(env)
     document = reader(env)
     assert result["page_count"] == len(document.pages)
-    assert any("Text shortened to fit one half page" in note for note in status(env)["warnings"])
+    assert any("Text shortened to fit its card" in note for note in status(env)["warnings"])
     cell_pages = [page for page in document.pages if "First Album" in page.extract_text() and "…" in page.extract_text()]
     assert len(cell_pages) == 1
 
@@ -715,11 +872,12 @@ def test_research_share_of_the_progress_is_reserved_when_enabled(environment, mo
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-not-a-real-key")
     monkeypatch.setattr("backend.agent.metadata.lookup_discogs_metadata", lambda *a, **k: None)
     monkeypatch.setattr("backend.agent.metadata.lookup_musicbrainz_metadata", lambda *a, **k: None)
-    monkeypatch.setattr(service, "research_text", lambda *a, **k: (_ for _ in ()).throw(ValueError("offline")))
+    monkeypatch.setattr("backend.magazine_sources.artist_background", lambda name, pace=None: ArtistBackground())
+    monkeypatch.setattr(service, "research_chapter", lambda *a, **k: (_ for _ in ()).throw(ValueError("offline")))
     monkeypatch.setattr(service, "set_progress", lambda mid, *args: (seen.append(args), original(mid, *args)))
     prepare(env, research=True, consent=True)
     assert any(args[0].startswith("Freezing") and args[4] == 35.0 for args in seen)
-    assert any(args[0].startswith("Researching") and args[2] == service.STEP_LIMIT and args[3] == 35.0
+    assert any(args[0].startswith("Researching") and args[2] == 2 and args[3] == 35.0
                for args in seen)
 
 

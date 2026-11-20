@@ -13,6 +13,7 @@ import difflib
 import logging
 import os
 import re
+import time
 import requests
 from typing import Dict, List, Optional, Any, Tuple
 from urllib.parse import quote
@@ -229,9 +230,13 @@ def _extract_discogs_market(release_data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+_SUGGESTIONS_RETRY_AFTER = 0.0
+
+
 def _fetch_discogs_price_suggestions(release_id: Any) -> Optional[Dict[str, float]]:
     """Per-condition price suggestions. Needs a token and filled-out Discogs seller settings."""
-    if not os.getenv("DISCOGS_TOKEN", "").strip():
+    global _SUGGESTIONS_RETRY_AFTER
+    if not os.getenv("DISCOGS_TOKEN", "").strip() or time.monotonic() < _SUGGESTIONS_RETRY_AFTER:
         return None
     try:
         response = requests.get(
@@ -241,6 +246,8 @@ def _fetch_discogs_price_suggestions(release_id: Any) -> Optional[Dict[str, floa
         )
         if response.status_code != 200:
             logger.info(f"Discogs price suggestions unavailable (HTTP {response.status_code})")
+            if response.status_code in (401, 403, 404):
+                _SUGGESTIONS_RETRY_AFTER = time.monotonic() + 3600  # missing seller settings: do not ask again every release
             return None
         try:
             data = response.json()
@@ -409,6 +416,48 @@ def lookup_discogs_metadata(
             return None
         else:
             raise MetadataError(f"Discogs lookup failed: {e}") from e
+
+
+def lookup_discogs_release(
+    release_id: int,
+    exact_match: bool = False,
+    probable_match: bool = False,
+) -> Dict[str, Any]:
+    """Marketplace figures of an already identified Discogs release: one request, no search.
+
+    Raises:
+        MetadataError: If the request fails (for example HTTP 429 when rate limited)
+    """
+    try:
+        response = requests.get(
+            f"{DISCOGS_API_BASE}/releases/{release_id}",
+            params={"curr_abbr": "EUR"},
+            timeout=API_TIMEOUT,
+            headers=_discogs_headers(),
+        )
+        response.raise_for_status()
+        try:
+            release_data = response.json()
+        finally:
+            response.close()
+    except (requests.RequestException, ValueError) as e:
+        raise MetadataError(f"Discogs release lookup failed: {e}") from e
+    market = _extract_discogs_market(release_data)
+    market["price_suggestions"] = _fetch_discogs_price_suggestions(release_id)
+    return {
+        "artist": _extract_discogs_artist(release_data),
+        "title": release_data.get("title"),
+        "year": release_data.get("year"),
+        "label": _extract_discogs_label(release_data),
+        "catalog_number": _extract_discogs_catalog(release_data),
+        "genres": release_data.get("genres", []),
+        "discogs_release_id": release_id,
+        "discogs_url": release_data.get("uri") or f"https://www.discogs.com/release/{release_id}",
+        "exact_match": exact_match,
+        "probable_match": probable_match,
+        "match_basis": "stored_release",
+        "marketplace": market,
+    }
 
 
 def lookup_musicbrainz_metadata(

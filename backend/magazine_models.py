@@ -49,6 +49,8 @@ class MagazineRecord(BaseModel):
     condition: str | None = None
     notes: str | None = None
     stored_value: float | None = None
+    discogs_release_id: int | None = None
+    discogs_match: Literal["", "exact", "probable"] = ""
     images: list[MagazineImage] = Field(default_factory=list)
     fingerprint: str
     description: str = ""
@@ -64,6 +66,7 @@ class MagazineRecord(BaseModel):
 class MagazineArtist(BaseModel):
     name: str
     portrait: str = ""
+    facts: str = ""
     manual: bool = False
     researched: bool = False
     sources: list[MagazineSource] = Field(default_factory=list)
@@ -76,6 +79,9 @@ class MagazineDraft(BaseModel):
     artists: list[MagazineArtist]
     warnings: list[str] = Field(default_factory=list)
     steps_used: int = 0
+    step_limit: int = 0
+    lookups_total: int = 0
+    lookups_done: int = 0
     estimated_cost_eur: float = 0
     preface_manual: bool = False
 

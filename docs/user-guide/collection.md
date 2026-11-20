@@ -119,13 +119,14 @@ To improve identification of a saved record:
 Open the **Profile** tab and expand **PDF Magazine** (section *Collection magazine*). Each collection user can
 have one magazine. It is an English, A4 **landscape** PDF with:
 
-- A title page, editable foreword and linked contents/PDF bookmarks.
-- **One half page per album**, two per page, with the photographs of that copy, the key facts and the estimated value.
-- A half-page artist portrait before an artist's records, where portrait text exists.
+- A title page, editable foreword, collection overview and a one-page, linked list of artists (plus PDF bookmarks for every album).
+- **Compact cards, four albums per page**: cover plus up to two more photographs of that copy, key facts, estimated value and a short text.
+- A compact artist card above each artist's records with a short portrait and a one-line fact summary (origin, years active, style), where information exists.
 - EUR estimates, dated when the valuation date is known.
+- One short *Sources* page that lists each website once per artist.
 
-Information that is not available is simply left out of the PDF: no portrait page, no empty fields,
-no "unknown" placeholders. Text that is too long for a half page is shortened with an ellipsis
+Information that is not available is simply left out of the PDF: no empty fields,
+no "unknown" placeholders. Text that is too long for its card is shortened with an ellipsis
 (the draft warnings tell you which). Images are resampled to the printed size, which keeps even
 large collections to a moderate file size.
 
@@ -133,13 +134,16 @@ Set a title, subtitle, optional display name and optional cover photograph.
 Leave the initial foreword empty for a factual proposal. Private collector notes
 are excluded unless explicitly enabled.
 
-**Research and cost consent:** available Discogs, web search (and MusicBrainz, if
+**Research and cost consent:** Wikipedia, Discogs, web search (and MusicBrainz, if
 `MUSICBRAINZ_ENABLED=true`)
 sources are used after you approve the external data transfer and cost allowance.
 Only necessary artist/album/release details leave Phonox, not your name, private
-notes or photographs. Each job has 20 research/AI steps and at most 1,200 output
-tokens per AI call. The displayed EUR allowance is approximate, not a provider
-quote. You can disable research to create a magazine from stored information.
+notes or photographs. Research is batched: one AI call writes the portraits,
+the fact lines and the album texts of up to 5 artists and 8 albums (at most 300 calls per job),
+so every artist and album is covered in one run. The EUR estimates come from Discogs
+marketplace data for the matching pressing. The displayed EUR allowance is approximate,
+not a provider quote. You can disable research to create a magazine from stored information.
+The artist portrait is a Wikipedia summary where one exists (no AI cost); the AI writes album texts and portraits for the remaining artists.
 Missing API keys or failed sources are shown as warnings.
 
 Click **Prepare magazine**, wait for the draft, then review and edit the foreword,

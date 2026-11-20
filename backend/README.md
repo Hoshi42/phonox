@@ -29,8 +29,9 @@ backend/
 ├── main.py                 # FastAPI app entry point
 ├── database.py             # SQLAlchemy ORM models
 ├── magazine_models.py      # Validated magazine snapshots and editorial drafts
-├── magazine_service.py     # Persistent jobs, bounded research and atomic editions
-├── magazine_pdf.py         # Landscape A4 layout: one half page per album, linked contents
+├── magazine_service.py     # Persistent jobs, batched research and atomic editions
+├── magazine_sources.py     # Free artist background: Wikipedia, Discogs, MusicBrainz
+├── magazine_pdf.py         # Landscape A4 layout: compact album/artist cards, artist contents
 ├── agent/
 │   ├── graph.py           # LangGraph workflow builder
 │   ├── state.py           # State models (TypedDict)
@@ -110,11 +111,13 @@ There is at most one magazine per user, enforced by a database unique constraint
 
 Preparation uses `MagazineSettings`: title, subtitle, display name, foreword,
 cover image, private-note opt-in, research, valuation refresh and explicit consent.
-Research requires `consent=true`. Each database lookup, web search invocation or
-AI call consumes one of **20 steps per job**; AI output is limited to **1,200
-tokens**, input evidence is bounded, and automatic AI retries are disabled.
-The existing web search helper can make two Tavily attempts plus DuckDuckGo
-fallback within a search step. The UI's EUR allowance is an estimate, not a
+Research requires `consent=true`. Research is batched: one AI call for up to 5 artist chapters
+and 8 albums (portraits, one-line facts and album texts), at most **300 AI calls per job**; AI
+output is limited to **3,000 tokens**, input evidence is bounded, and automatic AI retries
+are disabled. Wikipedia, Discogs and MusicBrainz lookups are free and do not use the budget;
+EUR values come from Discogs marketplace data of a matching pressing, not from AI. The
+existing web search helper can make two Tavily attempts plus DuckDuckGo fallback within a
+call. The UI's EUR allowance is an estimate, not a
 provider price guarantee. Missing keys/sources and budget exhaustion produce
 visible draft warnings, not fabricated portraits or prices.
 

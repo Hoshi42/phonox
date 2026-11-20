@@ -1,13 +1,15 @@
-"""Landscape A4 magazine: every album and artist portrait occupies exactly one half page.
+"""Landscape A4 magazine: compact album and artist cards, four albums per page.
 
 Missing information is simply left out; the layout never mentions what is unknown.
 """
 
+import unicodedata
 from collections import Counter
 from html import escape
 from io import BytesIO
 from pathlib import Path
 from typing import Callable
+from urllib.parse import urlparse
 
 from PIL import Image as PillowImage, ImageOps
 from pypdf import PdfReader
@@ -19,12 +21,12 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
-    BaseDocTemplate, Flowable, Frame, NextPageTemplate, PageBreak, PageTemplate, Paragraph, Spacer,
+    BaseDocTemplate, Flowable, Frame, FrameBreak, NextPageTemplate, PageBreak, PageTemplate, Paragraph, Spacer,
 )
 from reportlab.platypus.tableofcontents import TableOfContents
 
 from backend.magazine_models import MagazineArtist, MagazineDraft, MagazineImage, MagazineRecord, MagazineSource
-from backend.magazine_service import asset_path, record_order
+from backend.magazine_service import artist_name, asset_path, record_order
 
 PAGE_WIDTH, PAGE_HEIGHT = landscape(A4)
 MARGIN_X = 12 * mm
@@ -33,9 +35,14 @@ MARGIN_BOTTOM = 14 * mm
 GUTTER = 8 * mm
 FRAME_HEIGHT = PAGE_HEIGHT - MARGIN_TOP - MARGIN_BOTTOM
 CELL_WIDTH = (PAGE_WIDTH - 2 * MARGIN_X - GUTTER) / 2
-CELL_HEIGHT = FRAME_HEIGHT - 1
 TEXT_WIDTH = PAGE_WIDTH - 2 * MARGIN_X
-PAD = 5 * mm
+PAD = 4 * mm
+CARD_GAP = 2 * mm
+COVER_SIZE = 32 * mm
+THUMB_SIZE = (COVER_SIZE - 2 * mm) / 2
+TEXT_MAX_HEIGHT = 52 * mm
+MAX_IMAGES = 3
+PORTRAIT_MAX_HEIGHT = 46 * mm
 IMAGE_DPI = 200
 COVER_DPI = 150
 
@@ -79,11 +86,12 @@ def paragraphs(text: str, paragraph_style: ParagraphStyle) -> list[Flowable]:
 
 
 class SectionHeading(Paragraph):
-    """Heading that registers a contents entry and PDF bookmark."""
+    """Heading that registers a PDF bookmark and, optionally, a contents entry."""
 
-    def __init__(self, text: str, paragraph_style: ParagraphStyle, key: str, level: int):
+    def __init__(self, text: str, paragraph_style: ParagraphStyle, key: str, level: int, contents: bool = False):
         super().__init__(escape(text), paragraph_style)
         self.entries = [(level, text, key)]
+        self.contents = contents
 
 
 class MagazineDocument(BaseDocTemplate):
@@ -104,7 +112,6 @@ class MagazineDocument(BaseDocTemplate):
             PageTemplate(id="cover", frames=[Frame(0, 0, PAGE_WIDTH, PAGE_HEIGHT - 0.5, id="cover",
                                                    leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)],
                          onPage=self.draw_cover_page),
-            PageTemplate(id="text", frames=[frame(MARGIN_X, TEXT_WIDTH, "text")], onPage=self.draw_page),
             PageTemplate(id="columns", frames=[frame(MARGIN_X, column, "left"),
                                                frame(MARGIN_X + column + GUTTER, column, "right")],
                          onPage=self.draw_page),
@@ -135,7 +142,8 @@ class MagazineDocument(BaseDocTemplate):
         for level, title, key in getattr(flowable, "entries", []):
             self.canv.bookmarkPage(key)
             self.canv.addOutlineEntry(title, key, level=level, closed=False)
-            self.notify("TOCEntry", (level, escape(title), self.page, key))
+            if getattr(flowable, "contents", False):
+                self.notify("TOCEntry", (level, escape(title), self.page, key))
 
 
 _IMAGE_CACHE: dict[tuple, tuple[bytes, float, float]] = {}
@@ -216,158 +224,144 @@ def draw_paragraphs(canvas, items: list[Paragraph], x: float, top: float) -> flo
     return top
 
 
-class HalfPage(Flowable):
-    """A card that fills exactly one half of a landscape page."""
+class Card(Flowable):
+    """A white card as wide as one half page; its height depends on the content."""
 
-    def __init__(self, entries: list[tuple[int, str, str]]):
+    def __init__(self, height: float, entries: list[tuple[int, str, str]]):
         super().__init__()
-        self.width, self.height = CELL_WIDTH, CELL_HEIGHT
+        self.width, self.height = CELL_WIDTH, height
         self.entries = entries
+        self.contents = False
+        self.spaceAfter = CARD_GAP
         self.warnings: list[str] = []
 
     def draw_card(self) -> None:
         canvas = self.canv
         canvas.setFillColor(CARD)
         canvas.setStrokeColor(RULE)
-        canvas.roundRect(0, 0, self.width, self.height, 3 * mm, stroke=1, fill=1)
+        canvas.roundRect(0, 0, self.width, self.height, 2.5 * mm, stroke=1, fill=1)
 
 
-class AlbumCell(HalfPage):
+class LetterMarker(Flowable):
+    """Invisible anchor in front of the first artist of each initial; the contents list these letters."""
+
+    def __init__(self, letter: str, key: str):
+        super().__init__()
+        self.width = self.height = 0
+        self.entries = [(0, letter, key)]
+        self.contents = True
+        self.keepWithNext = True
+        self.warnings: list[str] = []
+
+    def draw(self):
+        pass
+
+
+def initial(name: str) -> str:
+    letter = unicodedata.normalize("NFKD", name.strip()[:1]).encode("ascii", "ignore").decode().upper()
+    return letter if letter.isalpha() else "#"
+
+
+class AlbumCard(Card):
     def __init__(self, record: MagazineRecord, title: str, magazine_id: str, include_notes: bool,
                  entries: list[tuple[int, str, str]]):
-        super().__init__(entries)
+        super().__init__(0, entries)
         self.record, self.title, self.magazine_id, self.include_notes = record, title, magazine_id, include_notes
+        self.images = [image for image in record.images if image.asset][:MAX_IMAGES]
+        self.text_x = PAD + (COVER_SIZE + 4 * mm if self.images else 0)
+        self.items = self.layout(self.width - PAD - self.text_x)
 
-    def meta(self) -> list[tuple[str, str]]:
+    def facts(self) -> str:
         record = self.record
-        pairs = [("Year", str(record.year) if record.year else ""), ("Label", record.label or ""),
-                 ("Catalogue", f"Cat. {record.catalog_number}" if record.catalog_number else ""),
-                 ("Condition", record.condition or ""),
-                 ("Genres", ", ".join(record.genres))]
-        return [(label, value) for label, value in pairs if value]
+        parts = [str(record.year) if record.year else "", record.label or "",
+                 f"Cat. {record.catalog_number}" if record.catalog_number else "", record.condition or ""]
+        return " · ".join(part for part in parts if part)
 
-    def value_text(self) -> tuple[str, str] | None:
+    def value_markup(self) -> str:
         record = self.record
         if record.value_eur is None:
-            return None
+            return ""
         label = "Market estimate" if record.value_kind == "researched" else "Estimate"
         if record.valued_at:
             label += f" · {record.valued_at[:10]}"
-        return f"EUR {record.value_eur:,.0f}", label
+        return (f'<font name="MagazineBold" color="#a45f37" size="10">EUR {record.value_eur:,.0f}</font>'
+                f' <font color="#6b7274" size="6.5">{escape(label)}</font>')
 
-    def draw(self):
-        self.draw_card()
-        canvas, record = self.canv, self.record
-        inner = self.width - 2 * PAD
-        top = self.height - PAD
-
-        if record.artist:
-            kicker = block(record.artist.upper(), style("kicker", "MagazineBold", 7.5, color=ACCENT, after=2))
-            kicker.wrap(inner, 20)
-            top = draw_paragraphs(canvas, [kicker], PAD, top)
-        for size in (16, 14, 12, 10.5):
-            heading = block(self.title, style("album-title", "MagazineSerif", size, size * 1.18))
-            if heading.wrap(inner, 100)[1] <= size * 1.18 * 2 + 0.1:
+    def layout(self, text_w: float) -> list[Paragraph]:
+        """Text paragraphs; the card is as tall as the photographs or the text, whichever is taller."""
+        record = self.record
+        items: list[Paragraph] = []
+        if record.artist and artist_name(record.artist).casefold() != record.group.casefold():
+            items.append(block(record.artist.upper(), style("kicker", "MagazineBold", 7, color=ACCENT, after=1)))
+        for size in (13, 12, 11, 10):
+            heading = block(self.title, style("album-title", "MagazineSerif", size, size * 1.18, after=1.5 * mm))
+            if heading.wrap(text_w, 100)[1] <= size * 1.18 * 2 + 0.1:
                 break
-        top = draw_paragraphs(canvas, [heading], PAD, top - 0.5 * mm) - 2 * mm
-
-        images = [image for image in record.images if image.asset][:5]
-        meta, value = self.meta(), self.value_text()
-        bottom_floor = PAD
-        facts = " · ".join(text for label, text in meta if label != "Genres")
-        genres = next((text for label, text in meta if label == "Genres"), "")
-
-        if images:
-            row_h = 78 * mm
-            gap = 3 * mm
-            draw_image(canvas, self.magazine_id, images[0], PAD, top - row_h, row_h, row_h)
-            column_x = PAD + row_h + gap
-            column_w = inner - row_h - gap
-            y = top
-            side = [block(text, style(f"side-{index}", size=8, color=INK if index == 0 else MUTED, after=3))
-                    for index, text in enumerate((facts, genres)) if text]
-            for item in side:
-                item.wrap(column_w, 60)
-            y = draw_paragraphs(canvas, side, column_x, y)
-            if value:
-                box_h = 13 * mm
-                y -= 1 * mm
-                canvas.setFillColor(TINT)
-                canvas.roundRect(column_x, y - box_h, column_w, box_h, 2 * mm, stroke=0, fill=1)
-                canvas.setFillColor(ACCENT)
-                canvas.setFont("MagazineBold", 13)
-                canvas.drawString(column_x + 3 * mm, y - 6.2 * mm, value[0])
-                canvas.setFillColor(MUTED)
-                canvas.setFont("MagazineBody", 6.5)
-                canvas.drawString(column_x + 3 * mm, y - 10.4 * mm, value[1][:34])
-            extras = images[1:]
-            if extras:
-                thumb = (column_w - 2 * mm) / 2
-                rows = (len(extras) + 1) // 2
-                base = top - row_h
-                for index, image in enumerate(extras):
-                    draw_image(canvas, self.magazine_id, image, column_x + (index % 2) * (thumb + 2 * mm),
-                               base + (rows - 1 - index // 2) * (thumb + 2 * mm), thumb, thumb)
-            top -= row_h + 4 * mm
-        else:
-            items = [block(text, style(f"line-{index}", size=8.5, color=INK if index == 0 else MUTED, after=2))
-                     for index, text in enumerate((facts, genres)) if text]
-            for item in items:
-                item.wrap(inner, 40)
-            top = draw_paragraphs(canvas, items, PAD, top)
-            if value:
-                canvas.setFillColor(ACCENT)
-                canvas.setFont("MagazineBold", 13)
-                canvas.drawString(PAD, top - 5 * mm, value[0])
-                canvas.setFillColor(MUTED)
-                canvas.setFont("MagazineBody", 7)
-                canvas.drawString(PAD + 28 * mm, top - 5 * mm, value[1][:60])
-                top -= 9 * mm
-
-        notes = self.record.notes if self.include_notes and self.record.notes else ""
+        items.append(heading)
+        genres = ", ".join(record.genres)
+        for index, (markup, color) in enumerate(((escape(self.facts()), INK), (escape(genres), MUTED),
+                                                 (self.value_markup(), INK))):
+            if markup:
+                items.append(Paragraph(markup, style(f"line-{index}", size=7.5, color=color, after=2)))
+        for item in items:
+            item.wrap(text_w, 100)
+        used = sum(item.height + item.style.spaceAfter for item in items)
+        photos = (COVER_SIZE + (2 * mm + THUMB_SIZE if len(self.images) > 1 else 0)) if self.images else 0
+        limit = max(photos, TEXT_MAX_HEIGHT)
+        notes = record.notes if self.include_notes and record.notes else ""
         body = "\n\n".join(part for part in (record.description.strip(), notes.strip()) if part)
         if body:
-            items, truncated = fit_text(body, inner, top - bottom_floor)
+            paragraphs_, truncated = fit_text(body, text_w, limit - used, sizes=(8.5, 8, 7.5, 7))
             if truncated:
-                self.warnings.append(f"Text shortened to fit one half page: {self.title}.")
-            for item in items:
-                item.wrap(inner, 10_000)
-            draw_paragraphs(canvas, items, PAD, top)
-
-
-class PortraitCell(HalfPage):
-    def __init__(self, artist: MagazineArtist, cover: MagazineImage | None, magazine_id: str,
-                 entries: list[tuple[int, str, str]]):
-        super().__init__(entries)
-        self.artist, self.cover, self.magazine_id = artist, cover, magazine_id
+                self.warnings.append(f"Text shortened to fit its card: {self.title}.")
+            items.extend(paragraphs_)
+            used += sum(item.height + item.style.spaceAfter for item in paragraphs_)
+        self.height = 2 * PAD + max(photos, used - items[-1].style.spaceAfter)
+        return items
 
     def draw(self):
         self.draw_card()
         canvas = self.canv
-        inner = self.width - 2 * PAD
         top = self.height - PAD
-        top = draw_paragraphs(canvas, [self._wrapped(block("ARTIST", style("k", "MagazineBold", 7.5, color=ACCENT, after=2)), inner)],
-                              PAD, top)
-        for size in (24, 20, 16, 13):
-            heading = block(self.artist.name, style("artist-name", "MagazineSerif", size, size * 1.15))
+        if self.images:
+            draw_image(canvas, self.magazine_id, self.images[0], PAD, top - COVER_SIZE, COVER_SIZE, COVER_SIZE)
+            for index, image in enumerate(self.images[1:]):
+                draw_image(canvas, self.magazine_id, image, PAD + index * (THUMB_SIZE + 2 * mm),
+                           top - COVER_SIZE - 2 * mm - THUMB_SIZE, THUMB_SIZE, THUMB_SIZE)
+        draw_paragraphs(canvas, self.items, self.text_x, top)
+
+
+class ArtistCard(Card):
+    """Artist name, one-line facts and portrait; its height follows the text."""
+
+    def __init__(self, artist: MagazineArtist, entries: list[tuple[int, str, str]]):
+        super().__init__(0, entries)
+        self.artist = artist
+        self.keepWithNext = True
+        inner = self.width - 2 * PAD
+        for size in (18, 16, 14, 12):
+            heading = block(artist.name, style("artist-name", "MagazineSerif", size, size * 1.15))
             if heading.wrap(inner, 100)[1] <= size * 1.15 * 2 + 0.1:
                 break
-        top = draw_paragraphs(canvas, [heading], PAD, top) - 2 * mm
-        if self.cover is not None and self.cover.asset:
-            band = 78 * mm
-            draw_image(canvas, self.magazine_id, self.cover, PAD, top - band, inner, band, crop=True)
-            top -= band + 4 * mm
-        items, truncated = fit_text(self.artist.portrait, inner, top - PAD)
-        if truncated:
-            self.warnings.append(f"Portrait shortened to fit one half page: {self.artist.name}.")
-        for item in items:
-            item.wrap(inner, 10_000)
-        draw_paragraphs(canvas, items, PAD, top)
+        self.items: list[Paragraph] = [heading]
+        heading.style.spaceAfter = 1.5 * mm
+        if artist.facts.strip():
+            facts = block(artist.facts.strip(), style("artist-facts", "MagazineBold", 7.5, color=ACCENT, after=1.5 * mm))
+            facts.wrap(inner, 40)
+            self.items.append(facts)
+        used = sum(item.height + item.style.spaceAfter for item in self.items)
+        if artist.portrait.strip():
+            portrait, truncated = fit_text(artist.portrait, inner, PORTRAIT_MAX_HEIGHT - 2 * PAD - used,
+                                           sizes=(8.5, 8, 7.5))
+            if truncated:
+                self.warnings.append(f"Portrait shortened to fit its card: {artist.name}.")
+            self.items.extend(portrait)
+        total = sum(item.height + item.style.spaceAfter for item in self.items)
+        self.height = 2 * PAD + total - self.items[-1].style.spaceAfter
 
-    @staticmethod
-    def _wrapped(item: Paragraph, width: float) -> Paragraph:
-        item.wrap(width, 100)
-        return item
+    def draw(self):
+        self.draw_card()
+        draw_paragraphs(self.canv, self.items, PAD, self.height - PAD)
 
 
 class CoverPage(Flowable):
@@ -413,41 +407,40 @@ class CoverPage(Flowable):
             sub.drawOn(canvas, left, top_text - h - 3 * mm - sub_h)
 
 
-def list_cells(draft: MagazineDraft, magazine_id: str) -> tuple[list[HalfPage], dict[str, list[MagazineSource]]]:
-    cells: list[HalfPage] = []
+def list_cells(draft: MagazineDraft, magazine_id: str) -> tuple[list[Flowable], dict[str, list[MagazineSource]]]:
+    cells: list[Flowable] = []
     sources: dict[str, list[MagazineSource]] = {}
     counts = Counter((record.group, record.title) for record in draft.records)
     seen: Counter = Counter()
+    last_initial = ""
     for index, artist in enumerate(draft.artists):
         records = sorted([record for record in draft.records if record.group == artist.name], key=record_order)
         if not records:
             continue
-        heading_entry: list[tuple[int, str, str]] = [(0, artist.name, f"artist-{index}")]
-        first_image = next((image for record in records for image in record.images if image.asset), None)
-        if artist.portrait.strip():
-            cells.append(PortraitCell(artist, first_image, magazine_id, heading_entry))
-            heading_entry = []
-            if artist.sources:
-                sources[artist.name] = artist.sources
+        if initial(artist.name) != last_initial:
+            last_initial = initial(artist.name)
+            cells.append(LetterMarker(last_initial, f"letter-{last_initial}-{index}"))
+        cells.append(ArtistCard(artist, [(1, artist.name, f"artist-{index}")]))
+        collected = list(artist.sources)
         for record in records:
             seen[(record.group, record.title)] += 1
             title = record.title or "Untitled record"
             if counts[(record.group, record.title)] > 1:
                 title += (f" / {record.catalog_number}" if record.catalog_number else "") + \
                          f" / Copy {seen[(record.group, record.title)]}"
-            entries = heading_entry + [(1, title, f"record-{record.id}")]
-            heading_entry = []
-            cells.append(AlbumCell(record, title, magazine_id, draft.settings.include_notes, entries))
-            if record.sources:
-                sources[f"{artist.name} / {title}"] = record.sources
+            cells.append(AlbumCard(record, title, magazine_id, draft.settings.include_notes,
+                                   [(2, title, f"record-{record.id}")]))
+            collected.extend(record.sources)
+        if collected:
+            sources[artist.name] = collected
     return cells, sources
 
 
 def overview(draft: MagazineDraft, heading_style: ParagraphStyle) -> list[Flowable]:
-    body = style("overview", size=11, leading=17, after=8)
-    story: list[Flowable] = [SectionHeading("The collection at a glance", heading_style, "overview", 0)]
+    body = style("overview", size=9.5, leading=14, after=5)
+    story: list[Flowable] = [Spacer(1, 6 * mm), SectionHeading("The collection at a glance", heading_style, "overview", 0)]
     artists = len({record.group for record in draft.records})
-    story.extend(paragraphs(f"{len(draft.records)} records · {artists} artists and groups", style("big", "MagazineSerif", 18, after=10)))
+    story.extend(paragraphs(f"{len(draft.records)} records · {artists} artists and groups", style("big", "MagazineSerif", 14, after=6)))
     years = [record.year for record in draft.records if record.year is not None]
     if years:
         story.extend(paragraphs(f"Released between {min(years)} and {max(years)}", body))
@@ -458,20 +451,31 @@ def overview(draft: MagazineDraft, heading_style: ParagraphStyle) -> list[Flowab
     if valued:
         total = sum(record.value_eur for record in valued if record.value_eur is not None)
         scope = "" if len(valued) == len(draft.records) else f" across {len(valued)} of {len(draft.records)} records"
-        story.extend(paragraphs(f"Estimated value: EUR {total:,.0f}{scope}", style("total", "MagazineBold", 14, color=ACCENT, after=8)))
+        story.extend(paragraphs(f"Estimated value: EUR {total:,.0f}{scope}", style("total", "MagazineBold", 12, color=ACCENT, after=6)))
     return story
+
+
+def source_line(name: str, items: list[MagazineSource], line_style: ParagraphStyle) -> Paragraph:
+    """One line per artist: each website once, linked to the first page used from it."""
+    sites: dict[str, MagazineSource] = {}
+    for source in items:
+        host = (urlparse(source.url).hostname or source.url).removeprefix("www.")
+        sites.setdefault(host, source)
+    links = ", ".join(f'<link href="{escape(source.url, quote=True)}" color="#a45f37">{escape(host)}</link>'
+                      for host, source in sites.items())
+    return Paragraph(f'<font name="MagazineBold">{escape(name)}</font> — {links}', line_style)
 
 
 def render_magazine(draft: MagazineDraft, magazine_id: str, target: Path, edition: int,
                     check: Callable[[], None],
-                    progress: Callable[[int, int], None] | None = None) -> tuple[int, list[str]]:
+                    progress: Callable[[int, int, float, float], None] | None = None) -> tuple[int, list[str]]:
     register_fonts()
     _IMAGE_CACHE.clear()
     target.parent.mkdir(parents=True, exist_ok=True)
     document = MagazineDocument(str(target), draft, check)
-    heading = style("heading", "MagazineSerif", 28, 34, after=14)
+    heading = style("heading", "MagazineSerif", 20, 24, after=8)
     heading.keepWithNext = True
-    body = style("body", size=10.5, leading=16, after=9)
+    body = style("body", size=10, leading=14, after=6)
 
     images = [image for record in draft.records for image in record.images if image.asset]
     cover = next((image for image in images if image.id == draft.settings.cover_image_id), None)
@@ -481,44 +485,37 @@ def render_magazine(draft: MagazineDraft, magazine_id: str, target: Path, editio
         SectionHeading("Foreword", heading, "foreword", 0),
     ]
     story.extend(paragraphs(draft.settings.preface, body))
-    story.extend([NextPageTemplate("columns"), PageBreak(), SectionHeading("Contents", heading, "contents", 0)])
+    subheading = style("subheading", "MagazineSerif", 15, 18, after=5)
+    subheading.keepWithNext = True
+    story.extend(overview(draft, subheading))
+    # Foreword and overview fill the left column of the opening page, the contents start in the right one.
+    story.extend([FrameBreak(), SectionHeading("Contents", heading, "contents", 0)])
     toc = TableOfContents()
-    toc.levelStyles = [
-        style("toc-artist", "MagazineBold", 9, 12.5, after=0),
-        style("toc-record", "MagazineBody", 8.5, 11.5, after=0),
-    ]
-    toc.levelStyles[0].spaceBefore = 5
-    toc.levelStyles[1].leftIndent = 10
-    story.extend([toc, NextPageTemplate("text"), PageBreak()])
-    story.extend(overview(draft, heading))
+    toc.levelStyles = [style("toc-artist", "MagazineBody", 8, 11)]
+    story.extend([toc, NextPageTemplate("cells"), PageBreak()])
     cells, sources = list_cells(draft, magazine_id)
     if progress:
-        # The document is typeset in several passes (contents need page numbers); estimate three.
-        estimate = max(1, (len(cells) + 1) // 2 + 8)
+        # The document is typeset in several passes (contents need page numbers). Each pass spans a third of
+        # the percentage; the counter shows the page within the current pass.
+        estimate = max(1, len(cells) // 4 + 6)
         state = {"last": 0, "pass": 0}
 
         def on_page(page: int) -> None:
             if page <= state["last"]:
                 state["pass"] += 1
             state["last"] = page
-            progress(min(3 * estimate, state["pass"] * estimate + page), 3 * estimate)
+            progress(min(page, estimate), estimate, min(60.0, state["pass"] * 30.0), 30.0)
 
         document.on_page = on_page
-    story.extend([NextPageTemplate("cells"), PageBreak()])
-    for position, cell in enumerate(cells):
+    for cell in cells:
         check()
         story.append(cell)
-    sources_text = style("sources", size=8, leading=11, after=3)
+    sources_text = style("sources", size=7.5, leading=10.5, after=2.5)
     notice = ("Editorial research may be assisted by AI. Prices are market estimates in EUR, not binding "
               "appraisals. This edition is intended for personal use.")
     story.extend([NextPageTemplate("columns"), PageBreak(),
                   SectionHeading("Sources", heading, "sources", 0), block(notice, body), Spacer(1, 3 * mm)])
-    for name, items in sources.items():
-        story.append(block(name, style("source-owner", "MagazineBold", 8, color=ACCENT, after=1)))
-        for source in items:
-            story.append(Paragraph(
-                f'<link href="{escape(source.url, quote=True)}" color="#a45f37">{escape(source.title)}</link>'
-                f' · {escape(source.accessed_at[:10])}', sources_text))
+    story.extend(source_line(name, items, sources_text) for name, items in sources.items())
     document.multiBuild(story, maxPasses=6)
     warnings = list(dict.fromkeys(warning for cell in cells for warning in cell.warnings))
     reader = PdfReader(target)

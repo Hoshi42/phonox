@@ -21,7 +21,8 @@ Returns `id`, `user_tag`, `status`, `phase`, `error`, `has_pdf`, `edition`,
 `research_step_limit` and `estimated_cost_eur`.
 While a job runs, `progress` reports it: `label`, `done`, `total`, `percent` (null while nothing is
 measurable) and `elapsed_seconds`. Preparation covers freezing the collection (records processed) and,
-with research enabled, the research steps (of 20); publishing counts typeset pages. `progress` is kept in
+with research enabled, the research steps (`draft.step_limit`, one AI call per up to 5 artist chapters and
+8 albums, at most 300; `lookups_total`/`lookups_done` count the Discogs value lookups); publishing counts typeset pages. `progress` is kept in
 memory of the single API process and is null when no job runs. While a job runs, `changes` is not computed.
 Set `include_draft=false` to omit editorial content. Status values are
 `not_created`, `preparing`, `draft`, `rendering`, `complete`, `failed` and
@@ -53,11 +54,15 @@ Set `research=false` to avoid external calls; stored values remain explicitly
 labelled with unknown dates unless an earlier magazine valuation has a real date.
 Omitted editorial settings inherit the previous draft/edition's settings.
 
-Each database lookup, web search invocation or AI call uses one of 20 allowed
-steps. AI output has a 1,200-token limit and no automatic retries. A web search
-step may invoke the existing helper's bounded Tavily/DuckDuckGo fallback.
-Allowance estimates are not guaranteed bills. Partial research failures and
-budget exhaustion are recorded in the draft/PDF; no default price is invented.
+Research is batched: one AI call writes the portraits, one-line
+`facts` summaries and the texts of up to 5 artist chapters and 8 albums
+(hard ceiling 300 calls per job; `research_step_limit` and `draft.step_limit` report it).
+Free sources (Wikipedia, the Discogs artist profile, MusicBrainz if enabled and the
+Discogs release data) are looked up without consuming AI calls. EUR values come from
+Discogs marketplace data for a matching pressing, never from AI output. AI output has a
+3,000-token limit and no automatic retries. A vetted Wikipedia summary is used as the artist portrait whenever one exists
+(no AI call); the AI then only writes the album texts and the portraits of artists without one. Allowance estimates are not guaranteed bills. Partial
+research failures and budget exhaustion are recorded in the draft; no default price is invented.
 
 ### PUT /api/magazine/draft
 
