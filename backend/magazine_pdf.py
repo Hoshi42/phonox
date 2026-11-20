@@ -43,8 +43,9 @@ THUMB_SIZE = (COVER_SIZE - 2 * mm) / 2
 TEXT_MAX_HEIGHT = 52 * mm
 MAX_IMAGES = 3
 PORTRAIT_MAX_HEIGHT = 46 * mm
-IMAGE_DPI = 200
-COVER_DPI = 150
+IMAGE_DPI = 140  # cards show photos at 15–32 mm; more resolution only inflates the file
+IMAGE_QUALITY = 68
+COVER_DPI = 120
 
 INK = colors.HexColor("#20282a")
 MUTED = colors.HexColor("#6b7274")
@@ -150,7 +151,7 @@ _IMAGE_CACHE: dict[tuple, tuple[bytes, float, float]] = {}
 
 
 def embedded(path: Path, width: float, height: float, crop: bool, dpi: int = IMAGE_DPI,
-             quality: int = 80) -> tuple[ImageReader, float, float]:
+             quality: int = IMAGE_QUALITY) -> tuple[ImageReader, float, float]:
     """Image resampled to what the printed size needs, so the PDF stays small.
 
     The result is cached because the document is typeset in several passes.
@@ -379,7 +380,7 @@ class CoverPage(Flowable):
                 photo = ImageOps.fit(source.convert("RGB"), (int(PAGE_WIDTH / 72 * COVER_DPI), int(PAGE_HEIGHT / 72 * COVER_DPI)),
                                      method=PillowImage.Resampling.LANCZOS)
             data = BytesIO()
-            photo.save(data, "JPEG", quality=80, optimize=True)
+            photo.save(data, "JPEG", quality=IMAGE_QUALITY + 2, optimize=True)
             data.seek(0)
             canvas.drawImage(ImageReader(data), 0, 0, PAGE_WIDTH, PAGE_HEIGHT)
             panel_h = 48 * mm
