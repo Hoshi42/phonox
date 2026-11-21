@@ -9,7 +9,6 @@ export interface MagazineSettings {
   cover_image_id: string | null
   include_notes: boolean
   research: boolean
-  refresh_values: boolean
   consent: boolean
 }
 
@@ -95,7 +94,6 @@ export const defaultMagazineSettings: MagazineSettings = {
   cover_image_id: null,
   include_notes: false,
   research: true,
-  refresh_values: true,
   consent: false,
 }
 

@@ -241,11 +241,6 @@ export default function CollectionMagazine({ user, records }: Props) {
                   onChange={event => setSettings({ ...settings, research: event.target.checked, consent: false })} />
                 Research artists and albums using available music databases and web sources
               </label>
-              <label className={styles.check}>
-                <input type="checkbox" checked={settings.refresh_values} disabled={!settings.research}
-                  onChange={event => setSettings({ ...settings, refresh_values: event.target.checked })} />
-                Research current EUR estimates (existing values otherwise keep their original dates)
-              </label>
               {settings.research && (
                 <div className={`${styles.notice} ${styles.wide}`}>
                   <p>

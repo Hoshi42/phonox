@@ -3,7 +3,7 @@ import type { MagazineSettings, MagazineStatus } from '../src/services/magazineA
 
 const defaultMagazineSettings: MagazineSettings = {
   title: 'My Vinyl Collection', subtitle: '', display_name: '', preface: '',
-  cover_image_id: null, include_notes: false, research: true, refresh_values: true, consent: false,
+  cover_image_id: null, include_notes: false, research: true, consent: false,
 }
 
 function magazine(user: string, overrides: Partial<MagazineStatus> = {}): MagazineStatus {

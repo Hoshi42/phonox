@@ -140,8 +140,7 @@ sources are used after you approve the external data transfer and cost allowance
 Only necessary artist/album/release details leave Phonox, not your name, private
 notes or photographs. Research is batched: one AI call writes the portraits,
 the fact lines and the album texts of up to 5 artists and 8 albums (at most 300 calls per job),
-so every artist and album is covered in one run. The EUR estimates come from Discogs
-marketplace data for the matching pressing. The displayed EUR allowance is approximate,
+so every artist and album is covered in one run. The EUR estimates are the values stored in your collection; the magazine never researches prices. The displayed EUR allowance is approximate,
 not a provider quote. You can disable research to create a magazine from stored information.
 The artist portrait is a Wikipedia summary where one exists (no AI cost); the AI writes album texts and portraits for the remaining artists.
 Missing API keys or failed sources are shown as warnings.
@@ -161,10 +160,11 @@ removed records. Previously edited text/settings are retained; an automatic
 foreword updates its counts. Unfinished research can continue within a new,
 explicitly approved job budget.
 
-Enable **Research current EUR estimates** when you want new valuations.
-Reused prices retain their real dates; an edition's creation date is not a
-valuation date. Missing values do not count as zero, and estimates are not
-binding sale prices or insurance appraisals.
+The EUR estimates in the magazine are always the values stored in your collection,
+so they match what the app shows; the magazine starts no price research. To refresh a
+price, re-estimate the record in the collection and update the magazine afterwards.
+Missing values do not count as zero, and estimates are not binding sale prices or
+insurance appraisals.
 
 The previous PDF remains available during an update and after cancellation or
 failure. It is replaced only after successful creation. Following a server

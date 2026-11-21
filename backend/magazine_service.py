@@ -13,7 +13,7 @@ import unicodedata
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
 from typing import Callable
@@ -38,10 +38,7 @@ ARTISTS_PER_CALL = 5
 STEP_COST_EUR = 0.02  # Planning allowance per AI call (about 5–8k input and 1–2k output tokens), not a provider price guarantee.
 OUTPUT_TOKEN_LIMIT = 3000
 INPUT_BYTE_LIMIT = 24000
-DISCOGS_FAILURE_LIMIT = 3
 DISCOGS_INTERVAL_SECONDS = 1.1  # per request: stays below the 60 requests per minute Discogs allows with a token
-DISCOGS_RETRIES = 2
-VALUE_MAX_AGE_DAYS = 30
 RESEARCH_WORKERS = 8
 MAX_ASSET_PIXELS = 2200
 TEMP_MAX_AGE_SECONDS = 23 * 3600  # Hourly cleanup keeps unreferenced work below 24 hours.
@@ -198,13 +195,6 @@ def snapshot_records(db: Session, magazine: CollectionMagazine, settings: Magazi
         fingerprint = hashlib.sha256(json.dumps(fingerprint_data, sort_keys=True).encode()).hexdigest()
         record = MagazineRecord(**data, images=images, fingerprint=fingerprint,
                                 value_eur=value, value_kind="stored" if value is not None else "unavailable")
-        for item in row.get_evidence_chain():
-            details = item.get("data") or {}
-            if str(item.get("source", "")).lower().endswith("discogs") and str(details.get("discogs_release_id") or "").isdigit():
-                record.discogs_release_id = int(details["discogs_release_id"])
-                record.discogs_match = "exact" if details.get("exact_match") else \
-                    "probable" if details.get("probable_match") else ""
-                break
         if value is not None:
             record.valuation_note = "Stored estimate; valuation date unknown."
         result.append(record)
@@ -332,7 +322,7 @@ class ResearchBudget:
 
 
 class RequestPacer:
-    """Spaces requests from several threads `interval` seconds apart per request and backs off on demand."""
+    """Spaces requests from several threads `interval` seconds apart per request."""
 
     def __init__(self, interval: float):
         self.interval = interval
@@ -346,10 +336,6 @@ class RequestPacer:
             self.next_slot = max(self.next_slot, now) + self.interval * requests
         if delay > 0:
             time.sleep(delay)
-
-    def back_off(self, seconds: float) -> None:
-        with self.lock:
-            self.next_slot = max(self.next_slot, time.monotonic() + seconds)
 
 
 @dataclass
@@ -499,9 +485,6 @@ def prepare_draft(db: Session, magazine: CollectionMagazine, settings: MagazineS
                 record.description = old.description
                 record.description_manual = old.description_manual
                 record.sources = old.sources
-                if old.fingerprint == record.fingerprint:
-                    record.value_eur, record.value_kind = old.value_eur, old.value_kind
-                    record.valued_at, record.valuation_note = old.valued_at, old.valuation_note
             if old.fingerprint != record.fingerprint and old.description_manual:
                 warnings.append(f"Review edited description after collection changes: {record.title or record.id}.")
     old_artists = {artist.name: artist for artist in previous.artists} if previous else {}
@@ -572,24 +555,6 @@ def pack_jobs(units: list[ResearchUnit]) -> list[list[ResearchUnit]]:
     return jobs
 
 
-def discogs_value(metadata: dict, condition: str | None) -> tuple[float, str] | None:
-    """EUR value from the Discogs marketplace, only for a matching pressing."""
-    if not (metadata.get("exact_match") or metadata.get("probable_match")):
-        return None
-    market = metadata.get("marketplace") or {}
-    pressing = "exact pressing" if metadata.get("exact_match") else "probable pressing"
-    wanted = (condition or "").strip().casefold()
-    for grade, value in (market.get("price_suggestions") or {}).items():
-        short = re.search(r"\(([^)]+)\)", grade)
-        names = {grade.casefold(), re.sub(r"\s*\(.*", "", grade).casefold(), short.group(1).casefold() if short else ""}
-        if wanted and wanted in names:
-            return float(value), f"Discogs price suggestion for condition {grade}, {pressing}"
-    lowest = market.get("lowest_price")
-    if isinstance(lowest, (int, float)) and lowest > 0:
-        return float(lowest), f"Discogs lowest marketplace listing ({market.get('num_for_sale') or 0} for sale), {pressing}"
-    return None
-
-
 def album_details(record: MagazineRecord) -> dict:
     return dict(artist=record.artist, title=record.title, year=record.year, label=record.label,
                 catalog_number=record.catalog_number, genres=record.genres, condition=record.condition)
@@ -607,7 +572,6 @@ def summary_portrait(artist: MagazineArtist, background) -> bool:
 
 
 def enrich_draft(draft: MagazineDraft, check: Callable[[], None]) -> None:
-    from backend.agent.metadata import lookup_discogs_metadata, lookup_discogs_release, MetadataError
     from backend.magazine_sources import artist_background
 
     if not draft.settings.research:
@@ -617,7 +581,7 @@ def enrich_draft(draft: MagazineDraft, check: Callable[[], None]) -> None:
     if not ai_available:
         logger.warning("Magazine research unavailable: ANTHROPIC_API_KEY is not configured")
         draft.warnings.append("AI research unavailable: Anthropic API key is not configured. "
-                              "Only stored data, public artist summaries and database values are used.")
+                              "Only stored data and public artist summaries are used.")
     unlocked_check, check_lock = check, threading.Lock()
 
     def check() -> None:
@@ -625,59 +589,8 @@ def enrich_draft(draft: MagazineDraft, check: Callable[[], None]) -> None:
             unlocked_check()
 
     budget = ResearchBudget(draft, check)
-    failures = (APIError, ValueError, ValidationError, MetadataError)
-    lock = threading.Lock()
+    failures = (APIError, ValueError, ValidationError)
     pacer = RequestPacer(DISCOGS_INTERVAL_SECONDS)
-    state = {"discogs_failures": 0, "discogs_off": False, "unvalued": 0}
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=VALUE_MAX_AGE_DAYS)).isoformat()
-    valuations = [record for record in draft.records if draft.settings.refresh_values and record.artist and record.title
-                  and not (record.value_kind == "researched" and (record.valued_at or "") > cutoff)]
-    draft.lookups_total, draft.lookups_done = len(valuations), 0
-    check()
-
-    def fetch_release(record: MagazineRecord) -> dict | None:
-        for attempt in range(DISCOGS_RETRIES + 1):
-            try:
-                if record.discogs_release_id and record.discogs_match:
-                    pacer.wait(1)  # the release identified when the record was analysed: one request, no search
-                    return lookup_discogs_release(record.discogs_release_id, record.discogs_match == "exact",
-                                                  record.discogs_match == "probable")
-                pacer.wait(2)
-                return lookup_discogs_metadata(
-                    record.artist, record.title, fallback_on_error=False, catalog_number=record.catalog_number,
-                    barcode=record.barcode, year=record.year, label=record.label)
-            except MetadataError as exc:
-                if "429" in str(exc) and attempt < DISCOGS_RETRIES:
-                    pacer.back_off(20 * (attempt + 1))  # rate limited: every thread waits, nothing is lost
-                    continue
-                raise
-        return None
-
-    def refresh_values() -> None:
-        for record in valuations:
-            check()
-            metadata = None
-            if not state["discogs_off"]:
-                try:
-                    metadata = fetch_release(record)
-                    state["discogs_failures"] = 0
-                except (MetadataError, ValueError) as exc:
-                    logger.warning("Discogs magazine lookup failed: %s", exc)
-                    with lock:
-                        state["discogs_failures"] += 1
-                        if state["discogs_failures"] >= DISCOGS_FAILURE_LIMIT and not state["discogs_off"]:
-                            state["discogs_off"] = True
-                            draft.warnings.append("Discogs became unavailable; remaining releases were not looked up. Update again to continue.")
-            value = discogs_value(metadata, record.condition) if metadata else None
-            if value:
-                record.value_eur, record.value_kind, record.valued_at = value[0], "researched", utc_now()
-                record.valuation_note = value[1]
-            else:
-                with lock:
-                    state["unvalued"] += 1
-            with lock:
-                draft.lookups_done += 1
-
     backgrounds: dict[str, object] = {}
 
     def fetch_background(artist: MagazineArtist, subject: str) -> None:
@@ -714,11 +627,8 @@ def enrich_draft(draft: MagazineDraft, check: Callable[[], None]) -> None:
                     record.description = text
                     record.sources = list({source.url: source for source in record.sources + owned}.values())
 
-    # Lookups and AI calls wait on the network, so they overlap: values in one thread, chapters in a pool.
     pool = ThreadPoolExecutor(max_workers=RESEARCH_WORKERS, thread_name_prefix="magazine-research")
-    values_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="magazine-values")
     try:
-        values_done = values_pool.submit(refresh_values) if valuations else None
         wanting = []
         for artist in draft.artists:
             if portrait_wanted(artist):
@@ -740,13 +650,8 @@ def enrich_draft(draft: MagazineDraft, check: Callable[[], None]) -> None:
             check()
             for future in as_completed([pool.submit(run_job, job) for job in jobs[:MAX_STEPS]]):
                 future.result()
-        if values_done:
-            values_done.result()
     finally:
         pool.shutdown(wait=True, cancel_futures=True)
-        values_pool.shutdown(wait=True, cancel_futures=True)
-    if state["unvalued"]:
-        draft.warnings.append(f"No current market valuation found for {state['unvalued']} records; previous estimates were retained where available.")
     for artist in draft.artists:
         if not artist.manual and not artist.portrait and artist.name not in NO_PORTRAIT:
             draft.warnings.append(f"No researched portrait available for {artist.name}.")
@@ -763,7 +668,7 @@ def fail_job(magazine_id: str, token: str, message: str) -> None:
 
 def run_preparation(magazine_id: str, token: str, settings: MagazineSettings) -> None:
     snapshot_label = "Freezing collection data and images"
-    research_label = "Researching artists, releases and values"
+    research_label = "Researching artists and releases"
     # Research is bounded to a few steps, so the snapshot is the larger share only when research is off.
     snapshot_share = 35.0 if settings.research else 100.0
     try:
@@ -784,8 +689,8 @@ def run_preparation(magazine_id: str, token: str, settings: MagazineSettings) ->
         set_progress(magazine_id, "Researching (steps used)", 0, 0, snapshot_share, 100 - snapshot_share)
 
         def research_tick() -> None:
-            done, total = draft.steps_used + draft.lookups_done, draft.step_limit + draft.lookups_total
-            set_progress(magazine_id, "Researching (AI calls and price lookups)", done, total,
+            done, total = draft.steps_used, draft.step_limit
+            set_progress(magazine_id, "Researching (AI calls)", done, total,
                          snapshot_share, 100 - snapshot_share)
             check_job(magazine_id, token, f"Researching artists and records ({done}/{total} steps)")
 

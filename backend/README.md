@@ -110,12 +110,12 @@ There is at most one magazine per user, enforced by a database unique constraint
 | DELETE | `/api/magazine` | Delete the magazine and its files, never collection records; returns 204 |
 
 Preparation uses `MagazineSettings`: title, subtitle, display name, foreword,
-cover image, private-note opt-in, research, valuation refresh and explicit consent.
+cover image, private-note opt-in, research and explicit consent.
 Research requires `consent=true`. Research is batched: one AI call for up to 5 artist chapters
 and 8 albums (portraits, one-line facts and album texts), at most **300 AI calls per job**; AI
 output is limited to **3,000 tokens**, input evidence is bounded, and automatic AI retries
 are disabled. Wikipedia, Discogs and MusicBrainz lookups are free and do not use the budget;
-EUR values come from Discogs marketplace data of a matching pressing, not from AI. The
+EUR values are always the `estimated_value_eur` stored in the collection; the magazine never researches prices. The
 existing web search helper can make two Tavily attempts plus DuckDuckGo fallback within a
 call. The UI's EUR allowance is an estimate, not a
 provider price guarantee. Missing keys/sources and budget exhaustion produce

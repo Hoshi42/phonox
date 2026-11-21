@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class MagazineSettings(BaseModel):
@@ -16,8 +16,15 @@ class MagazineSettings(BaseModel):
     cover_image_id: str | None = None
     include_notes: bool = False
     research: bool = True
-    refresh_values: bool = True
     consent: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def drop_removed_options(cls, data):
+        # Prices always come from the collection now; older clients and stored editions still send this flag.
+        if isinstance(data, dict):
+            data = {key: value for key, value in data.items() if key != "refresh_values"}
+        return data
 
 
 class MagazineSource(BaseModel):
@@ -49,8 +56,6 @@ class MagazineRecord(BaseModel):
     condition: str | None = None
     notes: str | None = None
     stored_value: float | None = None
-    discogs_release_id: int | None = None
-    discogs_match: Literal["", "exact", "probable"] = ""
     images: list[MagazineImage] = Field(default_factory=list)
     fingerprint: str
     description: str = ""
@@ -80,8 +85,6 @@ class MagazineDraft(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     steps_used: int = 0
     step_limit: int = 0
-    lookups_total: int = 0
-    lookups_done: int = 0
     estimated_cost_eur: float = 0
     preface_manual: bool = False
 

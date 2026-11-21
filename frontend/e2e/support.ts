@@ -95,5 +95,5 @@ export async function seedApp(page: Page, options: SeedOptions = {}): Promise<{ 
 
 export const MAGAZINE_DEFAULTS = {
   title: 'My Vinyl Collection', subtitle: '', display_name: '', preface: '',
-  cover_image_id: null, include_notes: false, research: true, refresh_values: true, consent: false,
+  cover_image_id: null, include_notes: false, research: true, consent: false,
 }

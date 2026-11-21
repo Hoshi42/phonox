@@ -22,7 +22,7 @@ Returns `id`, `user_tag`, `status`, `phase`, `error`, `has_pdf`, `edition`,
 While a job runs, `progress` reports it: `label`, `done`, `total`, `percent` (null while nothing is
 measurable) and `elapsed_seconds`. Preparation covers freezing the collection (records processed) and,
 with research enabled, the research steps (`draft.step_limit`, one AI call per up to 5 artist chapters and
-8 albums, at most 300; `lookups_total`/`lookups_done` count the Discogs value lookups); publishing counts typeset pages. `progress` is kept in
+8 albums, at most 300); publishing counts typeset pages. `progress` is kept in
 memory of the single API process and is null when no job runs. While a job runs, `changes` is not computed.
 Set `include_draft=false` to omit editorial content. Status values are
 `not_created`, `preparing`, `draft`, `rendering`, `complete`, `failed` and
@@ -41,7 +41,6 @@ curl -X POST 'http://localhost:8000/api/magazine/prepare?user_tag=collector' \
     "cover_image_id": null,
     "include_notes": false,
     "research": true,
-    "refresh_values": true,
     "consent": true
   }'
 ```

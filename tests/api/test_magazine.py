@@ -407,7 +407,7 @@ def stub_research(monkeypatch, calls, release_id=None):
         return answer, {unit.owner: [source] for unit in units}
 
     def lookup(artist, title, fallback_on_error, **kwargs):
-        calls.append("search")
+        calls.append("search")  # the magazine must never look up prices
         return {"artist": artist, "title": title, "exact_match": True, "discogs_url": "https://www.discogs.com/release/1",
                 "marketplace": {"lowest_price": 20.0, "num_for_sale": 3}}
 
@@ -434,14 +434,13 @@ def test_research_bundles_artists_per_ai_call_and_fills_every_chapter(environmen
     jobs = [call for call in calls if isinstance(call, list)]
     assert draft["steps_used"] == draft["step_limit"] == len(jobs) == 2  # 16 albums, at most 8 per call
     assert all(len(job) <= service.ARTISTS_PER_CALL for job in jobs)
-    assert calls.count("search") == 16
+    assert "search" not in calls and "release" not in calls
     assert all(artist["portrait"] and artist["facts"] and artist["researched"] for artist in draft["artists"])
     assert all(record["description"] and record["sources"] for record in draft["records"])
-    assert all(record["value_eur"] == 20 and record["value_kind"] == "researched" for record in draft["records"])
-    assert draft["lookups_total"] == draft["lookups_done"] == 16
+    assert all(record["value_eur"] == 12.5 and record["value_kind"] == "stored" for record in draft["records"])
     assert not any("budget" in warning.lower() for warning in draft["warnings"])
     assert "PRIVATE COLLECTOR NOTE" not in json.dumps(draft)
-    # A second update has nothing left to research, and the fresh values are not looked up again.
+    # A second update has nothing left to research.
     calls.clear()
     publish(env)
     assert prepare(env, research=True, consent=True)["draft"]["steps_used"] == 0
@@ -455,13 +454,13 @@ def test_research_budget_is_a_hard_ceiling_and_the_update_continues(environment,
     calls = []
     stub_research(monkeypatch, calls)
     monkeypatch.setattr(service, "MAX_STEPS", 1)
-    draft = prepare(env, research=True, consent=True, refresh_values=False)["draft"]
+    draft = prepare(env, research=True, consent=True)["draft"]
     assert draft["steps_used"] == draft["step_limit"] == 1
     assert any("budget" in warning.lower() for warning in draft["warnings"])
     assert sum(1 for artist in draft["artists"] if artist["researched"]) == service.ARTISTS_PER_CALL
     publish(env)
     monkeypatch.setattr(service, "MAX_STEPS", 300)
-    assert prepare(env, research=True, consent=True, refresh_values=False)["draft"]["steps_used"] == 1
+    assert prepare(env, research=True, consent=True)["draft"]["steps_used"] == 1
 
 
 def test_public_summary_is_the_portrait_and_the_ai_only_writes_album_texts(environment, monkeypatch):
@@ -497,54 +496,40 @@ def test_failed_research_falls_back_to_public_summary_and_values_stay_optional(e
     artist = draft["artists"][0]
     assert artist["portrait"].startswith("Artist One are a fictional group") and artist["researched"]
     assert artist["sources"][0]["url"].endswith("Artist_One")
-    assert draft["steps_used"] == 0 and "search" in calls
-    assert draft["records"][0]["value_eur"] == 20  # database values need no AI
+    assert draft["steps_used"] == 0 and "search" not in calls
+    assert draft["records"][0]["value_eur"] == 12.5  # database values need no AI
     assert any("AI research unavailable" in warning for warning in draft["warnings"])
 
 
-def test_values_use_the_stored_discogs_release_and_survive_rate_limiting(environment, monkeypatch):
+def test_magazine_prices_always_follow_the_collection_and_are_never_researched(environment, monkeypatch):
     env = environment
     record_id = add_record(env)
-    with env.db() as db:
-        db.get(VinylRecord, record_id).evidence_chain = json.dumps([
-            {"source": "discogs", "data": {"discogs_release_id": 4711, "exact_match": True}}])
-        db.commit()
     calls = []
     stub_research(monkeypatch, calls)
-    monkeypatch.setattr(service.time, "sleep", lambda seconds: None)
-    from backend.agent.metadata import MetadataError
-    attempts = []
-
-    def by_id(release, exact_match=False, probable_match=False):
-        attempts.append(release)
-        if len(attempts) == 1:
-            raise MetadataError("Discogs release lookup failed: 429 Client Error: Too Many Requests")
-        return {"exact_match": exact_match, "marketplace": {"lowest_price": 31.0, "num_for_sale": 2}}
-
-    monkeypatch.setattr("backend.agent.metadata.lookup_discogs_release", by_id)
-    draft = prepare(env, research=True, consent=True)["draft"]
-    assert attempts == [4711, 4711] and "search" not in calls  # one retry after the 429, never a search
-    assert draft["records"][0]["discogs_release_id"] == 4711 and draft["records"][0]["value_eur"] == 31
-    assert not any("Discogs became unavailable" in warning for warning in draft["warnings"])
-
-
-def test_researched_values_keep_actual_dates_on_update(environment, monkeypatch):
-    env = environment
-    add_record(env)
-    prepared = prepare(env)
+    prepare(env, research=True, consent=True)
+    publish(env)
     with env.db() as db:
         magazine = db.query(CollectionMagazine).one()
-        draft = MagazineDraft.model_validate_json(magazine.draft_payload)
-        draft.records[0].value_eur = 25
-        draft.records[0].value_kind = "researched"
-        draft.records[0].valued_at = "2020-01-01T00:00:00+00:00"
-        magazine.draft_payload = draft.model_dump_json()
+        current = MagazineDraft.model_validate_json(magazine.current_payload)
+        current.records[0].value_eur, current.records[0].value_kind = 31, "researched"
+        magazine.current_payload = current.model_dump_json()
+        db.commit()
+    updated = prepare(env, research=True, consent=True)["draft"]["records"][0]
+    assert updated["value_eur"] == 12.5 and updated["value_kind"] == "stored"  # stale researched value is not carried over
+    with env.db() as db:
+        db.get(VinylRecord, record_id).estimated_value_eur = 40
         db.commit()
     publish(env)
-    updated = prepare(env, refresh_values=False)
-    assert updated["id"] == prepared["id"]
-    assert updated["draft"]["records"][0]["value_eur"] == 25
-    assert updated["draft"]["records"][0]["valued_at"].startswith("2020-01-01")
+    assert prepare(env, research=True, consent=True)["draft"]["records"][0]["value_eur"] == 40
+    assert "search" not in calls and "release" not in calls
+
+
+def test_previous_refresh_values_option_is_still_accepted(environment):
+    env = environment
+    add_record(env)
+    draft = prepare(env, refresh_values=True)["draft"]
+    assert "refresh_values" not in draft["settings"]
+    assert draft["records"][0]["value_eur"] == 12.5
 
 
 def test_long_titles_and_hundred_record_collection(environment):
@@ -661,16 +646,6 @@ def test_research_units_batch_albums_per_artist_and_jobs_share_calls(environment
     assert all(len(job) <= service.ARTISTS_PER_CALL and sum(len(unit.albums) for unit in job) <= service.ALBUMS_PER_CALL
                for job in jobs)
     assert sum(len(job) for job in jobs) == sum(len(chapter) for chapter in units.values())
-
-
-def test_discogs_values_need_a_matching_pressing_and_prefer_the_copy_condition():
-    market = {"lowest_price": 18.0, "num_for_sale": 4,
-              "price_suggestions": {"Very Good Plus (VG+)": 30.0, "Mint (M)": 80.0}}
-    assert service.discogs_value({"exact_match": False, "marketplace": market}, "VG+") is None
-    assert service.discogs_value({"exact_match": True, "marketplace": market}, "vg+")[0] == 30.0
-    value, note = service.discogs_value({"probable_match": True, "marketplace": market}, "good")
-    assert value == 18.0 and "probable pressing" in note
-    assert service.discogs_value({"exact_match": True, "marketplace": {}}, None) is None
 
 
 def test_public_summaries_are_only_taken_from_matching_music_pages():
@@ -870,14 +845,13 @@ def test_research_share_of_the_progress_is_reserved_when_enabled(environment, mo
     seen = []
     original = service.set_progress
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-not-a-real-key")
-    monkeypatch.setattr("backend.agent.metadata.lookup_discogs_metadata", lambda *a, **k: None)
     monkeypatch.setattr("backend.agent.metadata.lookup_musicbrainz_metadata", lambda *a, **k: None)
     monkeypatch.setattr("backend.magazine_sources.artist_background", lambda name, pace=None: ArtistBackground())
     monkeypatch.setattr(service, "research_chapter", lambda *a, **k: (_ for _ in ()).throw(ValueError("offline")))
     monkeypatch.setattr(service, "set_progress", lambda mid, *args: (seen.append(args), original(mid, *args)))
     prepare(env, research=True, consent=True)
     assert any(args[0].startswith("Freezing") and args[4] == 35.0 for args in seen)
-    assert any(args[0].startswith("Researching") and args[2] == 2 and args[3] == 35.0
+    assert any(args[0].startswith("Researching") and args[2] == 1 and args[3] == 35.0
                for args in seen)
 
 
