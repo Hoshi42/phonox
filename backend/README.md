@@ -131,7 +131,7 @@ other variables, `DISCOGS_TOKEN` and
 See [API request examples](../docs/api/endpoints.md#collection-magazine).
 
 **Deployment:** rebuild the backend (`docker compose up -d --build backend`) to
-install ReportLab, pypdf and DejaVu fonts. `Base.metadata.create_all` adds the new
+install ReportLab and pypdf. The IBM Plex fonts (SIL OFL) ship in `backend/fonts/`. `Base.metadata.create_all` adds the new
 `collection_magazines` table without changing existing record tables.
 Files live under `UPLOAD_DIR/magazines` (default `/app/uploads/magazines` in the
 Compose backend), covered by the existing persistent uploads volume.

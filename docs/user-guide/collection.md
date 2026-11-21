@@ -119,10 +119,11 @@ To improve identification of a saved record:
 Open the **Profile** tab and expand **PDF Magazine** (section *Collection magazine*). Each collection user can
 have one magazine. It is an English, A4 **landscape** PDF with:
 
-- A title page, editable foreword, collection overview and a one-page, linked list of artists (plus PDF bookmarks for every album).
-- **Compact cards, four albums per page**: cover plus up to two more photographs of that copy, key facts, estimated value and a short text.
-- A compact artist card above each artist's records with a short portrait and a one-line fact summary (origin, years active, style), where information exists.
-- EUR estimates, dated when the valuation date is known.
+- A **collector's catalogue** look in the colours of the app: a red label-style cover with an edition stamp (№ 001, 002, …) or your chosen cover photograph, an editable foreword, a collection overview and a one-page, linked list of artists (plus PDF bookmarks for every album).
+- **Compact cards, up to six albums per page**: cover plus up to two more photographs of that copy, a plate number (`PHX-0001`, counted in order of appearance in this edition), a data sheet (catalogue number, label, year, condition, EUR estimate) and a short text.
+- A numbered chapter card above each artist's records with a short portrait and a one-line fact summary (origin, years active, style), where information exists.
+- Running heads and folios (`005 / 128`) on every page and a closing colophon with the edition facts.
+- EUR estimates as stored in your collection.
 - One short *Sources* page that lists each website once per artist.
 
 Information that is not available is simply left out of the PDF: no empty fields,

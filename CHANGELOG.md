@@ -1,4 +1,13 @@
 # Changelog
+## [2.7.0] - 2026-11-21 - Collector's catalogue design
+
+### Changed
+- **Collector's catalogue layout** (`backend/magazine_pdf.py`) — the PDF magazine follows the Phonox app palette (warm paper, near-black ink, red accent) and IBM Plex (Sans Condensed headings, Serif text, Mono catalogue data). New label-style cover with spine strip and edition stamp (№ 003), or the chosen cover photograph with the stamp on its corner. Album cards carry a plate number (`PHX-0001`, in order of appearance) and a data sheet (catalogue number, label, year, condition, EUR estimate); artists open a numbered chapter. Every page has a running head and a folio with the total page count; the Sources page ends with a colophon. The white rounded cards are gone: hairline rules and a flush-left grid instead.
+- **Fonts shipped with the backend** (`backend/fonts/`, `Dockerfile.backend`) — the IBM Plex fonts (SIL Open Font License, `backend/fonts/OFL.txt`) are bundled; the DejaVu system package is no longer installed. Rebuild the backend image to deploy.
+
+### Fixed
+- **PDF font check in tests** (`tests/api/test_magazine.py`) — reads the page resources through `get_object()`, which older pypdf versions require.
+
 ## [2.6.0] - 2026-11-21 - Compact magazine with complete research
 
 ### Changed

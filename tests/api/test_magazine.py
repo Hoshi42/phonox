@@ -198,7 +198,8 @@ def test_landscape_compact_magazine_structure_images_fonts_links(environment):
     assert any(entry.title == "Artist One" for entry in entries)  # artists stay reachable as bookmarks
     assert sum(len(page.images) for page in document.pages) >= 12  # both views of all six albums
     for page in document.pages:
-        for font in page["/Resources"].get("/Font", {}).values():
+        fonts = page["/Resources"].get_object().get("/Font")
+        for font in (fonts.get_object() if fonts is not None else {}).values():
             descriptor = font.get_object().get("/FontDescriptor")
             if descriptor:
                 assert "/FontFile2" in descriptor.get_object()
@@ -209,6 +210,24 @@ def test_landscape_compact_magazine_structure_images_fonts_links(environment):
     assert env.client.get("/api/magazine/pdf?user_tag=alice&download=true").headers["content-disposition"].startswith("attachment")
     assert draft["draft"]["records"][0]["images"][0]["asset"] is None
     assert str(env.root) not in json.dumps(draft)
+
+
+def test_catalogue_design_numbers_plates_and_embeds_the_bundled_fonts(environment):
+    env = environment
+    add_record(env, artist="Artist One", title="First Album", images=1)
+    add_record(env, artist="Artist Two", title="Second Album", value=40)
+    prepare(env)
+    publish(env, "alice")
+    document = reader(env)
+    text = "\n".join(page.extract_text() for page in document.pages)
+    assert "PHX-0001" in text and "PHX-0002" in text and "PHX-0003" not in text
+    assert "EUR 40" in text and "CHAPTER 01" in text and "CHAPTER 02" in text  # catalogue labels are set in capitals
+    names = set()
+    for page in document.pages:
+        fonts = page["/Resources"].get_object().get("/Font")
+        names.update(str(font.get_object().get("/BaseFont")) for font in (fonts.get_object() if fonts is not None else {}).values())
+    names.discard("/Helvetica")  # ReportLab lists its unused default font on every page
+    assert names and all("IBMPlex" in name for name in names)
 
 
 def test_snapshot_preserves_deleted_images_and_original_data(environment):
