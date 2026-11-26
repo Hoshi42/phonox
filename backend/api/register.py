@@ -88,6 +88,7 @@ class RegisterRecordRequest(BaseModel):
     user_notes: Optional[str] = None
     spotify_url: Optional[str] = None
     user_tag: Optional[str] = None
+    is_favorite: Optional[bool] = None
     image_urls: Optional[List[str]] = None  # For managing images on update
 
 
@@ -109,6 +110,7 @@ class RegisterRecordResponse(BaseModel):
     updated_at: datetime
     image_urls: List[str] = []
     user_tag: Optional[str] = None
+    is_favorite: bool = False
 
     class Config:
         from_attributes = True
@@ -155,7 +157,8 @@ async def get_register(user_tag: str, db: Session = Depends(get_db)):
             created_at=record.created_at,
             updated_at=record.updated_at,
             image_urls=image_urls,
-            user_tag=record.user_tag
+            user_tag=record.user_tag,
+            is_favorite=bool(record.is_favorite)
         ))
     
     return result
@@ -224,7 +227,8 @@ async def move_record(
         created_at=record.created_at,
         updated_at=record.updated_at,
         image_urls=image_urls,
-        user_tag=record.user_tag
+        user_tag=record.user_tag,
+        is_favorite=bool(record.is_favorite)
     )
 
 
@@ -248,6 +252,8 @@ async def add_to_register(
         record.spotify_url = request.spotify_url
     if request.user_tag is not None:
         record.user_tag = request.user_tag
+    if request.is_favorite is not None:
+        record.is_favorite = request.is_favorite
     record.updated_at = datetime.utcnow()
     
     db.commit()
@@ -281,7 +287,8 @@ async def add_to_register(
         created_at=record.created_at,
         updated_at=record.updated_at,
         image_urls=image_urls,
-        user_tag=record.user_tag
+        user_tag=record.user_tag,
+        is_favorite=bool(record.is_favorite)
     )
 
 
@@ -338,12 +345,14 @@ async def update_register_record(
     
     for field, value in update_data.items():
         if field == 'genres':
-            # Special handling for genres (uses set_genres method)
-            if value:
-                record.set_genres(value)
-            else:
-                record.set_genres([])
-            print(f'[UPDATE REGISTER] Set genres: {value}')
+            # Only touch genres when the client actually sent the field
+            if value is not None or field in request.model_fields_set:
+                record.set_genres(value or [])
+                print(f'[UPDATE REGISTER] Set genres: {value}')
+        elif field == 'is_favorite':
+            # Non-nullable flag: only change it when a value is actually sent
+            if value is not None:
+                record.is_favorite = value
         elif value is not None or field in request.model_fields_set:
             # Only update fields that are not None, or explicitly set (to allow clearing with None)
             setattr(record, field, value)
@@ -383,7 +392,8 @@ async def update_register_record(
         created_at=record.created_at,
         updated_at=record.updated_at,
         image_urls=image_urls,
-        user_tag=record.user_tag
+        user_tag=record.user_tag,
+        is_favorite=bool(record.is_favorite)
     )
 
 

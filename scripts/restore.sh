@@ -112,10 +112,10 @@ docker compose exec -T db dropdb -U phonox phonox 2>/dev/null || true
 docker compose exec -T db createdb -U phonox phonox
 print_success "Database prepared"
 
-# Create a temp SQL file with \restrict line removed to avoid restricted mode
+# Create a temp SQL file with \restrict / \unrestrict lines removed to avoid restricted mode
 print_info "Processing backup file..."
 TEMP_SQL=$(mktemp)
-sed '/^\\restrict/d' "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql" > "${TEMP_SQL}"
+sed -e '/^\\restrict/d' -e '/^\\unrestrict/d' "${BACKUP_DIR}/phonox_db_${TIMESTAMP}.sql" > "${TEMP_SQL}"
 print_success "Backup file processed"
 
 # Restore database with progress

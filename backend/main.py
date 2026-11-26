@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from backend.database import Base, VinylRecord, ensure_catalog_number_capacity, get_db
+from backend.database import Base, VinylRecord, ensure_catalog_number_capacity, ensure_favorite_column, get_db
 from backend.db_connection import DatabaseConnectionManager
 from backend.api.models import HealthCheckResponse
 from backend.api.register import router as register_router
@@ -94,6 +94,7 @@ async def lifespan(app: FastAPI):
         # Create tables
         Base.metadata.create_all(bind=engine)
         ensure_catalog_number_capacity(engine)
+        ensure_favorite_column(engine)
         logger.info("✅ Database tables created/verified")
         magazine_maintenance(recover=True)
 

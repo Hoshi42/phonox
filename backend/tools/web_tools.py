@@ -3,6 +3,7 @@
 import logging
 import os
 import re
+import time
 from typing import Dict, List, Optional, Any
 from urllib.parse import urljoin, urlparse
 import requests
@@ -22,6 +23,31 @@ logger.info(f"Web scraping configured: timeout={WEB_SCRAPING_TIMEOUT}s, max_urls
 MIN_RESULTS_THRESHOLD = int(os.getenv("WEBSEARCH_MIN_RESULTS_THRESHOLD", "4"))
 # Default max results per search call
 WEBSEARCH_MAX_RESULTS = int(os.getenv("WEBSEARCH_MAX_RESULTS", "7"))
+
+# ddgs queries a changing subset of engines per call; some calls hit only blocked
+# engines (e.g. 429) and come back empty. Failures also come in bursts, so retries
+# back off, and the second attempt pins the engines that most often still answer.
+DDGS_BACKENDS = ["auto", "bing,google,yahoo", "auto"]
+DDGS_RETRY_DELAY = 1.0  # seconds, multiplied by the attempt number
+DDGS_MAX_ATTEMPTS = len(DDGS_BACKENDS)
+
+
+def ddgs_text_with_retry(query: str, max_results: int) -> List[Dict[str, Any]]:
+    """Run a ddgs text search, retrying when it fails or returns nothing.
+
+    Returns an empty list after the last attempt instead of raising.
+    """
+    for attempt, backend in enumerate(DDGS_BACKENDS, start=1):
+        try:
+            results = list(DDGS(timeout=10).text(query, max_results=max_results, backend=backend))
+            if results:
+                return results
+            logger.warning(f"ddgs returned no results (attempt {attempt}/{DDGS_MAX_ATTEMPTS}) for: {query}")
+        except Exception as e:
+            logger.warning(f"ddgs search failed (attempt {attempt}/{DDGS_MAX_ATTEMPTS}): {e}")
+        if attempt < DDGS_MAX_ATTEMPTS:
+            time.sleep(DDGS_RETRY_DELAY * attempt)
+    return []
 
 class WebSearchTool:
     """Web search tool using Tavily API."""
@@ -179,8 +205,7 @@ class WebSearchTool:
     def _duckduckgo_search(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
         """DuckDuckGo search using the DDGS library (no API key required)."""
         try:
-            ddgs = DDGS(timeout=10)
-            ddg_results = list(ddgs.text(query, max_results=max_results))
+            ddg_results = ddgs_text_with_retry(query, max_results)
             
             results: List[Dict[str, Any]] = []
             for result in ddg_results:

@@ -1,7 +1,7 @@
 import type { RegisterRecord } from '../services/registerApi'
 import { API_BASE } from '../config'
 
-export type SortKey = 'artist' | 'title' | 'year' | 'value' | 'added'
+export type SortKey = 'artist' | 'title' | 'year' | 'value' | 'added' | 'favorite'
 export type Layout = 'grid' | 'list'
 
 export interface CollectionQuery {
@@ -9,6 +9,7 @@ export interface CollectionQuery {
   artist: string | null
   genre: string | null
   decade: number | null
+  favorites: boolean
   sort: SortKey
   layout: Layout
 }
@@ -18,6 +19,7 @@ export const EMPTY_QUERY: CollectionQuery = {
   artist: null,
   genre: null,
   decade: null,
+  favorites: false,
   sort: 'artist',
   layout: 'grid',
 }
@@ -28,6 +30,7 @@ export const SORT_LABELS: Record<SortKey, string> = {
   year: 'Year (newest first)',
   value: 'Value (highest first)',
   added: 'Date added (newest first)',
+  favorite: 'Favorites first',
 }
 
 export const UNKNOWN_ARTIST = 'Unknown Artist'
@@ -70,7 +73,11 @@ function searchable(record: RegisterRecord): string {
 }
 
 export function isFiltered(query: CollectionQuery): boolean {
-  return Boolean(query.search.trim() || query.artist || query.genre || query.decade)
+  return Boolean(query.search.trim() || query.artist || query.genre || query.decade || query.favorites)
+}
+
+function compareArtistTitle(a: RegisterRecord, b: RegisterRecord): number {
+  return (a.artist || '').localeCompare(b.artist || '') || (a.title || '').localeCompare(b.title || '')
 }
 
 export function applyQuery(records: RegisterRecord[], query: CollectionQuery): RegisterRecord[] {
@@ -79,6 +86,7 @@ export function applyQuery(records: RegisterRecord[], query: CollectionQuery): R
     if (query.artist && artistKey(record) !== query.artist.toLocaleLowerCase()) return false
     if (query.genre && !(record.genres || []).some(genre => genre.toLocaleLowerCase() === query.genre!.toLocaleLowerCase())) return false
     if (query.decade && decadeOf(record) !== query.decade) return false
+    if (query.favorites && !record.is_favorite) return false
     return !text || searchable(record).includes(text)
   })
   return filtered.sort((a, b) => {
@@ -91,8 +99,10 @@ export function applyQuery(records: RegisterRecord[], query: CollectionQuery): R
         return recordValue(b) - recordValue(a)
       case 'added':
         return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+      case 'favorite':
+        return Number(Boolean(b.is_favorite)) - Number(Boolean(a.is_favorite)) || compareArtistTitle(a, b)
       default:
-        return (a.artist || '').localeCompare(b.artist || '') || (a.title || '').localeCompare(b.title || '')
+        return compareArtistTitle(a, b)
     }
   })
 }

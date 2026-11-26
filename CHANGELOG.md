@@ -1,4 +1,16 @@
 # Changelog
+## [2.8.0] - 2026-11-26 - Favorites
+
+### Added
+- **Favorites** (`backend/database.py`, `backend/api/register.py`, `backend/main.py`) — new `is_favorite` flag on collection records (default `false`). `ensure_favorite_column` adds the column to existing databases at startup, so backups from before this version restore without changes to `scripts/backup.sh` / `scripts/restore.sh`. All register responses include `is_favorite`; `PUT /api/register/update` accepts it.
+- **Heart toggle, filter and sort** (`frontend/src/ui/RecordCard.tsx`, `frontend/src/views/CollectionView.tsx`, `frontend/src/views/RecordSheet.tsx`, `frontend/src/features/collection.ts`) — a heart on every record card and in the record sheet (updates optimistically, reverts on error), a favorites-only toggle next to the search with a removable chip, the sort option "Favorites first", and a "Favorites" shelf on the Collection tab.
+
+### Fixed
+- **Genres were cleared by partial updates** (`backend/api/register.py`) — `PUT /api/register/update` reset `genres` to an empty list whenever the field was not sent. Genres are now only changed when the client sends them.
+- **Flaky DuckDuckGo fallback** (`backend/tools/web_tools.py`, `backend/agent/websearch.py`) — `ddgs` intermittently returns nothing (blocked engines). Searches now retry up to 3 times with backoff; the second attempt pins Bing, Google and Yahoo. A working Tavily key remains the reliable source.
+- **Restore script** (`scripts/restore.sh`) — also strips the `\unrestrict` line of the dump, which caused a harmless psql warning.
+- **Offline web search tests** (`tests/unit/test_websearch.py`) — the DuckDuckGo fallback is mocked, so the tests no longer depend on the live network.
+
 ## [2.7.0] - 2026-11-21 - Collector's catalogue design
 
 ### Changed

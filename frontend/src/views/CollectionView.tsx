@@ -16,6 +16,7 @@ interface CollectionViewProps {
   query: CollectionQuery
   onQueryChange: (patch: Partial<CollectionQuery>) => void
   onOpenRecord: (record: RegisterRecord) => void
+  onToggleFavorite: (record: RegisterRecord) => void
   onOpenDiscover: () => void
   onOpenProfile: () => void
   onCapture: () => void
@@ -38,7 +39,7 @@ function Shelf({ title, onMore, children }: { title: string; onMore?: () => void
 }
 
 export default function CollectionView({
-  user, records, loading, query, onQueryChange, onOpenRecord, onOpenDiscover, onOpenProfile, onCapture,
+  user, records, loading, query, onQueryChange, onOpenRecord, onToggleFavorite, onOpenDiscover, onOpenProfile, onCapture,
 }: CollectionViewProps) {
   const [sortOpen, setSortOpen] = useState(false)
   const filtered = isFiltered(query)
@@ -49,11 +50,16 @@ export default function CollectionView({
     () => applyQuery([...records], { ...EMPTY_QUERY, sort: 'added' }).slice(0, 10),
     [records],
   )
+  const favorites = useMemo(
+    () => applyQuery([...records], { ...EMPTY_QUERY, favorites: true }).slice(0, 10),
+    [records],
+  )
   const artists = useMemo(() => groupRecords(records, 'artist').slice(0, 14), [records])
   const genres = useMemo(() => groupRecords(records, 'genre').slice(0, 12), [records])
   const resultValue = useMemo(() => results.reduce((sum, record) => sum + recordValue(record), 0), [results])
 
   const activeChips = [
+    query.favorites && { label: 'Favorites', clear: { favorites: false } },
     query.artist && { label: results[0]?.artist || query.artist, clear: { artist: null } },
     query.genre && { label: query.genre, clear: { genre: null } },
     query.decade && { label: `${query.decade}s`, clear: { decade: null } },
@@ -95,6 +101,15 @@ export default function CollectionView({
           </label>
           <button
             type="button"
+            className={`${styles.iconButton} ${query.favorites ? styles.iconButtonActive : ''}`}
+            onClick={() => onQueryChange({ favorites: !query.favorites })}
+            aria-pressed={query.favorites}
+            aria-label="Show favorites only"
+          >
+            <Icon name="heart" size={20} fill={query.favorites ? 'currentColor' : 'none'} />
+          </button>
+          <button
+            type="button"
             className={styles.iconButton}
             onClick={() => setSortOpen(true)}
             aria-label="Sort and layout"
@@ -134,9 +149,16 @@ export default function CollectionView({
           <>
             {!filtered && (
               <>
+                {favorites.length > 0 && (
+                  <Shelf title="Favorites" onMore={() => onQueryChange({ favorites: true })}>
+                    {favorites.map(record => (
+                      <RecordCard key={record.id} record={record} shelf onOpen={onOpenRecord} onToggleFavorite={onToggleFavorite} />
+                    ))}
+                  </Shelf>
+                )}
                 <Shelf title="Recently added">
                   {recent.map(record => (
-                    <RecordCard key={record.id} record={record} shelf onOpen={onOpenRecord} />
+                    <RecordCard key={record.id} record={record} shelf onOpen={onOpenRecord} onToggleFavorite={onToggleFavorite} />
                   ))}
                 </Shelf>
                 <Shelf title="Artists" onMore={onOpenDiscover}>
@@ -198,6 +220,7 @@ export default function CollectionView({
                       record={record}
                       layout={query.layout}
                       onOpen={onOpenRecord}
+                      onToggleFavorite={onToggleFavorite}
                     />
                   ))}
                 </div>

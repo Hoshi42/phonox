@@ -78,7 +78,7 @@ Queries structured databases:
 
 When primary sources have low confidence (<0.75):
 - Uses Tavily API for targeted web search
-- Falls back to DuckDuckGo for free search
+- Falls back to DuckDuckGo for free search (up to 3 attempts with backoff; the second one pins Bing, Google and Yahoo)
 - Extracts relevant sources and information
 - Returns structured results with citations
 
@@ -193,7 +193,10 @@ Body: { user_tag, vinyl_record_data }
 Response: { id, created_at }
 
 GET /api/register?user_tag=user1
-Response: RegisterRecord[]
+Response: RegisterRecord[]   (each with is_favorite: bool)
+
+PUT /api/register/update
+Body: { record_id, ...fields }   (only the fields sent are changed, e.g. { record_id, is_favorite: true })
 
 DELETE /api/register/{record_id}
 Response: { success: true }
@@ -249,7 +252,7 @@ A separate **LangGraph ReAct agent** handles the `/api/v1/chat` endpoint. It run
 - confidence: float
 - spotify_url, estimated_value_eur, condition, user_tag, user_notes
 - in_register: bool
-- needs_review, auto_commit, validation_passed: bool
+- is_favorite: bool (default false; added to existing databases at startup), auto_commit, validation_passed: bool
 - created_at, updated_at: DateTime
 ```
 

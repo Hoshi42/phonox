@@ -548,6 +548,22 @@ function App() {
 
   const isRecordInRegister = record ? 
     vinylRegister.some(r => r.id === record.record_id) : false
+  const isRecordFavorite = record
+    ? Boolean(vinylRegister.find(r => r.id === record.record_id)?.is_favorite)
+    : false
+
+  const handleToggleFavorite = useCallback(async (target: { id: string; is_favorite?: boolean }) => {
+    const next = !target.is_favorite
+    const apply = (value: boolean) =>
+      setVinylRegister(previous => previous.map(r => (r.id === target.id ? { ...r, is_favorite: value } : r)))
+    apply(next)
+    try {
+      await registerApiClient.updateRegisterRecord({ record_id: target.id, is_favorite: next })
+    } catch (error) {
+      console.error('Failed to update favorite:', error)
+      apply(!next)
+    }
+  }, [])
 
   // Load register from database on component mount
   useEffect(() => {
@@ -597,6 +613,7 @@ function App() {
       artist: by === 'artist' ? key : null,
       genre: by === 'genre' ? key : null,
       decade: by === 'decade' ? Number(key) : null,
+      favorites: false,
     }))
     setTab('collection')
   }
@@ -679,6 +696,7 @@ function App() {
               query={query}
               onQueryChange={updateQuery}
               onOpenRecord={handleRecordSelectFromRegister}
+              onToggleFavorite={handleToggleFavorite}
               onOpenDiscover={() => setTab('discover')}
               onOpenProfile={() => setTab('profile')}
               onCapture={() => setTab('capture')}
@@ -718,6 +736,8 @@ function App() {
         user={currentUser}
         recordId={record?.record_id || null}
         inRegister={isRecordInRegister}
+        isFavorite={isRecordFavorite}
+        onToggleFavorite={() => record && handleToggleFavorite({ id: record.record_id, is_favorite: isRecordFavorite })}
         spotifyUrl={spotifyUrl}
         onClose={() => setSheetOpen(false)}
         onRemove={handleDeleteFromRegister}

@@ -14,6 +14,13 @@ from backend.agent.websearch import (
 )
 
 
+@pytest.fixture(autouse=True)
+def no_live_duckduckgo():
+    """Keep these tests offline: the DuckDuckGo fallback must not reach the network."""
+    with patch("backend.agent.websearch._duckduckgo_search", return_value=[]):
+        yield
+
+
 class TestSearchVinylMetadata:
     """Tests for search_vinyl_metadata function."""
 

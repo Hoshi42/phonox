@@ -94,6 +94,11 @@
   color: var(--text);
 }
 
+.iconButtonActive {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;

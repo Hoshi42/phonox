@@ -3,7 +3,7 @@ import type { SVGProps } from 'react'
 export type IconName =
   | 'library' | 'sparkle' | 'compass' | 'user' | 'search' | 'plus' | 'sort' | 'close'
   | 'chevron-right' | 'chevron-left' | 'trash' | 'move' | 'headphones' | 'download' | 'book'
-  | 'chart' | 'sun' | 'moon' | 'monitor' | 'check' | 'disc' | 'filter' | 'chat' | 'swap'
+  | 'chart' | 'sun' | 'moon' | 'monitor' | 'check' | 'disc' | 'filter' | 'chat' | 'swap' | 'heart'
 
 const PATHS: Record<IconName, JSX.Element> = {
   library: <><path d="M4 4v16" /><path d="M9 4v16" /><path d="m14 5.5 4.6-1.4 2.2 14.9-4.6 1.4Z" /></>,
@@ -30,6 +30,7 @@ const PATHS: Record<IconName, JSX.Element> = {
   filter: <><path d="M4 6h16M7 12h10M10 18h4" /></>,
   chat: <><path d="M4 5h16v11H9l-5 4Z" /></>,
   swap: <><path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4" /></>,
+  heart: <><path d="M12 20.5s-8-4.9-8-11A4.5 4.5 0 0 1 12 6.8 4.5 4.5 0 0 1 20 9.5c0 6.1-8 11-8 11Z" /></>,
 }
 
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {

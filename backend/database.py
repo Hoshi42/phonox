@@ -65,6 +65,19 @@ def ensure_catalog_number_capacity(engine: Engine) -> None:
     )
 
 
+def ensure_favorite_column(engine: Engine) -> None:
+    """Add the is_favorite flag to an existing vinyl_records table."""
+    columns = {item["name"] for item in inspect(engine).get_columns("vinyl_records")}
+    if "is_favorite" in columns:
+        return
+
+    with engine.begin() as connection:
+        connection.execute(
+            text("ALTER TABLE vinyl_records ADD COLUMN is_favorite BOOLEAN NOT NULL DEFAULT false")
+        )
+    logger.info("Added vinyl_records.is_favorite column")
+
+
 class VinylRecord(Base):  # type: ignore[misc,valid-type]
     """Vinyl record database model."""
     __tablename__ = "vinyl_records"
@@ -106,6 +119,7 @@ class VinylRecord(Base):  # type: ignore[misc,valid-type]
     estimated_value_eur: ColumnType = Column(Float, nullable=True)
     condition: ColumnType = Column(String(50), nullable=True)  # poor, fair, good, excellent, near_mint
     user_tag: ColumnType = Column(String(50), nullable=True, index=True)  # Simple user identifier
+    is_favorite: ColumnType = Column(Boolean, default=False, nullable=False, server_default=text("false"))
     
     # Relationships
     images = relationship("VinylImage", back_populates="record", cascade="all, delete-orphan")

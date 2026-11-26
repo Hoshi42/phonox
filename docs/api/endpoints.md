@@ -319,9 +319,20 @@ curl "http://localhost:8000/api/register?user_tag=collector123"
     "title": "Abbey Road",
     "year": 1969,
     "estimated_value_eur": 45.50,
-    "condition": "Near Mint"
+    "condition": "Near Mint",
+    "is_favorite": false
   }
 ]
+```
+
+### PUT /api/register/update
+
+Update fields of a record in the collection. Only the fields you send are changed; fields you leave out (including `genres` and `is_favorite`) keep their value.
+
+```bash
+curl -X PUT "http://localhost:8000/api/register/update" \
+  -H "Content-Type: application/json" \
+  -d '{"record_id": "uuid", "is_favorite": true}'
 ```
 
 ---

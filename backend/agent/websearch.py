@@ -15,7 +15,7 @@ from typing import Optional, Dict, List, Any
 from tavily import TavilyClient
 import requests
 from bs4 import BeautifulSoup
-from ddgs import DDGS
+from backend.tools.web_tools import ddgs_text_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -309,8 +309,7 @@ def _duckduckgo_search(query: str, max_results: int = 7) -> List[Dict[str, Any]]
     try:
         logger.info(f"DuckDuckGo fallback search for: {query}")
         
-        ddgs = DDGS(timeout=10)
-        ddg_results = list(ddgs.text(query, max_results=max_results))
+        ddg_results = ddgs_text_with_retry(query, max_results)
         
         if not ddg_results:
             logger.warning("DuckDuckGo returned no results")

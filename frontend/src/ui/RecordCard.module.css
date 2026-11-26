@@ -107,3 +107,46 @@
   color: var(--success);
   font-variant-numeric: tabular-nums;
 }
+
+.item {
+  position: relative;
+  min-width: 0;
+}
+
+.heart {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.38);
+  color: #fff;
+  backdrop-filter: blur(6px);
+}
+
+.heartActive {
+  color: var(--danger);
+  background: rgb(255 255 255 / 0.9);
+}
+
+.listItem .heart {
+  top: 50%;
+  transform: translateY(-50%);
+  right: 0;
+  background: none;
+  backdrop-filter: none;
+  color: var(--text-subtle);
+}
+
+.listItem .heartActive {
+  color: var(--danger);
+  background: none;
+}
+
+.list.withToggle {
+  padding-right: 44px;
+}

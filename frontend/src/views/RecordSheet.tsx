@@ -11,6 +11,8 @@ interface RecordSheetProps {
   recordId: string | null
   /** Register actions are only offered for records that are saved in the collection. */
   inRegister: boolean
+  isFavorite: boolean
+  onToggleFavorite: () => void
   spotifyUrl?: string
   onClose: () => void
   onRemove: (recordId: string) => Promise<void> | void
@@ -90,7 +92,7 @@ function MoveDialog({
 }
 
 export default function RecordSheet({
-  open, title, user, recordId, inRegister, spotifyUrl, onClose, onRemove, onMoved, onAskChat, children,
+  open, title, user, recordId, inRegister, isFavorite, spotifyUrl, onClose, onRemove, onMoved, onAskChat, onToggleFavorite, children,
 }: RecordSheetProps) {
   const [moving, setMoving] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -112,6 +114,16 @@ export default function RecordSheet({
       )}
       {inRegister && recordId && (
         <>
+          <button
+            type="button"
+            className={`${styles.iconAction} ${isFavorite ? styles.favorite : ''}`}
+            onClick={onToggleFavorite}
+            aria-pressed={isFavorite}
+            aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+            title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+          >
+            <Icon name="heart" size={20} fill={isFavorite ? 'currentColor' : 'none'} />
+          </button>
           <button type="button" className={styles.iconAction} onClick={() => setMoving(true)} aria-label="Move to another profile" title="Move to another profile">
             <Icon name="move" size={20} />
           </button>

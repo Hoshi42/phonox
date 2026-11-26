@@ -19,8 +19,9 @@ Tapping a record opens its details in a sheet (a side panel on wide screens). Sw
 
 The **Collection** tab shows all records saved for the selected profile. You can:
 - Search by artist, title, label, catalogue number or barcode
-- Sort by artist, title, year, value or date added, and switch between grid and list
-- Filter by artist, genre or decade (from the shelves or the **Discover** tab)
+- Sort by artist, title, year, value, date added or favorites first, and switch between grid and list
+- Filter by artist, genre, decade or favorites only (from the shelves, the heart button next to the search, or the **Discover** tab)
+- Mark records as favorites with the heart on a record card or in the record sheet; favorites also get their own shelf on the Collection tab
 - Open a record to view or edit it, move it to another profile or remove it
 - Generate analysis reports and export a CSV from the **Profile** tab
 
@@ -222,6 +223,7 @@ Phonox includes backup functionality:
 - Backups stored in `./backups/` directory
 - Manual backup via command line
 - Backup includes all records and images
+- Backups made before the favorites flag can still be restored: the backend adds the missing `is_favorite` column on startup (all records start as not favorite)
 
 **Manual Backup:**
 ```bash

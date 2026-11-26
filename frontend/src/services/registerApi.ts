@@ -51,6 +51,7 @@ export interface RegisterRecord {
   updated_at: string
   image_urls: string[]
   user_tag?: string
+  is_favorite?: boolean
 }
 
 export interface RegisterRequest {
@@ -67,6 +68,7 @@ export interface RegisterRequest {
   user_notes?: string | null
   spotify_url?: string | null
   user_tag?: string
+  is_favorite?: boolean
   image_urls?: string[]  // For managing which images to keep on update
 }
 
