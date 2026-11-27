@@ -1,4 +1,9 @@
 # Changelog
+## [Unreleased]
+
+### Fixed
+- **Small barcodes were not decoded** (`backend/agent/barcode_decoder.py`) — a blurry barcode in the corner of a large photo (e.g. the back cover of Madonna – Like a Virgin) was missed, so the barcode came from the LLM, which read only 11 digits and was discarded. The decoder now locates stripe-like regions and decodes them at several scales before falling back to the tile scan. Covered by `tests/unit/test_barcode_decoder.py`.
+
 ## [2.8.0] - 2026-11-26 - Favorites
 
 ### Added
